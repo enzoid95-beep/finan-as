@@ -20,7 +20,7 @@
   --bg:#03050a; --bg2:#05070a; --panel:#0a0d12; --panel2:#0e1218;
   --line:rgba(255,255,255,.05); --line2:rgba(255,255,255,.09);
   --text:#eef1f6; --muted:#8a93a3; --dim:#6f7a8c;
-  --g1:#00c16e; --g2:#f2c94c; --pos:#4ade80; --neg:#f87171; --warn:#fbbf24;
+  --g1:#e8a90c; --g2:#ffd76a; --gold:#f5b301; --pos:#4ade80; --neg:#f87171; --warn:#fbbf24;
   --edge:color-mix(in srgb,var(--g1) 16%,rgba(255,255,255,.04));
   --side:256px;
   --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -33,7 +33,7 @@
 [hidden]{display:none!important}
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 body{margin:0;min-height:100%;color:var(--text);font:15px/1.5 "Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;
-  background:radial-gradient(900px 420px at 70% -120px,color-mix(in srgb,var(--g1) 10%,transparent),transparent 70%),radial-gradient(700px 500px at 0% 110%,color-mix(in srgb,var(--g2) 6%,transparent),transparent 70%),var(--noise),var(--bg);background-attachment:fixed}
+  background:radial-gradient(900px 460px at 70% -120px,color-mix(in srgb,var(--g1) 14%,transparent),transparent 70%),radial-gradient(700px 500px at 0% 110%,color-mix(in srgb,var(--g2) 8%,transparent),transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='%23f5b301' font-family='Arial Black,Arial,Helvetica,sans-serif' font-weight='900' text-anchor='middle'%3E%3Ctext x='30' y='40' font-size='17' fill-opacity='0.12' transform='rotate(-16 30 40)'%3E%24%3C/text%3E%3Ctext x='140' y='25' font-size='26' fill-opacity='0.06' transform='rotate(-22 140 25)'%3E%24%3C/text%3E%3Ctext x='250' y='60' font-size='22' fill-opacity='0.1' transform='rotate(-19 250 60)'%3E%24%3C/text%3E%3Ctext x='80' y='120' font-size='22' fill-opacity='0.08' transform='rotate(-22 80 120)'%3E%24%3C/text%3E%3Ctext x='200' y='140' font-size='13' fill-opacity='0.12' transform='rotate(-20 200 140)'%3E%24%3C/text%3E%3Ctext x='275' y='190' font-size='19' fill-opacity='0.08' transform='rotate(-21 275 190)'%3E%24%3C/text%3E%3Ctext x='25' y='210' font-size='13' fill-opacity='0.12' transform='rotate(10 25 210)'%3E%24%3C/text%3E%3Ctext x='130' y='230' font-size='13' fill-opacity='0.06' transform='rotate(11 130 230)'%3E%24%3C/text%3E%3Ctext x='220' y='265' font-size='15' fill-opacity='0.06' transform='rotate(15 220 265)'%3E%24%3C/text%3E%3Ctext x='60' y='285' font-size='22' fill-opacity='0.12' transform='rotate(12 60 285)'%3E%24%3C/text%3E%3Ctext x='175' y='75' font-size='13' fill-opacity='0.06' transform='rotate(-11 175 75)'%3E%24%3C/text%3E%3Ctext x='110' y='175' font-size='22' fill-opacity='0.1' transform='rotate(-17 110 175)'%3E%24%3C/text%3E%3C/g%3E%3C/svg%3E"),var(--noise),var(--bg);background-attachment:fixed}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
 input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--g2);outline-offset:2px;border-radius:6px}
@@ -101,7 +101,7 @@ input,select{font:inherit;color:inherit}
 
 /* ---------- hero ---------- */
 .hero{position:relative;overflow:hidden;border-radius:22px;padding:clamp(20px,3vw,34px);margin-bottom:16px;border:1px solid var(--line2);
-  background:radial-gradient(90% 140% at 100% 0%,color-mix(in srgb,var(--g2) 42%,transparent),transparent 60%),radial-gradient(80% 120% at 0% 100%,color-mix(in srgb,var(--g1) 60%,transparent),transparent 65%),linear-gradient(135deg,color-mix(in srgb,var(--g1) 35%,#05070c),#05070c);
+  background:radial-gradient(90% 140% at 100% 0%,color-mix(in srgb,var(--g2) 42%,transparent),transparent 60%),radial-gradient(80% 120% at 0% 100%,color-mix(in srgb,var(--g1) 60%,transparent),transparent 65%),linear-gradient(135deg,color-mix(in srgb,var(--g1) 30%,#07060a),#05070c);
   display:grid;grid-template-columns:minmax(0,1fr) auto;gap:22px;align-items:center}
 .hero.neg{background:radial-gradient(90% 140% at 100% 0%,rgba(248,113,113,.35),transparent 60%),radial-gradient(80% 120% at 0% 100%,rgba(185,28,28,.5),transparent 65%),linear-gradient(135deg,#2a0b0b,#05070c)}
 .hero::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.03) 0 2px,transparent 2px 14px);pointer-events:none}
@@ -144,7 +144,7 @@ input,select{font:inherit;color:inherit}
 .cpair{flex:1;width:100%;display:flex;gap:5px;justify-content:center;align-items:flex-end}
 .cb{position:relative;width:42%;max-width:30px;height:100%;display:flex;align-items:flex-end;background:rgba(255,255,255,.035);border-radius:7px}
 .cb i{display:block;width:100%;border-radius:7px;min-height:2px}
-.cb i.e{background:linear-gradient(0deg,var(--g1),color-mix(in srgb,var(--g1) 50%,#fff))}
+.cb i.e{background:linear-gradient(0deg,#16a34a,#4ade80)}
 .cb i.g{background:linear-gradient(0deg,#b91c1c,var(--neg))}
 .cg small{font-size:12.5px;color:var(--muted);text-transform:capitalize;font-weight:600}
 .cg.atual small{color:#fff}
@@ -822,7 +822,7 @@ function vGeral(){
         <div><div class="vrow"><b>${R0(r.guardado)}</b>${delta(r.guardado,ant.guardado)}</div><span>Guardado em ${esc(mc)}</span></div>
       </div></div>
     <div class="hero-side">
-      <div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle cx="60" cy="60" r="54" fill="none" stroke="url(#gr)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/><defs><linearGradient id="gr"><stop offset="0" stop-color="#00c16e"/><stop offset="1" stop-color="#f2c94c"/></linearGradient></defs></svg><div class="rv">${pct}%</div></div>
+      <div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle cx="60" cy="60" r="54" fill="none" stroke="url(#gr)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/><defs><linearGradient id="gr"><stop offset="0" stop-color="#e8a90c"/><stop offset="1" stop-color="#fff1b8"/></linearGradient></defs></svg><div class="rv">${pct}%</div></div>
       <div><b class="cond" style="font-size:19px">Taxa de economia</b><small>${r.entradas>0?'da renda de '+esc(mc)+' ficou com vocês':'lance as entradas do mês'}</small></div>
     </div>
   </div>
@@ -834,7 +834,7 @@ function vGeral(){
   </div>
   <div class="grid g21">
     <div class="panel"><h2>Entradas e gastos</h2><p class="sub">Últimos seis meses</p><div class="chart">${chart}</div>
-      <div class="legend"><span><i style="background:var(--g1)"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
+      <div class="legend"><span><i style="background:#22c55e"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
     <div class="panel"><div class="panel-head"><div><h2>Para onde foi</h2><p class="sub">Maiores categorias, comparadas ao orçamento</p></div><button class="lnk" data-go="orcamento">Orçamento</button></div>${catsHTML}</div>
   </div>
   <div class="grid g2">
@@ -1275,7 +1275,7 @@ function vRetro(){
   <div class="hero ${ent-gas<0?'neg':''}"><div><div class="hero-kick"><span class="live"></span>${ano} em números</div><h1>${R(ent-gas)}</h1>
     <div class="hero-sub"><span>foi o que sobrou no ano, depois de todos os gastos</span></div>
     <div class="hero-meta"><div><b>${R0(ent)}</b><span>Entrou</span></div><div><b>${R0(gas)}</b><span>Saiu em gastos</span></div><div><b>${R0(guard)}</b><span>Guardado em metas</span></div><div><b>${d.length}</b><span>Lançamentos</span></div></div></div>
-    <div class="hero-side"><div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle cx="60" cy="60" r="54" fill="none" stroke="url(#gr2)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${2*Math.PI*54}" stroke-dashoffset="${2*Math.PI*54*(1-Math.max(0,Math.min(100,taxa))/100)}"/><defs><linearGradient id="gr2"><stop offset="0" stop-color="#00c16e"/><stop offset="1" stop-color="#f2c94c"/></linearGradient></defs></svg><div class="rv">${taxa}%</div></div><div><b class="cond" style="font-size:19px">Taxa de economia</b><small>da renda do ano ficou com vocês</small></div></div>
+    <div class="hero-side"><div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle cx="60" cy="60" r="54" fill="none" stroke="url(#gr2)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${2*Math.PI*54}" stroke-dashoffset="${2*Math.PI*54*(1-Math.max(0,Math.min(100,taxa))/100)}"/><defs><linearGradient id="gr2"><stop offset="0" stop-color="#e8a90c"/><stop offset="1" stop-color="#fff1b8"/></linearGradient></defs></svg><div class="rv">${taxa}%</div></div><div><b class="cond" style="font-size:19px">Taxa de economia</b><small>da renda do ano ficou com vocês</small></div></div>
   </div>
   <div class="tiles">
     <div class="tile"><div class="k">Mês campeão 🏆</div><div class="v">${melhor?esc(cap(soMes(melhor.m))):'—'}</div><div class="d">${melhor?'sobraram '+R0(melhor.ent-melhor.gas):''}</div></div>
@@ -1286,7 +1286,7 @@ function vRetro(){
   <div class="grid g21">
     <div class="panel"><h2>Mês a mês</h2><p class="sub">Entradas e gastos de ${ano}</p>
       <div class="chart12">${meses.map(x=>`<div class="cg" title="${esc(nomeMes(x.m))}: entrou ${R(x.ent)}, saiu ${R(x.gas)}"><div class="cpair"><div class="cb"><i class="e" style="height:${x.ent/maxV*100}%"></i></div><div class="cb"><i class="g" style="height:${x.gas/maxV*100}%"></i></div></div><small>${nomeMes(x.m,true).charAt(0)}</small></div>`).join('')}</div>
-      <div class="legend"><span><i style="background:var(--g1)"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
+      <div class="legend"><span><i style="background:#22c55e"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
     <div class="panel"><h2>Para onde foi o dinheiro</h2><p class="sub">Categorias do ano</p>
       ${topC.slice(0,8).map(([id,v])=>{const c=CAT[id]||{em:'•',nome:id};return pbar(`${c.em} ${esc(c.nome)}`,R0(v),Math.round(v/gas*100)+'%',v/topC[0][1])}).join('')}</div>
   </div>
