@@ -289,10 +289,10 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
   .lim-row{grid-template-columns:minmax(0,1fr) 110px}
 }
 /* ---------- contorno neon uniforme em todos os cards ---------- */
-:root{--neon:#39ff88}
-.panel,.tile,.hero,.meta-card,.conta,.login-card{border:1px solid var(--neon)!important;
-  box-shadow:0 0 0 1px rgba(57,255,136,.12),0 0 14px rgba(57,255,136,.32),inset 0 0 12px rgba(57,255,136,.05),inset 0 1px 0 rgba(255,255,255,.05),0 14px 30px -18px rgba(0,0,0,.95)!important}
-.panel .tile{box-shadow:0 0 0 1px rgba(57,255,136,.12),0 0 10px rgba(57,255,136,.25)!important}
+:root{--neon:#e8a90c;--borda:rgba(232,169,12,.38)}
+.panel,.tile,.hero,.meta-card,.conta,.login-card{border:1px solid var(--borda)!important;
+  box-shadow:0 0 6px rgba(232,169,12,.10),inset 0 1px 0 rgba(255,255,255,.04),0 14px 30px -18px rgba(0,0,0,.95)!important}
+.panel .tile{box-shadow:0 0 4px rgba(232,169,12,.08)!important}
 /* ---------- comparação com o mês anterior ---------- */
 .dl{display:inline-flex;align-items:center;gap:3px;font:700 13px/1 "Barlow",system-ui,sans-serif;padding:3px 8px 3px 6px;border-radius:20px;white-space:nowrap;vertical-align:middle;letter-spacing:0}
 .dl svg{width:13px;height:13px}
@@ -307,7 +307,7 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
 .hero-sub .lnk{color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:3px 11px;background:rgba(0,0,0,.25)}
 .hero-sub .lnk:hover{text-decoration:none;background:rgba(255,255,255,.12)}
 .hero-kick{display:flex;align-items:center;gap:8px}
-.hero-kick .live{width:8px;height:8px;border-radius:50%;background:var(--neon);box-shadow:0 0 10px var(--neon)}
+.hero-kick .live{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,.7)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* ================= v4 ================= */
 .side{gap:12px;padding-top:18px}
@@ -327,7 +327,7 @@ body.priv .v,body.priv .hero h1,body.priv .hero-meta b,body.priv .hero-sub b,bod
 body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .cal .a,body.priv td.vl{filter:blur(8px);user-select:none}
 
 /* neon também nos cards novos */
-.ccard-wrap,.cal-panel{border:1px solid var(--neon)!important;box-shadow:0 0 0 1px rgba(57,255,136,.12),0 0 14px rgba(57,255,136,.32)!important}
+.ccard-wrap,.cal-panel{border:1px solid var(--borda)!important;box-shadow:0 0 6px rgba(232,169,12,.10)!important}
 
 /* cartões */
 .ccards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;margin-bottom:16px}
@@ -411,6 +411,9 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 /* livre */
 .pessoa{display:flex;flex-direction:column;gap:12px}
+.pessoa .av.img{width:58px;height:58px;padding:0;overflow:hidden;background:radial-gradient(circle at 50% 35%,#3a2c10,#14100a);border:1.5px solid var(--borda)}
+.pessoa .av.img svg,.em.av-sm svg{width:100%;height:100%;display:block}
+.em.av-sm{overflow:hidden;padding:0;background:radial-gradient(circle at 50% 35%,#3a2c10,#14100a)!important;border-radius:50%!important}
 .pessoa .av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font:800 20px "Barlow Condensed";background:linear-gradient(135deg,var(--g1),var(--g2));color:#06080c;flex:none}
 
 /* checkbox */
@@ -447,7 +450,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <div class="login" id="login" hidden>
   <div class="login-card panel">
-    <div class="brand"><div class="brand-mark">💰</div><div><b>Planejamento Financeiro</b><span>Finanças do casal</span></div></div>
+    <div class="brand"><div class="brand-mark">💰</div><div><b>Planejamento Financeiro</b></div></div>
     <p>Entre com o seu e-mail. Vamos mandar um link de acesso, sem senha.</p>
     <div id="lForm">
       <label class="mut" style="font-size:13px;font-weight:600">E-mail
@@ -461,7 +464,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <div class="app" id="app" hidden>
   <aside class="side" aria-label="Navegação">
-    <div class="brand"><div class="brand-mark">💰</div><div><b>Planejamento Financeiro</b><span>Finanças do casal</span></div></div>
+    <div class="brand"><div class="brand-mark">💰</div><div><b>Planejamento Financeiro</b></div></div>
     <nav id="sideNav"></nav>
     <div class="side-foot">
       <div class="tools">
@@ -541,6 +544,7 @@ const VIEWS=[
   {id:'livre',nome:'Dinheiro livre',g:'Conquistas'},
   {id:'retro',nome:'Retrospectiva',g:'Conquistas'}
 ];
+const AVATARES={enzo:'<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M24.5 44h15v22h-15z" fill="#9c5f3b"/><path d="M24.5 46c2.5 2.2 12.5 2.2 15 0v3c-3 2-12 2-15 0z" fill="#86502f"/><ellipse cx="17" cy="33" rx="3.2" ry="4.6" fill="#b5764c"/><ellipse cx="47" cy="33" rx="3.2" ry="4.6" fill="#b5764c"/><ellipse cx="32" cy="31" rx="15" ry="17.5" fill="#b9794f"/><path d="M17 30C15.5 16 23.5 10 32 10s16.5 6 15 20c-1.2-6-3.8-9.2-8.5-10.4-4.8 1.8-13 2-18.3.6C18.6 22.4 17.6 25.6 17 30z" fill="#16120f"/><path d="M22.4 26.6q3.6-2.2 7.2-.3M34.4 26.3q3.6-1.9 7.2.3" stroke="#16120f" stroke-width="2.2" fill="none" stroke-linecap="round"/><ellipse cx="26" cy="31.2" rx="1.9" ry="2.3" fill="#24150e"/><ellipse cx="38" cy="31.2" rx="1.9" ry="2.3" fill="#24150e"/><path d="M32 32.5q-2.2 4.6.2 5.8" stroke="#8a5032" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M26 41.4c2.6-1.7 9.4-1.7 12 0-1.4.7-3.4.5-6 .5s-4.6.2-6-.5z" fill="#16120f"/><path d="M26.1 41.7c-.3 2.4.6 4.4 2.3 5.6M37.9 41.7c.3 2.4-.6 4.4-2.3 5.6" stroke="#16120f" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M28.6 43.4q3.4 2.2 6.8 0" stroke="#fff" stroke-width="1.2" fill="#f4efe9" stroke-linecap="round"/><path d="M28.6 43.4q3.4 2.6 6.8 0" stroke="#6b3220" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M28.6 47c1.1 2 2 3 3.4 3s2.3-1 3.4-3c-2 1-4.8 1-6.8 0z" fill="#16120f"/></svg>',mariana:'<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 31C13 15 22 9 32 9s19 6 18 22l1 21c0 4-3.6 6.2-7 5.6H20c-3.4.6-7-1.6-7-5.6z" fill="#d9a63c"/><path d="M25.5 44h13v22h-13z" fill="#ecc4a8"/><path d="M25.5 46c2.4 2 10.6 2 13 0v3c-3 1.8-10 1.8-13 0z" fill="#dfb194"/><ellipse cx="32" cy="31" rx="14" ry="16.5" fill="#f8dbc6"/><path d="M18 31C16.6 17 25 12 33 12c9 0 14.4 6 13.6 17.6-2.6-6-6.6-9.8-12.8-10.8-3 4-9.6 8-15.8 12.2z" fill="#f3c95e"/><path d="M18.2 28.5c-2 10-1.2 20 3 28H15.8c-3.4-9-2.6-19.6 2.4-28zM46.2 27.6c2 10.4 1.2 20.6-3 28.9h5.4c3.4-9.2 2.6-20-2.4-28.9z" fill="#f3c95e"/><path d="M23.4 27q3.4-1.8 6.6-.2M34.2 26.8q3.4-1.6 6.6.2" stroke="#b8893a" stroke-width="1.7" fill="none" stroke-linecap="round"/><ellipse cx="26.6" cy="31.6" rx="1.8" ry="2.2" fill="#3b2a20"/><ellipse cx="37.4" cy="31.6" rx="1.8" ry="2.2" fill="#3b2a20"/><path d="M24.4 29.6l-1.2-1M39.6 29.6l1.2-1" stroke="#3b2a20" stroke-width="1.1" stroke-linecap="round"/><circle cx="23.6" cy="37" r="2.4" fill="#f2a29a" opacity=".45"/><circle cx="40.4" cy="37" r="2.4" fill="#f2a29a" opacity=".45"/><path d="M32 33q-1.6 3.4.4 4.2" stroke="#d9a58c" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M28.4 41.2q3.6 2.8 7.2 0" stroke="#d0686a" stroke-width="1.9" fill="none" stroke-linecap="round"/></svg>'};
 const TABS=['geral','gastos','calendario','metas'];
 
 /* ================= utilidades ================= */
@@ -698,6 +702,7 @@ function statusConta(c,m){
   if(d<=5)return {k:'soon',txt:d===1?'Vence amanhã':`Vence em ${d} dias`,venc};
   return {k:'idle',txt:'Vence dia '+Math.min(c.dia,ultimoDia(m)),venc};
 }
+function avatarDe(email){const n=String(S.nomes[email]||email||'').trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return AVATARES[n]||''}
 function nomeDe(email){if(!email)return '';if(email===S.me)return 'Você';return S.nomes[email]||email.split('@')[0]}
 function descVis(i){const c=CAT[i.categoria]||{nome:''};if(i.categoria==='livre'&&i.autor&&i.autor!==S.me)return 'Dinheiro livre de '+nomeDe(i.autor);return i.descricao||c.nome}
 /* cartões */
@@ -1232,7 +1237,7 @@ function vLivre(){
   const totalMes=pessoas.reduce((s,e)=>s+(Number(S.mesadas[e])||0),0);
   return head('Dinheiro livre','Um valor por mês para cada um gastar como quiser, sem prestar contas.',`<button class="btn novo" data-act="novo" data-tipo="gasto" data-cat="livre">${svg('plus')}Lançar gasto livre</button>`)+`
   <div class="cards" style="margin-bottom:16px">${pessoas.map(e=>{const m=Number(S.mesadas[e])||0,u=soma(it.filter(i=>i.autor===e)),rest=m-u;const nome=S.nomes[e]||e;return `<div class="meta-card pessoa">
-    <div class="meta-top"><div class="av">${esc((nome||'?').charAt(0).toUpperCase())}</div><div style="min-width:0"><b>${esc(e===S.me?nome+' (você)':nome)}</b><small>${m?R(m)+' por mês':'Valor ainda não definido'}</small></div></div>
+    <div class="meta-top"><div class="av ${avatarDe(e)?'img':''}">${avatarDe(e)||esc((nome||'?').charAt(0).toUpperCase())}</div><div style="min-width:0"><b>${esc(e===S.me?nome+' (você)':nome)}</b><small>${m?R(m)+' por mês':'Valor ainda não definido'}</small></div></div>
     <div class="meta-val"><b class="${rest<0?'neg':''}">${R(rest)}</b><span>${rest<0?'acima do combinado':'disponível em '+esc(soMes(S.mes))}</span></div>
     <div class="tr ${m?clsLim(u/m):''}"><i style="width:${m?Math.min(100,u/m*100):0}%"></i></div>
     <div class="meta-facts"><div><small>Usado no mês</small><b>${R(u)}</b></div><div><small>Lançamentos</small><b>${it.filter(i=>i.autor===e).length}</b></div></div>
@@ -1241,7 +1246,7 @@ function vLivre(){
     <div class="panel"><h2>Seus gastos livres</h2><p class="sub">Só você vê os detalhes. A outra pessoa vê apenas o total.</p>
       ${meus.length?`<div class="mini">${meus.map(linhaMini).join('')}</div>`:vazio('Nada lançado','Seus gastos livres do mês aparecem aqui.')}</div>
     <div class="panel"><h2>Combinado do casal</h2><p class="sub">Valor mensal de cada um</p>
-      ${pessoas.map(e=>`<div class="mini-row"><div class="em">🎈</div><div class="nm"><b>${esc(S.nomes[e]||e)}</b></div><div class="vl">${R(Number(S.mesadas[e])||0)}</div></div>`).join('')}
+      ${pessoas.map(e=>`<div class="mini-row"><div class="em ${avatarDe(e)?'av-sm':''}">${avatarDe(e)||'🎈'}</div><div class="nm"><b>${esc(S.nomes[e]||e)}</b></div><div class="vl">${R(Number(S.mesadas[e])||0)}</div></div>`).join('')}
       <p class="nota">Total reservado por mês: <b>${R(totalMes)}</b>. Incluam esse valor na categoria "Dinheiro livre" do orçamento.</p>
       <button class="btn ghost" style="margin-top:12px" data-act="mesadas">Definir valores</button></div>
   </div>`;
