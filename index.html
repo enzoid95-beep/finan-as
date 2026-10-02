@@ -568,10 +568,12 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 const CATS_G=[
   {id:'moradia',nome:'Moradia',em:'🏠'},{id:'mercado',nome:'Mercado',em:'🛒'},{id:'contas',nome:'Contas da casa',em:'💡'},
   {id:'transporte',nome:'Transporte',em:'🚗'},{id:'restaurantes',nome:'Restaurantes e delivery',em:'🍝'},{id:'lazer',nome:'Lazer',em:'🎬'},
-  {id:'saude',nome:'Saúde',em:'🩺'},{id:'compras',nome:'Compras',em:'🛍️'},{id:'assinaturas',nome:'Assinaturas',em:'📺'},
-  {id:'dividas',nome:'Dívidas e empréstimos',em:'🏦'},{id:'livre',nome:'Dinheiro livre',em:'🎈'},{id:'outros',nome:'Outros',em:'📦'}];
+  {id:'saude',nome:'Saúde',em:'🩺'},{id:'compras',nome:'Compras pessoais',em:'🛍️'},{id:'assinaturas',nome:'Assinaturas',em:'📺'},
+  {id:'dividas',nome:'Dívidas e empréstimos',em:'🏦'},{id:'educacao',nome:'Educação',em:'🎓'},{id:'viagens',nome:'Viagens',em:'✈️'},
+  {id:'impostos',nome:'Impostos e taxas',em:'🧾'},{id:'pets',nome:'Pets',em:'🐶'},{id:'presentes',nome:'Presentes',em:'🎁'},
+  {id:'investimentos',nome:'Investimentos',em:'💰'},{id:'outros',nome:'Outros',em:'📦'}];
 const CATS_E=[{id:'salario',nome:'Salário',em:'💼'},{id:'extra',nome:'Renda extra',em:'✨'},{id:'outros-in',nome:'Outras entradas',em:'➕'}];
-const CAT=Object.fromEntries([...CATS_G,...CATS_E,{id:'meta',nome:'Metas',em:'🎯'}].map(c=>[c.id,c]));
+const CAT=Object.fromEntries([...CATS_G,...CATS_E,{id:'meta',nome:'Metas',em:'🎯'},{id:'livre',nome:'Dinheiro livre',em:'🎈'}].map(c=>[c.id,c]));
 const EMOJIS_META=['💍','🏡','🛟','✈️','🚗','🎓','👶','🐶','🛋️','🎯'];
 const EMOJIS_DESEJO=['✨','✈️','🛋️','📱','💻','🚗','🏖️','🎮','👗','🍽️','🎁','🏠'];
 const INV=[
@@ -677,7 +679,7 @@ try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 /* ================= carregamento ================= */
 function deLinha(r){return {id:r.id,tipo:r.tipo,valor:Number(r.valor),descricao:r.descricao||'',categoria:r.categoria,data:r.data,mes:r.data.slice(0,7),autor:r.autor_email,
   criadoEm:Date.parse(r.criado_em)||0,meta_id:r.meta_id||null,conta_id:r.conta_id||null,cartao_id:r.cartao_id||null,compra_id:r.compra_id||null,
-  parcela:r.parcela||null,parcelas:r.parcelas||null,recorrente_id:r.recorrente_id||null,divida_id:r.divida_id||null}}
+  parcela:r.parcela||null,parcelas:r.parcelas||null,recorrente_id:r.recorrente_id||null,divida_id:r.divida_id||null,livre:!!r.livre||r.categoria==='livre'}}
 async function carregarItens(){
   const alvo=S.mes;const ini=addMes(alvo,-5)+'-01';const fim=addMes(alvo,1)+'-01';
   const {data,error}=await sb.from('lancamentos').select('*').gte('data',ini).lt('data',fim);
@@ -702,9 +704,11 @@ async function carregarResto(){
     q('orcamentos').select('*'),
     q('lancamentos').select('id,cartao_id,valor,data,compra_id,parcela,parcelas,descricao,categoria').not('cartao_id','is',null).gte('data',MES_ATUAL+'-01'),
     q('lancamentos').select('divida_id,data').not('divida_id','is',null),
-    q('investimentos').select('*').order('data',{ascending:false})
+    q('investimentos').select('*').order('data',{ascending:false}),
+    q('lancamentos').select('livre').limit(1)
   ]);
-  const [mt,ct,cf,mv,tot,base,cc,rc,dv,ds,orc,fut,pd,inv]=r;
+  const [mt,ct,cf,mv,tot,base,cc,rc,dv,ds,orc,fut,pd,inv,lv]=r;
+  S.temV6=!lv.error;
   S.temV5=!inv.error;
   S.invest=(inv.data||[]).map(x=>({...x,valor:Number(x.valor)}));
   S.temV2=!mt.error&&!ct.error;
@@ -794,7 +798,10 @@ function statusConta(c,m){
 }
 function avatarDe(email){const n=String(S.nomes[email]||email||'').trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return AVATARES[n]||''}
 function nomeDe(email){if(!email)return '';if(email===S.me)return 'Você';return S.nomes[email]||email.split('@')[0]}
-function descVis(i){const c=CAT[i.categoria]||{nome:''};if(i.categoria==='livre'&&i.autor&&i.autor!==S.me)return 'Dinheiro livre de '+nomeDe(i.autor);return i.descricao||c.nome}
+function ehLivre(i){return !!(i.livre||i.categoria==='livre')}
+function outroLivre(i){return ehLivre(i)&&!!i.autor&&i.autor!==S.me}
+function catVis(i){return outroLivre(i)?CAT.livre:(CAT[i.categoria]||{em:'•',nome:i.categoria||''})}
+function descVis(i){const c=CAT[i.categoria]||{nome:''};if(outroLivre(i))return 'Dinheiro livre de '+nomeDe(i.autor);return i.descricao||c.nome}
 /* cartões */
 function mesFatura(card,dataISO){let fm=dataISO.slice(0,7);if(Number(dataISO.slice(8,10))>=card.fechamento)fm=addMes(fm,1);if(card.vencimento<=card.fechamento)fm=addMes(fm,1);return fm}
 function usadoCartao(id){return S.fut.filter(x=>x.cartao_id===id&&x.data>=HOJE).reduce((s,x)=>s+x.valor,0)}
@@ -861,7 +868,7 @@ function avisoV(n){return vazio('Falta atualizar o banco',`Rode o arquivo schema
 function pbar(label,valor,extra,ratio,cls,vc){return `<div class="pbar"><div class="top"><span>${label}</span><b class="${vc||''}">${valor}${extra?`<small>${extra}</small>`:''}</b></div><div class="tr ${cls||''}"><i style="width:${Math.max(0,Math.min(100,ratio*100))}%"></i></div></div>`}
 function clsLim(r){return r>1?'passou':r>=.8?'quase':''}
 function linhaMini(i){
-  const c=CAT[i.categoria]||{em:'•',nome:''};
+  const c=catVis(i);
   const sinal=i.tipo==='entrada'||i.tipo==='resgate'?'+ ':i.tipo==='aporte'?'→ ':'';
   const cls=i.tipo==='gasto'?'neg':'pos';
   return `<div class="mini-row"><div class="em">${c.em}</div><div class="nm"><b>${esc(descVis(i))}</b><small>${dataBR(i.data)} · ${esc(nomeDe(i.autor)||'Automático')}</small></div><div class="vl ${cls}">${sinal}${R(i.valor)}</div></div>`;
@@ -946,7 +953,7 @@ function vGeral(){
 /* ================= calendário ================= */
 function eventosMes(m){
   const ev={};const add=(d,e)=>{(ev[d]=ev[d]||[]).push(e)};
-  S.itens.filter(i=>i.mes===m&&!i.cartao_id).forEach(i=>{const c=CAT[i.categoria]||{em:'•'};
+  S.itens.filter(i=>i.mes===m&&!i.cartao_id).forEach(i=>{const c=catVis(i);
     add(i.data,{em:c.em,txt:descVis(i),valor:i.valor,entra:i.tipo==='entrada'||i.tipo==='resgate',sai:i.tipo==='gasto',k:i.tipo==='aporte'?'Guardado em meta':i.tipo==='entrada'?'Entrada':i.tipo==='resgate'?'Resgate de meta':'Gasto',feito:true})});
   S.cartoes.forEach(c=>{const f=faturaMes(c.id,m);if(!f.length)return;const d=diaNoMes(m,c.vencimento);
     add(d,{em:'💳',txt:'Fatura '+c.nome,valor:soma(f),sai:true,k:plural(f.length,'compra','compras'),feito:d<=HOJE,ic:'💳'})});
@@ -999,9 +1006,9 @@ function vCalendario(){
 function tabela(itens,tipo){
   if(!itens.length)return vazio('Nada por aqui',`${tipo==='gasto'?'Nenhum gasto':'Nenhuma entrada'} ${S.fCat||S.fBusca?'com esse filtro':'neste mês'}.`);
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="hide-sm hide-md">Quem lançou</th><th class="r">Valor</th><th class="r"></th></tr></thead><tbody>
-  ${itens.map(i=>{const c=CAT[i.categoria]||{em:'•',nome:i.categoria};const cc=i.cartao_id&&S.cartoes.find(x=>x.id===i.cartao_id);
-    const tags=(cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}${i.parcelas>1?' '+i.parcela+'/'+i.parcelas:''}</span>`:'')+(i.conta_id?'<span class="badge-s">conta fixa</span>':'')+(i.recorrente_id?'<span class="badge-s">🔁 automático</span>':'')+(i.divida_id?'<span class="badge-s">🏦 dívida</span>':'');
-    const meuOuNaoLivre=!(i.categoria==='livre'&&i.autor&&i.autor!==S.me);
+  ${itens.map(i=>{const c=catVis(i);const cc=i.cartao_id&&S.cartoes.find(x=>x.id===i.cartao_id);
+    const tags=(cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}${i.parcelas>1?' '+i.parcela+'/'+i.parcelas:''}</span>`:'')+(i.conta_id?'<span class="badge-s">conta fixa</span>':'')+(i.recorrente_id?'<span class="badge-s">🔁 automático</span>':'')+(i.divida_id?'<span class="badge-s">🏦 dívida</span>':'')+(ehLivre(i)&&!outroLivre(i)?'<span class="badge-s">🎈 dinheiro livre</span>':'');
+    const meuOuNaoLivre=!outroLivre(i);
     return `<tr class="row"><td class="mut">${dataBR(i.data)}</td><td class="desc">${esc(descVis(i))}${tags}</td><td class="wrap"><span class="cat">${c.em} ${esc(c.nome)}</span></td><td class="hide-sm hide-md mut">${esc(nomeDe(i.autor)||'Automático')}</td><td class="r vl ${tipo==='entrada'?'pos':'neg'}">${R(i.valor)}</td>
     <td class="r"><span class="acts">${meuOuNaoLivre?`<button class="ic" data-act="editar" data-id="${i.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${i.id}" aria-label="Apagar">${svg('del')}</button>`:''}</span></td></tr>`}).join('')}
   </tbody></table></div>`;
@@ -1156,7 +1163,7 @@ function vOrcamento(){
   </div>
   <div class="grid">
     <div class="panel"><h2>Dicas para o plano</h2><p class="sub">Referência 50/30/20</p>
-      ${(()=>{const e=entPl||1;const ess=['moradia','mercado','contas','transporte','saude','dividas'].reduce((s,k)=>s+(Number(pl.gastos[k])||0),0);const des=totPl-ess;
+      ${(()=>{const e=entPl||1;const ess=['moradia','mercado','contas','transporte','saude','dividas','impostos'].reduce((s,k)=>s+(Number(pl.gastos[k])||0),0);const des=totPl-ess;
         return pbar('Essenciais (até 50%)',Math.round(ess/e*100)+'%',RF(R0(ess)),ess/e/.5,clsLim(ess/e/.5))+pbar('Estilo de vida (até 30%)',Math.round(des/e*100)+'%',RF(R0(des)),des/e/.3,clsLim(des/e/.3))+pbar('Metas e reserva (20% ou mais)',Math.round((e-totPl)/e*100)+'%',RF(R0(e-totPl)),Math.max(0,(e-totPl)/e/.2))})()}
       <p class="nota">A regra 50/30/20 sugere até 50% da renda para o essencial, até 30% para o estilo de vida e pelo menos 20% para o futuro. É uma referência, não uma obrigação.</p>
       <p class="nota">Gasto médio dos últimos meses: <b class="neg">${R0(med.gas)}</b>.</p>
@@ -1324,10 +1331,11 @@ function vDesejos(){
 function vLivre(){
   if(!S.temV4)return head('Dinheiro livre','')+`<div class="panel">${avisoV(4)}</div>`;
   const pessoas=Object.keys(S.nomes);
-  const it=doMes(S.mes).filter(i=>i.tipo==='gasto'&&i.categoria==='livre');
+  if(!S.temV6)return head('Dinheiro livre','')+`<div class="panel">${avisoV(6)}</div>`;
+  const it=doMes(S.mes).filter(i=>i.tipo==='gasto'&&ehLivre(i));
   const meus=it.filter(i=>i.autor===S.me).sort((a,b)=>b.data.localeCompare(a.data));
   const totalMes=pessoas.reduce((s,e)=>s+(Number(S.mesadas[e])||0),0);
-  return head('Dinheiro livre','Um valor por mês para cada um gastar como quiser, sem prestar contas.',`<button class="btn novo" data-act="novo" data-tipo="gasto" data-cat="livre">${svg('plus')}Lançar gasto livre</button>`)+`
+  return head('Dinheiro livre','Um valor por mês para cada um gastar como quiser, sem prestar contas.',`<button class="btn novo" data-act="novo" data-tipo="gasto" data-livre="1">${svg('plus')}Lançar gasto livre</button>`)+`
   <div class="cards" style="margin-bottom:16px">${pessoas.map(e=>{const m=Number(S.mesadas[e])||0,u=soma(it.filter(i=>i.autor===e)),rest=m-u;const nome=S.nomes[e]||e;return `<div class="meta-card pessoa">
     <div class="meta-top"><div class="av ${avatarDe(e)?'img':''}">${avatarDe(e)||esc((nome||'?').charAt(0).toUpperCase())}</div><div style="min-width:0"><b>${esc(e===S.me?nome+' (você)':nome)}</b><small>${m?RF(R(m))+' por mês':'Valor ainda não definido'}</small></div></div>
     <div class="meta-val"><b class="${cS(rest)}">${R(rest)}</b><span>${rest<0?'acima do combinado':'disponível em '+esc(soMes(S.mes))}</span></div>
@@ -1339,14 +1347,14 @@ function vLivre(){
       ${meus.length?`<div class="mini">${meus.map(linhaMini).join('')}</div>`:vazio('Nada lançado','Seus gastos livres do mês aparecem aqui.')}</div>
     <div class="panel"><h2>Combinado do casal</h2><p class="sub">Valor mensal de cada um</p>
       ${pessoas.map(e=>`<div class="mini-row"><div class="em ${avatarDe(e)?'av-sm':''}">${avatarDe(e)||'🎈'}</div><div class="nm"><b>${esc(S.nomes[e]||e)}</b></div><div class="vl ref">${R(Number(S.mesadas[e])||0)}</div></div>`).join('')}
-      <p class="nota">Total reservado por mês: <b class="ref">${R(totalMes)}</b>. Incluam esse valor na categoria "Dinheiro livre" do orçamento.</p>
+      <p class="nota">Total reservado por mês: <b class="ref">${R(totalMes)}</b>. Ao lançar, marquem "Pago com meu dinheiro livre": o gasto entra na categoria certa e desconta do valor de quem pagou.</p>
       <button class="btn ghost" style="margin-top:12px" data-act="mesadas">Definir valores</button></div>
   </div>`;
 }
 
 /* ================= retrospectiva ================= */
 async function carregarRetro(ano){
-  const {data,error}=await sb.from('lancamentos').select('tipo,valor,data,categoria,descricao,cartao_id,autor_email').gte('data',ano+'-01-01').lt('data',(ano+1)+'-01-01');
+  const {data,error}=await sb.from('lancamentos').select('*').gte('data',ano+'-01-01').lt('data',(ano+1)+'-01-01');
   S.retro[ano]=error?[]:(data||[]).map(x=>({...x,valor:Number(x.valor),mes:x.data.slice(0,7),autor:x.autor_email}));
   if(S.view==='retro')render();
 }
@@ -1364,7 +1372,7 @@ function vRetro(){
   const melhor=[...ativos].sort((a,b)=>(b.ent-b.gas)-(a.ent-a.gas))[0],pior=[...ativos].sort((a,b)=>(a.ent-a.gas)-(b.ent-b.gas))[0];
   const cats={};d.filter(x=>x.tipo==='gasto').forEach(x=>cats[x.categoria]=(cats[x.categoria]||0)+x.valor);
   const topC=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-  const maior=d.filter(x=>x.tipo==='gasto'&&!(x.categoria==='livre'&&x.autor!==S.me)).sort((a,b)=>b.valor-a.valor)[0];
+  const maior=d.filter(x=>x.tipo==='gasto'&&!outroLivre(x)).sort((a,b)=>b.valor-a.valor)[0];
   const cartao=d.filter(x=>x.tipo==='gasto'&&x.cartao_id).reduce((s,x)=>s+x.valor,0);
   const maxV=Math.max(1,...meses.map(x=>Math.max(x.ent,x.gas)));
   const taxa=ent>0?Math.round((ent-gas)/ent*100):0;
@@ -1557,7 +1565,7 @@ function confirmar(titulo,texto,botao,acao){modal(`<h2>${titulo}</h2><p class="m
 function info(titulo,html){modal(`<h2>${titulo}</h2>${html}<div class="btns" style="margin-top:16px"><button class="btn" data-m="cancelar">Entendi</button></div>`)}
 
 /* ---------- lançamento (com cartão e parcelas) ---------- */
-window.__trocaTipo=b=>{const t=b.dataset.v,lista=t==='gasto'?CATS_G:CATS_E;$('mdl').querySelector('[data-g="cat"]').innerHTML=chipsCat(lista,lista[0].id);const fw=$('mdl').querySelector('#formaWrap');if(fw)fw.hidden=t!=='gasto'};
+window.__trocaTipo=b=>{const t=b.dataset.v,lista=t==='gasto'?CATS_G:CATS_E;$('mdl').querySelector('[data-g="cat"]').innerHTML=chipsCat(lista,lista[0].id);['#formaWrap','#livreWrap'].forEach(s=>{const el=$('mdl').querySelector(s);if(el)el.hidden=t!=='gasto'})};
 window.__trocaForma=b=>{const pw=$('mdl').querySelector('#parcWrap');if(pw)pw.hidden=b.dataset.v==='conta';const l=$('mdl').querySelector('#lblData');if(l)l.firstChild.textContent=b.dataset.v==='conta'?'Data':'Data da compra'};
 function modalLancamento(tipo,item,o={}){
   tipo=item?item.tipo:tipo;
@@ -1573,22 +1581,24 @@ function modalLancamento(tipo,item,o={}){
       <div class="chips" data-g="forma" data-onchange="__trocaForma"><button type="button" class="chip" data-v="conta" aria-pressed="true">Pix, débito ou dinheiro</button>${S.cartoes.map(c=>`<button type="button" class="chip" data-v="${c.id}" aria-pressed="false">💳 ${esc(c.nome)}</button>`).join('')}</div>
       <div id="parcWrap" hidden><label>Número de parcelas<input class="field" id="mParc" type="number" min="1" max="24" value="1"></label></div></div>`:''}
     <label id="lblData">Data<input class="field" id="mData" type="date" value="${data}"></label>
+    ${S.temV6&&(!item||(item.tipo==='gasto'&&!outroLivre(item)))?`<div id="livreWrap" ${tipo==='gasto'?'':'hidden'}><label class="chk"><input type="checkbox" id="mLivre" ${(item?ehLivre(item):o.livre)?'checked':''}> 🎈 Pago com meu dinheiro livre</label></div>`:''}
     ${btns(item?'Salvar alterações':'Salvar lançamento')}`,
   async()=>{
     const valor=parseValor(val('mValor')),d=val('mData'),desc=val('mDesc').trim().slice(0,80),categoria=sel('cat');
     if(!valor)return 'Digite um valor maior que zero, por exemplo 45,90.';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
-    if(item){const {error}=await sb.from('lancamentos').update({valor,descricao:desc,categoria,data:d}).eq('id',item.id);if(error)throw error;toast('Lançamento atualizado');return}
+    const livre=!!$('mdl').querySelector('#mLivre')?.checked;
+    if(item){const up={valor,descricao:desc,categoria,data:d};if(S.temV6&&item.tipo==='gasto')up.livre=livre;const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast('Lançamento atualizado');return}
     const t=sel('tipo'),forma=sel('forma')||'conta';
     if(t==='gasto'&&forma!=='conta'){
       const card=S.cartoes.find(c=>c.id===forma),n=Math.max(1,Math.min(24,parseInt(val('mParc'),10)||1));
       const fm=mesFatura(card,d),compra=uuid(),base=Math.floor(valor/n*100)/100,resto=Math.round((valor-base*n)*100)/100;
       const linhas=[...Array(n)].map((_,k)=>({tipo:'gasto',valor:Math.round((base+(k===0?resto:0))*100)/100,descricao:(desc||CAT[categoria].nome)+(n>1?` (${k+1}/${n})`:''),categoria,
-        data:diaNoMes(addMes(fm,k),card.vencimento),cartao_id:card.id,compra_id:compra,parcela:k+1,parcelas:n}));
+        data:diaNoMes(addMes(fm,k),card.vencimento),cartao_id:card.id,compra_id:compra,parcela:k+1,parcelas:n,...(livre?{livre:true}:{})}));
       const {error}=await sb.from('lancamentos').insert(linhas);if(error)throw error;
       toast(n>1?`Compra lançada em ${n} parcelas de ${R(linhas[1]?linhas[1].valor:linhas[0].valor)}`:`Compra lançada na fatura de ${soMes(fm)}`);
     }else{
-      const {error}=await sb.from('lancamentos').insert({tipo:t,valor,descricao:desc,categoria,data:d});if(error)throw error;
+      const {error}=await sb.from('lancamentos').insert({tipo:t,valor,descricao:desc,categoria,data:d,...(t==='gasto'&&livre?{livre:true}:{})});if(error)throw error;
       if(d.slice(0,7)!==S.mes)S.mes=d.slice(0,7);
       toast('Lançamento salvo');
     }
@@ -1816,7 +1826,7 @@ async function exportarExcel(periodo){
   const TIPO={gasto:'Gasto',entrada:'Entrada',aporte:'Guardado em meta',resgate:'Resgate de meta'};
   const ord=[...rows].sort((a,b)=>a.data.localeCompare(b.data));
   const linhas=ord.map(i=>{const cc=i.cartao_id&&S.cartoes.find(c=>c.id===i.cartao_id);const [y,m,d]=i.data.split('-');
-    return {'Data':`${d}/${m}/${y}`,'Tipo':TIPO[i.tipo]||i.tipo,'Descrição':descVis(i),'Categoria':(CAT[i.categoria]||{nome:i.categoria}).nome,'Valor (R$)':(i.tipo==='entrada'||i.tipo==='resgate'?1:-1)*i.valor,'Quem lançou':nomeDe(i.autor)||'Automático','Cartão':cc?cc.nome:''}});
+    return {'Data':`${d}/${m}/${y}`,'Tipo':TIPO[i.tipo]||i.tipo,'Descrição':descVis(i),'Categoria':catVis(i).nome,'Valor (R$)':(i.tipo==='entrada'||i.tipo==='resgate'?1:-1)*i.valor,'Quem lançou':nomeDe(i.autor)||'Automático','Cartão':cc?cc.nome:''}});
   const meses=[...new Set(ord.map(i=>i.data.slice(0,7)))];
   const f=(a,t)=>a.filter(x=>x.tipo===t).reduce((s,x)=>s+x.valor,0);
   const resumoM=meses.map(m=>{const a=ord.filter(x=>x.data.slice(0,7)===m);const e=f(a,'entrada'),g=f(a,'gasto'),ap=f(a,'aporte')-f(a,'resgate');return {'Mês':nomeMes(m),'Entradas':e,'Gastos':g,'Guardado em metas':ap,'Sobra':e-g-ap}});
@@ -1853,7 +1863,7 @@ document.addEventListener('click',async e=>{
     case 'mes+1':S.mes=addMes(S.mes,1);await carregarItens();render();break;
     case 'ano-1':S.ano--;render();break;
     case 'ano+1':S.ano++;render();break;
-    case 'novo':modalLancamento(a.dataset.tipo||'gasto',null,{cat:a.dataset.cat,data:a.dataset.data});break;
+    case 'novo':modalLancamento(a.dataset.tipo||'gasto',null,{cat:a.dataset.cat,data:a.dataset.data,livre:a.dataset.livre==='1'});break;
     case 'editar':if(item)modalLancamento(null,item);break;
     case 'apagar':if(!item)break;
       if(item.compra_id&&item.parcelas>1)confirmar('Apagar compra parcelada?',`${esc(item.descricao.replace(/\s\(\d+\/\d+\)$/,''))} tem ${item.parcelas} parcelas. Todas serão removidas.`,'Apagar compra inteira',async()=>{const {error}=await sb.from('lancamentos').delete().eq('compra_id',item.compra_id);if(error)throw error;toast('Compra apagada')});
