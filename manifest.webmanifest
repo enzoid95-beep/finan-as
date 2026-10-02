@@ -1,6 +1,6 @@
 {
-  "name": "Planejamento Financeiro",
-  "short_name": "Planejamento",
+  "name": "Controle 360",
+  "short_name": "Controle 360",
   "description": "Finanças do casal: caixa, gastos, metas e desejos.",
   "start_url": "./",
   "scope": "./",
@@ -9,8 +9,23 @@
   "theme_color": "#03050a",
   "lang": "pt-BR",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
