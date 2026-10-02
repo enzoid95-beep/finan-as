@@ -508,6 +508,45 @@ dialog{position:fixed}
   dialog.mg .mais{grid-template-columns:repeat(5,minmax(0,1fr))}
   .mdl .row2{grid-template-columns:1fr 1fr}
 }
+/* ================= v12 ================= */
+/* orçamento: botão zerar */
+.oc-zerar{margin-left:auto;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;color:var(--muted);border:1px solid var(--line2);background:rgba(255,255,255,.03);flex:none}
+.oc-zerar:hover:not(:disabled){color:#fca5a5;border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.1)}
+.oc-zerar:disabled{opacity:.35;cursor:default}
+.oc-top b{white-space:normal!important;overflow:visible!important;line-height:1.2}
+.oc-top{align-items:flex-start}
+/* barra lateral: usa toda a altura disponível */
+.side{gap:clamp(8px,1.6vh,18px)!important}
+#sideNav{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-height:0}
+.side .nav-btn{height:clamp(24px,3.9vh,42px);font-size:clamp(13.5px,1.9vh,16.5px)}
+.side .nav-btn svg{width:clamp(17px,2.3vh,21px);height:clamp(17px,2.3vh,21px)}
+.side .nav-sub{height:clamp(20px,3.2vh,36px);font-size:clamp(12.5px,1.75vh,15px)}
+.side>.brand b{font-size:clamp(17px,2.6vh,24px)}
+.side>.brand .brand-mark{width:clamp(30px,4.8vh,46px);height:clamp(30px,4.8vh,46px);font-size:clamp(16px,2.5vh,25px)}
+.novo-side{padding:clamp(6px,1.4vh,13px)!important;font-size:clamp(14px,1.9vh,16px)!important}
+/* janelas: maiores e mais espaçadas */
+@media (min-width:761px){
+  dialog.c1{width:min(600px,calc(100% - 48px))}
+  dialog.c2{width:min(1040px,calc(100% - 64px))}
+  dialog.c3{width:min(1380px,calc(100% - 64px))}
+  dialog.mg{width:min(1180px,calc(100% - 64px))}
+  dialog .mdl{padding:34px 38px 32px}
+  dialog.c2 .mdl,dialog.c3 .mdl{column-gap:48px}
+  .mdl>h2{font-size:32px;margin-bottom:26px}
+  .mdl label{margin-bottom:20px;font-size:14px}
+  .mdl label .field{margin-top:8px;padding:13px 15px;font-size:17px}
+  .mdl .big{font-size:34px!important}
+  .mdl .chips{gap:9px;margin:8px 0 22px}
+  .mdl .chip{padding:9px 15px;font-size:14.5px}
+  .mdl .seg{margin-bottom:22px}.mdl .seg button{padding:12px;font-size:15px}
+  .mdl .fg,.mdl>div{margin-bottom:6px}
+  .mdl .btns{margin-top:12px}.mdl .btns .btn{padding:15px;font-size:16px}
+  .mdl-x{top:18px;right:18px;width:40px;height:40px}
+  dialog.mg .novo-op{padding:18px;gap:14px}
+  dialog.mg .novo-op .no-em{width:50px;height:50px;font-size:24px}
+  dialog.mg .novo-op b{font-size:16.5px}dialog.mg .novo-op small{font-size:13.5px}
+  dialog.mg .novo-grid{gap:12px}
+}
 /* regra de cores */
 .zero{color:#fff!important}.ref{color:var(--g2)!important}
 .ccard .big.neg{color:#fecaca!important;text-shadow:0 1px 3px rgba(0,0,0,.6)}
@@ -1308,7 +1347,7 @@ function vOrcamento(){
   const cardVerba=verbaPl||verbaUso?`<div class="orc-card"><div class="oc-top"><span class="oc-em">💸</span><b>Dinheiro pessoal</b></div><div class="oc-val"><span class="${verbaUso?'neg':'zero'}">${R0(verbaUso)}</span><span class="mut">/</span><button class="oc-ed ref" data-go="livre" title="Definir em Nosso dinheiro">${R0(verbaPl)}</button></div><div class="tr ${verbaPl?clsLim(verbaUso/verbaPl):''}"><i style="width:${verbaPl?Math.min(100,verbaUso/verbaPl*100):0}%"></i></div><div class="oc-pe"><span>verba dos dois</span><span class="${verbaPl-verbaUso<0?'neg':'pos'}">${verbaPl-verbaUso<0?'Passou '+R0(verbaUso-verbaPl):'Restam '+R0(verbaPl-verbaUso)}</span></div></div>`:'';
   const cards=cardVerba+CATS_G.map(c=>{const v=pc[c.id]||0,lim=Number(pl.gastos[c.id])||0,ratio=lim?v/lim:0,rest=lim-v;
     return `<div class="orc-card ${lim?'':'sem'}">
-      <div class="oc-top"><span class="oc-em">${c.em}</span><b>${esc(c.nome)}</b></div>
+      <div class="oc-top"><span class="oc-em">${c.em}</span><b>${esc(c.nome)}</b><button class="oc-zerar" data-act="orc-zerar" data-cat="${c.id}" ${lim?'':'disabled'} title="${lim?'Zerar o valor planejado':'Nada planejado para zerar'}">Zerar</button></div>
       <div class="oc-val"><span class="${v>0?'neg':'zero'}">${R0(v)}</span><span class="mut">/</span><button class="oc-ed ref" data-orc-edit="${c.id}" title="Clique para editar">${lim?R0(lim):'Definir'}</button></div>
       <div class="tr ${lim?clsLim(ratio):''}"><i style="width:${lim?Math.min(100,ratio*100):0}%"></i></div>
       <div class="oc-pe">${lim?`<span>${Math.round(ratio*100)}%</span><span class="${rest<0?'neg':'pos'}">${rest<0?'Passou '+R0(-rest):'Restam '+R0(rest)}</span>`:`<span class="mut">sem orçamento</span>${v?`<span class="neg">${R0(v)} gastos</span>`:''}`}</div>
@@ -2300,6 +2339,9 @@ document.addEventListener('click',async e=>{
       if(error){toast('Não deu para criar a meta.');a.disabled=false;break}await sb.from('desejos').update({status:'meta'}).eq('id',des.id);toast('Virou meta! Vejam em Metas.');recarregar()}break;
     case 'des-comprado':if(des)modalLancamento('gasto',null,{valor:des.valor,desc:des.nome,cat:'compras',after:async()=>{await sb.from('desejos').update({status:'comprado'}).eq('id',des.id)}});break;
     case 'des-reabrir':if(des){await sb.from('desejos').update({status:'aberto'}).eq('id',des.id);recarregar()}break;
+    case 'orc-zerar':{const k=a.dataset.cat,pl=planejado(S.mes);if(!pl.gastos[k])break;const g={...pl.gastos};delete g[k];S.orc[S.mes]={gastos:g,entradas:pl.entradas||0};render();
+      const {error}=await sb.from('orcamentos').upsert({mes:S.mes,gastos:g,entradas:pl.entradas||0,atualizado_em:new Date().toISOString()});
+      if(error)toast('Não deu para zerar agora.');else toast((CAT[k]||{nome:''}).nome+': planejado zerado')}break;
     case 'orc-padrao':{const p=planejado(S.mes);a.disabled=true;const {error}=await sb.from('config').upsert({id:'casal',limites:p.gastos,atualizado_em:new Date().toISOString()});a.disabled=false;
       if(error)toast('Não deu para salvar agora.');else{toast('Este orçamento virou o padrão dos próximos meses');recarregar()}}break;
     case 'orc-copiar':{const p=planejado(addMes(S.mes,-1));a.disabled=true;const {error}=await sb.from('orcamentos').upsert({mes:S.mes,gastos:p.gastos,entradas:p.entradas||0,atualizado_em:new Date().toISOString()});a.disabled=false;
