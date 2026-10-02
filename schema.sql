@@ -68,6 +68,6 @@ end $$;
 
 -- >>> TROQUE PELOS E-MAILS E NOMES DE VOCÊS <<<
 insert into public.membros (email, nome) values
-  ('seu.email@exemplo.com',    'Seu nome'),
-  ('email.dela@exemplo.com',   'Nome dela')
+  ('seu.email@exemplo.com',    'Enzo'),
+  ('email.dela@exemplo.com',   'Mariana')
 on conflict (email) do update set nome = excluded.nome;
