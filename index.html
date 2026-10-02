@@ -294,8 +294,8 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
   box-shadow:0 0 6px rgba(232,169,12,.10),inset 0 1px 0 rgba(255,255,255,.04),0 14px 30px -18px rgba(0,0,0,.95)!important}
 .panel .tile{box-shadow:0 0 4px rgba(232,169,12,.08)!important}
 /* ---------- comparação com o mês anterior ---------- */
-.dl{display:inline-flex;align-items:center;gap:3px;font:700 13px/1 "Barlow",system-ui,sans-serif;padding:3px 8px 3px 6px;border-radius:20px;white-space:nowrap;vertical-align:middle;letter-spacing:0}
-.dl svg{width:13px;height:13px}
+.dl{display:inline-grid;place-items:center;width:28px;height:28px;flex:none;font:800 15px/1 "Barlow",system-ui,sans-serif;border-radius:50%;vertical-align:middle;cursor:help}
+.dl svg{width:16px;height:16px}
 .dl.up{color:#4ade80;background:rgba(74,222,128,.16);border:1px solid rgba(74,222,128,.35)}
 .dl.down{color:#f87171;background:rgba(248,113,113,.16);border:1px solid rgba(248,113,113,.35)}
 .dl.eq{color:var(--muted);background:rgba(255,255,255,.06);border:1px solid var(--line2)}
@@ -334,6 +334,11 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
 .login-card .btn{margin-top:4px}
 .lnk-c{display:block;width:100%;margin:14px 0 0;text-align:center;font-size:13.5px}
 .login-card .msg.erro-l{color:var(--neg)}
+.tile{container-type:inline-size}
+.tile .vrow{flex-wrap:nowrap}
+.tile .v{text-overflow:clip!important}
+@supports (width:1cqw){.tile .v{font-size:clamp(17px,10.5cqw,32px)!important}}
+@media (max-width:760px){.tile .vrow .dl{position:absolute;top:10px;right:10px;width:24px;height:24px}.tile .vrow .dl svg{width:14px;height:14px}.tile .k{padding-right:26px}@supports (width:1cqw){.tile .v{font-size:clamp(16px,14cqw,24px)!important}}}
 /* regra de cores */
 .zero{color:#fff!important}.ref{color:var(--g2)!important}
 .ccard .big.neg{color:#fecaca!important;text-shadow:0 1px 3px rgba(0,0,0,.6)}
@@ -611,8 +616,9 @@ function dataBR(iso){if(!iso)return '';const [y,m,d]=iso.split('-');return `${d}
 function dataLonga(iso){const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}).replace('.','')}
 function diaSemana(iso){const [y,m,d]=iso.split('-').map(Number);return cap(new Date(y,m-1,d).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}))}
 function diasEntre(a,b){const p=s=>{const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)}
-function parseValor(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return isFinite(n)&&n>0?Math.round(n*100)/100:null}
-function parseLivre(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;const neg=s.startsWith('-');s=s.replace('-','');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return isFinite(n)?Math.round((neg?-n:n)*100)/100:null}
+function normNum(s){if(s.includes(','))return s.replace(/\./g,'').replace(',','.');if(/^\d{1,3}(\.\d{3})+$/.test(s))return s.replace(/\./g,'');return s}
+function parseValor(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;s=normNum(s);const n=Number(s);return isFinite(n)&&n>0?Math.round(n*100)/100:null}
+function parseLivre(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;const neg=s.startsWith('-');s=normNum(s.replace('-',''));const n=Number(s);return isFinite(n)?Math.round((neg?-n:n)*100)/100:null}
 function fmtInput(v){return v||v===0?String(v).replace('.',','):''}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2600)}
 const soma=arr=>arr.reduce((s,i)=>s+i.valor,0);
@@ -760,7 +766,7 @@ function infoDivida(d){
 /* reserva de emergência */
 function reservaIdeal(){const g=media().gas;return Math.round(g*6/100)*100}
 function reservaAtual(){return S.metas.filter(m=>m.reserva).reduce((s,m)=>s+guardadoMeta(m.id),0)}
-function alvoMeta(m){if(m.reserva){const i=reservaIdeal();return i>0?i:m.alvo}return m.alvo}
+function alvoMeta(m){return m.alvo}
 /* projeção de metas: média guardada nos últimos 3 meses */
 function previsaoMeta(m){
   const g=guardadoMeta(m.id),alvo=alvoMeta(m);if(g>=alvo)return {txt:'Meta batida! 🎉',ok:true};
@@ -776,9 +782,9 @@ function delta(atual,anterior,inverso){
   const d=Math.round((atual-anterior)*100)/100;
   const quando='que em '+nomeMes(addMes(S.mes,-1),true).toLowerCase();
   if(!anterior&&!atual)return '';
-  if(d===0)return `<span class="dl eq" title="Igual ${quando}">= igual</span>`;
-  const bom=inverso?d<0:d>0;
-  return `<span class="dl ${bom?'up':'down'}" title="${d>0?'A mais':'A menos'} ${quando}">${d>0?SETA_UP:SETA_DN}${R(Math.abs(d))}</span>`;
+  if(d===0)return `<span class="dl eq" title="Igual ${quando}" aria-label="Igual ${quando}">=</span>`;
+  const bom=inverso?d<0:d>0,txt=`${R(Math.abs(d))} a ${d>0?'mais':'menos'} ${quando}`;
+  return `<span class="dl ${bom?'up':'down'}" title="${txt}" aria-label="${txt}">${d>0?SETA_UP:SETA_DN}</span>`;
 }
 /* ================= navegação ================= */
 function navHTML(){
@@ -1031,7 +1037,7 @@ function vCartoes(){
       ${c.limite?`<div><div class="lim-bar"><span>Limite usado <b class="m neg">${R0(usado)}</b></span><span>Disponível <b class="m ${cS(disp)}">${R0(disp)}</b></span></div><div class="tr ${clsLim(usado/c.limite)}"><i style="width:${Math.min(100,usado/c.limite*100)}%"></i></div></div>`:''}
       ${fat.length?`<div class="mini">${fat.sort((a,b)=>b.valor-a.valor).slice(0,5).map(i=>`<div class="mini-row"><div class="em">${(CAT[i.categoria]||{em:'•'}).em}</div><div class="nm"><b>${esc(i.descricao)}</b><small>${i.parcelas>1?`Parcela ${i.parcela} de ${i.parcelas}`:'À vista'}</small></div><div class="vl neg">${R(i.valor)}</div></div>`).join('')}${fat.length>5?`<p class="nota">+ ${plural(fat.length-5,'compra','compras')} nesta fatura</p>`:''}</div>`:'<p class="nota">Nenhuma compra nesta fatura.</p>'}
     </div>`}).join('');
-  return head('Cartões','Faturas, limites e compras parceladas.',BTN('cartao-novo','Novo cartão'))+`
+  return head('Cartões','Faturas, limites e compras parceladas.',S.cartoes.length?BTN('cartao-novo','Novo cartão'):'')+`
   <div class="tiles">
     <div class="tile"><div class="k">Próxima fatura (todos)</div><div class="v neg">${R(prox1)}</div><div class="d">${esc(nomeMes(addMes(MES_ATUAL,1)))}</div></div>
     <div class="tile"><div class="k">Renda já comprometida</div><div class="v ${pctRenda>30?'neg':pctRenda>20?'warn':''}">${pctRenda}%</div><div class="d">da renda média do próximo mês</div></div>
@@ -1055,7 +1061,7 @@ function vRecorrentes(){
   const at=S.recorrentes.filter(r=>r.ativa);
   const e=soma(at.filter(r=>r.tipo==='entrada')),g=soma(at.filter(r=>r.tipo==='gasto'));
   const lst=[...S.recorrentes].sort((a,b)=>(a.ativa===b.ativa?0:a.ativa?-1:1)||a.dia-b.dia);
-  return head('Recorrentes','Entram sozinhos todo mês, no dia certo.',BTN('rec-novo','Nova recorrência'),true)+`
+  return head('Recorrentes','Entram sozinhos todo mês, no dia certo.',lst.length?BTN('rec-novo','Nova recorrência'):'',true)+`
   <div class="tiles">
     <div class="tile"><div class="k">Entradas automáticas</div><div class="v pos">${R(e)}</div><div class="d">por mês</div></div>
     <div class="tile"><div class="k">Gastos automáticos</div><div class="v neg">${R(g)}</div><div class="d">por mês</div></div>
@@ -1119,7 +1125,7 @@ function vContas(){
   const ativas=lst.filter(x=>x.c.ativa);
   const total=ativas.reduce((s,x)=>s+x.c.valor,0),pago=ativas.filter(x=>x.s.k==='ok').reduce((s,x)=>s+x.c.valor,0);
   const atras=ativas.filter(x=>x.s.k==='late');
-  return head('Contas fixas','Contas que se repetem todo mês e que vocês marcam ao pagar.',BTN('conta-nova','Nova conta'))+`
+  return head('Contas fixas','Contas que se repetem todo mês e que vocês marcam ao pagar.',lst.length?BTN('conta-nova','Nova conta'):'')+`
   <div class="tiles">
     <div class="tile"><div class="k">Total das contas</div><div class="v neg">${R(total)}</div><div class="d">${plural(ativas.length,'conta ativa','contas ativas')}</div></div>
     <div class="tile"><div class="k">Já pago</div><div class="v neg">${R(pago)}</div><div class="d">${ativas.filter(x=>x.s.k==='ok').length} de ${ativas.length}</div></div>
@@ -1144,7 +1150,7 @@ function vDividas(){
   const saldo=ativas.reduce((s,x)=>s+x.i.saldo,0),mensal=ativas.reduce((s,x)=>s+x.d.parcela,0);
   const fim=ativas.map(x=>x.i.fim).sort().pop();
   const med=media();
-  return head('Dívidas','Empréstimos e financiamentos com plano de quitação.',BTN('div-nova','Nova dívida'))+`
+  return head('Dívidas','Empréstimos e financiamentos com plano de quitação.',S.dividas.length?BTN('div-nova','Nova dívida'):'')+`
   <div class="tiles">
     <div class="tile"><div class="k">Saldo devedor</div><div class="v ${saldo>0?'neg':'zero'}">${R(saldo)}</div><div class="d">${plural(ativas.length,'dívida ativa','dívidas ativas')}</div></div>
     <div class="tile"><div class="k">Parcelas por mês</div><div class="v neg">${R(mensal)}</div><div class="d">${med.ent?Math.round(mensal/med.ent*100)+'% da renda média':''}</div></div>
@@ -1168,9 +1174,10 @@ function vMetas(){
   const tm=totalMetas(),alvo=S.metas.reduce((s,m)=>s+alvoMeta(m),0),noMes=resumo(S.mes).guardado;
   const med=media(),ideal=reservaIdeal(),res=reservaAtual(),temRes=S.metas.some(m=>m.reserva);
   const mesesCob=med.gas>0?(res+Math.max(0,emCaixa()))/med.gas:0;
+  const metaRes=S.metas.find(m=>m.reserva),alvoRes=metaRes?metaRes.alvo:0;
   const cards=S.metas.map(m=>{
     const g=guardadoMeta(m.id),a=alvoMeta(m),p=Math.min(100,Math.max(0,g/a*100)),falta=Math.max(0,a-g),pv=previsaoMeta(m);
-    let porMes='—',prazoTxt=m.reserva?'Reserva de emergência · alvo automático':'Sem prazo';
+    let porMes='—',prazoTxt=m.reserva?'Reserva de emergência':'Sem prazo';
     if(m.prazo){const meses=Math.max(1,difMes(MES_ATUAL,m.prazo.slice(0,7)));prazoTxt=(m.reserva?'Reserva · ':'')+'até '+dataLonga(m.prazo);porMes=falta>0?R(falta/meses):'Concluída'}
     return `<div class="meta-card">
       <div class="meta-top"><div class="em">${esc(m.emoji)}</div><div style="min-width:0"><b>${esc(m.nome)}</b><small>${prazoTxt}</small></div>
@@ -1181,7 +1188,7 @@ function vMetas(){
       ${m.prazo?`<p class="nota" style="margin:0">${esc(pv.txt)}</p>`:''}
       <div class="meta-btns"><button class="btn sm" data-act="aporte" data-id="${m.id}">Guardar dinheiro</button><button class="btn sm ghost" data-act="resgate" data-id="${m.id}" ${g<=0?'disabled style="opacity:.5"':''}>Resgatar</button></div>
     </div>`}).join('');
-  return head('Metas','O que vocês estão construindo juntos.',BTN('meta-nova','Nova meta'))+`
+  return head('Metas','O que vocês estão construindo juntos.',S.metas.length?BTN('meta-nova','Nova meta'):'')+`
   <div class="tiles">
     <div class="tile"><div class="k">Total guardado</div><div class="v ${cS(tm)}">${R(tm)}</div><div class="d">somando todas as metas</div></div>
     <div class="tile"><div class="k">Soma dos objetivos</div><div class="v ref">${R(alvo)}</div><div class="d">${alvo?Math.round(tm/alvo*100)+'% do caminho':'Nenhuma meta'}</div></div>
@@ -1190,12 +1197,13 @@ function vMetas(){
   </div>
   <div class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>🛟 Reserva de emergência</h2><p class="sub">O ideal é ter 6 meses de gastos guardados para imprevistos</p></div></div>
     <div class="facts" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-      <div class="fact"><small>Reserva ideal (6× gasto médio)</small><b class="ref">${ideal?R0(ideal):'Sem histórico'}</b></div>
+      <div class="fact"><small>Reserva ideal (6× gasto médio)</small><b class="ref">${ideal?R0(ideal):'Sem histórico ainda'}</b></div>
       <div class="fact"><small>Guardado na reserva</small><b class="${cS(res)}">${R0(res)}</b></div>
       <div class="fact"><small>Vocês aguentariam sem renda</small><b class="${mesesCob<3?'neg':mesesCob<6?'warn':'pos'}">${med.gas>0?mesesCob.toLocaleString('pt-BR',{maximumFractionDigits:1})+' meses':'—'}</b></div>
-      <div class="fact"><small>Situação</small><b>${!temRes?'Ainda não criada':res>=ideal&&ideal?'Completa ✅':Math.round(ideal?res/ideal*100:0)+'% da ideal'}</b></div>
+      <div class="fact"><small>${temRes?'Alvo de vocês':'Situação'}</small><b class="${temRes?'ref':''}">${!temRes?'Ainda não criada':R0(alvoRes)+(res>=alvoRes?' ✅':' · '+Math.round(res/alvoRes*100)+'%')}</b></div>
     </div>
-    ${temRes?'<p class="nota">O alvo da reserva se ajusta sozinho conforme os gastos médios de vocês mudam. A estimativa de meses considera a reserva mais o dinheiro em caixa.</p>':`<div style="margin-top:12px"><button class="btn" data-act="reserva-criar" ${ideal?'':'disabled style="opacity:.5"'}>${svg('plus')}Criar reserva de ${ideal?R0(ideal):'emergência'}</button></div>`}
+    ${temRes?`<p class="nota">A estimativa de meses considera a reserva mais o dinheiro em caixa.${ideal&&alvoRes&&Math.abs(ideal-alvoRes)/ideal>.05?` Pelos gastos atuais, o ideal seria <b class="ref">${R0(ideal)}</b>.`:''}</p>${ideal&&alvoRes&&Math.abs(ideal-alvoRes)/ideal>.05?`<div style="margin-top:10px"><button class="btn sm ghost" data-act="reserva-ajustar">Atualizar alvo para ${R0(ideal)}</button></div>`:''}`
+      :`<div style="margin-top:12px"><button class="btn" data-act="reserva-criar">${svg('plus')}Criar reserva de emergência</button></div>`}
   </div>
   ${S.metas.length?`<div class="metas">${cards}</div>`:`<div class="panel">${vazio('Nenhuma meta ainda','Comecem pelo casamento, pela mudança ou pela reserva de emergência.',BTN('meta-nova','Criar a primeira meta'))}</div>`}`;
 }
@@ -1238,7 +1246,7 @@ function vDesejos(){
   const feitos=S.desejos.filter(d=>d.status!=='aberto');
   const lst=S.abaDesejos==='aberto'?abertos:feitos,med=media();
   const PR={1:['p1','Alta'],2:['p2','Média'],3:['p3','Baixa']};
-  return head('Desejos','Tudo que vocês querem conquistar, sem dívida.',temV?BTN('des-novo','Novo desejo'):'',true)+`
+  return head('Desejos','Tudo que vocês querem conquistar, sem dívida.',temV&&!(S.abaDesejos==='aberto'&&!abertos.length)?BTN('des-novo','Novo desejo'):'',true)+`
   <div class="panel" style="margin-bottom:16px"><h2>Podemos comprar?</h2><p class="sub">Simule uma compra e veja o impacto no caixa, na reserva e no mês de vocês</p>
     <div class="sim-form">
       <label>O que é (opcional)<input class="field" id="simNome" maxlength="60" placeholder="Ex.: Sofá novo" value="${esc(S.sim.nome)}"></label>
@@ -1431,7 +1439,7 @@ function modalMeta(m){
     <label style="margin-bottom:0">Ícone</label><div class="chips" data-g="emoji">${EMOJIS_META.map(e=>`<button type="button" class="chip" data-v="${e}" aria-pressed="${(m?m.emoji:'💍')===e}">${e}</button>`).join('')}</div>
     <div class="row2"><label>Quanto precisam (R$)<input class="field" id="mAlvo" inputmode="decimal" placeholder="30.000" value="${m?fmtInput(m.alvo):''}"></label>
     <label>Prazo (opcional)<input class="field" id="mPrazo" type="date" value="${m&&m.prazo?m.prazo:''}"></label></div>
-    ${S.temV4?`<label class="chk"><input type="checkbox" id="mRes" ${m&&m.reserva?'checked':''}> Esta é a reserva de emergência (alvo automático de 6 meses de gastos)</label>`:''}
+    ${S.temV4?`<label class="chk"><input type="checkbox" id="mRes" ${m&&m.reserva?'checked':''}> Esta é a reserva de emergência</label>`:''}
     ${btns(m?'Salvar alterações':'Criar meta')}`,
   async()=>{
     const nome=val('mNome').trim(),alvo=parseValor(val('mAlvo'));
@@ -1455,6 +1463,25 @@ function modalAporte(m,tipo){
     if(tipo==='resgate'&&valor>g+0.001)return 'O valor é maior do que está guardado nesta meta.';
     const {error}=await sb.from('lancamentos').insert({tipo,valor,descricao:(tipo==='aporte'?'Guardado: ':'Resgate: ')+m.nome,categoria:'meta',data:d,meta_id:m.id});
     if(error)throw error;toast(tipo==='aporte'?'Dinheiro guardado':'Resgate registrado');
+  });
+}
+function modalReserva(){
+  const ideal=reservaIdeal();
+  modal(`<h2>🛟 Criar reserva de emergência</h2>
+    <p class="mut" style="margin:-6px 0 16px">${ideal?`Pelos gastos de vocês, o ideal é <b class="ref">${R0(ideal)}</b> (6 meses de gastos). Podem usar esse valor ou definir outro.`:'Ainda não há histórico de gastos para sugerir um valor. Uma boa referência é somar 6 meses do custo de vida de vocês.'}</p>
+    <label>Quanto querem ter na reserva (R$)<input class="field big" id="mAlvo" inputmode="decimal" placeholder="Ex.: 30.000" value="${ideal?fmtInput(ideal):''}"></label>
+    <label>Já têm algum valor guardado para isso? (opcional)<input class="field" id="mJa" inputmode="decimal" placeholder="0,00"></label>
+    <p class="mut" style="font-size:13px;margin:-6px 0 14px">Esse valor entra direto na reserva, sem descontar do Em caixa.</p>
+    ${btns('Criar reserva')}`,
+  async()=>{
+    const alvo=parseValor(val('mAlvo')),ja=parseValor(val('mJa'));
+    if(!alvo)return 'Digite quanto querem juntar na reserva.';
+    const reg={nome:'Reserva de emergência',emoji:'🛟',alvo};if(S.temV4)reg.reserva=true;
+    const {data,error}=await sb.from('metas').insert(reg).select('id');
+    if(error)throw error;
+    if(ja&&data&&data[0]){const r=await sb.from('lancamentos').insert({tipo:'aporte',valor:ja,descricao:'Já guardado: Reserva de emergência',categoria:'meta',data:HOJE,meta_id:data[0].id});if(r.error)throw r.error;
+      await sb.from('config').upsert({id:'casal',saldo_inicial:Math.round((S.saldoInicial+ja)*100)/100,atualizado_em:new Date().toISOString()})}
+    toast('Reserva criada');
   });
 }
 /* ---------- contas fixas ---------- */
@@ -1651,7 +1678,8 @@ document.addEventListener('click',async e=>{
     case 'meta-editar':if(meta)modalMeta(meta);break;
     case 'meta-apagar':if(meta)confirmar('Excluir meta?',`A meta ${esc(meta.nome)} e todo o histórico de dinheiro guardado nela serão apagados.`,'Excluir meta',async()=>{const {error}=await sb.from('metas').delete().eq('id',id);if(error)throw error;toast('Meta excluída')});break;
     case 'aporte':case 'resgate':if(meta)modalAporte(meta,act);break;
-    case 'reserva-criar':{const v=reservaIdeal();if(v)await inserir('metas',{nome:'Reserva de emergência',emoji:'🛟',alvo:v,reserva:true},'Reserva criada')}break;
+    case 'reserva-criar':modalReserva();break;
+    case 'reserva-ajustar':{const m=S.metas.find(x=>x.reserva),v=reservaIdeal();if(m&&v){const {error}=await sb.from('metas').update({alvo:v}).eq('id',m.id);if(error)toast('Não deu para atualizar.');else{toast('Alvo atualizado');recarregar()}}}break;
     case 'conta-nova':modalConta();break;
     case 'conta-editar':if(conta)modalConta(conta);break;
     case 'conta-apagar':if(conta)confirmar('Excluir conta fixa?',`${esc(conta.nome)} deixa de aparecer nos próximos meses. Os pagamentos já lançados continuam nos gastos.`,'Excluir conta',async()=>{const {error}=await sb.from('contas_fixas').delete().eq('id',id);if(error)throw error;toast('Conta excluída')});break;
