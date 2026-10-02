@@ -322,6 +322,18 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
 .who-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .who-row .who{margin:0;min-width:0}
 
+/* login */
+.login-card .brand{margin-bottom:24px}
+.btn-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border-radius:12px;font-weight:700;font-size:15.5px;background:#fff;color:#1f2328;box-shadow:0 6px 18px -8px rgba(0,0,0,.6)}
+.btn-google:hover{background:#f2f2f2}
+.btn-google svg{width:18px;height:18px}
+.ou{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--muted);font-size:13px}
+.ou::before,.ou::after{content:"";flex:1;height:1px;background:var(--line2)}
+.login-card .lbl{display:block;font-size:13px;font-weight:600;color:var(--muted)}
+.login-card .lbl .field{margin:6px 0 12px}
+.login-card .btn{margin-top:4px}
+.lnk-c{display:block;width:100%;margin:14px 0 0;text-align:center;font-size:13.5px}
+.login-card .msg.erro-l{color:var(--neg)}
 /* regra de cores */
 .zero{color:#fff!important}.ref{color:var(--g2)!important}
 .ccard .big.neg{color:#fecaca!important;text-shadow:0 1px 3px rgba(0,0,0,.6)}
@@ -455,14 +467,33 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 <div class="login" id="login" hidden>
   <div class="login-card panel">
     <div class="brand"><div class="brand-mark">💰</div><div><b>Planejamento Financeiro</b></div></div>
-    <p>Entre com o seu e-mail. Vamos mandar um link de acesso, sem senha.</p>
+
     <div id="lForm">
-      <label class="mut" style="font-size:13px;font-weight:600">E-mail
-        <input class="field" id="lEmail" type="email" autocomplete="email" inputmode="email" placeholder="voce@exemplo.com"></label>
-      <button class="btn" id="lEnviar">Enviar link de acesso</button>
+      <button class="btn-google" id="lGoogle" type="button">
+        <span>Entrar com Google</span></button>
+      <div class="ou"><span>ou entre com e-mail e senha</span></div>
+      <label class="lbl">E-mail<input class="field" id="lEmail" type="email" autocomplete="email" inputmode="email" placeholder="voce@exemplo.com"></label>
+      <label class="lbl">Senha<input class="field" id="lSenha" type="password" autocomplete="current-password" placeholder="Sua senha"></label>
+      <button class="btn" id="lEntrar" type="button">Entrar</button>
+      <button class="lnk lnk-c" id="lEsqueci" type="button">Primeiro acesso com senha ou esqueceu a senha?</button>
     </div>
+
+    <div id="lReset" hidden>
+      <p>Digite seu e-mail. Vamos mandar um link para você criar ou redefinir a sua senha.</p>
+      <label class="lbl">E-mail<input class="field" id="lEmailR" type="email" autocomplete="email" inputmode="email" placeholder="voce@exemplo.com"></label>
+      <button class="btn" id="lEnviarR" type="button">Enviar link para criar senha</button>
+      <button class="lnk lnk-c" id="lVoltar" type="button">Voltar para o login</button>
+    </div>
+
+    <div id="lNova" hidden>
+      <p>Crie sua nova senha. Use pelo menos 8 caracteres.</p>
+      <label class="lbl">Nova senha<input class="field" id="lSenha1" type="password" autocomplete="new-password" placeholder="Nova senha"></label>
+      <label class="lbl">Repita a senha<input class="field" id="lSenha2" type="password" autocomplete="new-password" placeholder="Repita a nova senha"></label>
+      <button class="btn" id="lSalvarSenha" type="button">Salvar senha e entrar</button>
+    </div>
+
     <div class="msg" id="lMsg" role="status"></div>
-    <button class="lnk" id="lSair" hidden>Entrar com outro e-mail</button>
+    <button class="lnk lnk-c" id="lSair" hidden>Entrar com outra conta</button>
   </div>
 </div>
 
@@ -1672,25 +1703,69 @@ document.addEventListener('click',async e=>{
 window.addEventListener('hashchange',()=>{let v=location.hash.slice(1);if(v==='limites')v='orcamento';if(VIEWS.some(x=>x.id===v)&&v!==S.view){S.view=v;render()}});
 
 /* ================= login ================= */
-function telaLogin(msg,semForm){$('app').hidden=true;$('login').hidden=false;$('lMsg').textContent=msg||'';$('lForm').hidden=!!semForm}
+const URL_SITE=location.origin+location.pathname;
+let recuperando=/type=recovery/.test(location.hash+location.search);
+function msgLogin(t,erro){const m=$('lMsg');m.textContent=t||'';m.classList.toggle('erro-l',!!erro)}
+function modoLogin(m){['lForm','lReset','lNova'].forEach(id=>$(id).hidden=id!==m);msgLogin('')}
+function telaLogin(msg,semForm){$('app').hidden=true;$('login').hidden=false;modoLogin(semForm?'':'lForm');if(semForm)['lForm','lReset','lNova'].forEach(id=>$(id).hidden=true);msgLogin(msg||'',!!semForm)}
+function erroPT(e){const m=(e&&e.message)||'';
+  if(/Invalid login credentials/i.test(m))return 'E-mail ou senha incorretos. Se ainda não criou uma senha, use o link abaixo.';
+  if(/Email not confirmed/i.test(m))return 'Confirme seu e-mail primeiro: abra a mensagem que enviamos.';
+  if(/rate limit|security purposes|too many/i.test(m))return 'Muitas tentativas seguidas. Espere um minuto e tente de novo.';
+  if(/should be different/i.test(m))return 'A nova senha precisa ser diferente da anterior.';
+  if(/at least|weak|short/i.test(m))return 'Senha muito curta ou fraca. Use pelo menos 8 caracteres.';
+  if(/provider is not enabled|Unsupported provider/i.test(m))return 'O login com Google ainda não foi ativado no Supabase.';
+  return m||'Algo deu errado. Tente de novo.'}
 async function entrar(sessao){
   S.me=(sessao.user.email||'').toLowerCase();
   const {data,error}=await sb.from('membros').select('email,nome');
-  if(error||!data||!data.length){telaLogin('O e-mail '+S.me+' não está na lista de quem pode usar este caixa.',true);$('lSair').hidden=false;return}
+  if(error||!data||!data.length){telaLogin('A conta '+S.me+' não está na lista de quem pode usar este site.',true);$('lSair').hidden=false;return}
   S.nomes=Object.fromEntries(data.map(m=>[m.email.toLowerCase(),m.nome]));
   $('whoName').textContent=S.nomes[S.me]||S.me.split('@')[0];$('whoMail').textContent=S.me;
   if(standalone())$('instBtn').hidden=true;
+  if(/access_token|type=/.test(location.hash))history.replaceState(null,'',location.pathname);
   let h=location.hash.slice(1);if(h==='limites')h='orcamento';if(VIEWS.some(v=>v.id===h))S.view=h;
   $('login').hidden=true;$('app').hidden=false;
   render();await recarregar();assinar();
 }
-$('lEnviar').addEventListener('click',async()=>{
-  const email=$('lEmail').value.trim();
-  if(!/^\S+@\S+\.\S+$/.test(email)){$('lMsg').textContent='Digite um e-mail válido.';return}
-  $('lEnviar').disabled=true;
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-  $('lEnviar').disabled=false;
-  $('lMsg').textContent=error?'Não deu para enviar o link: '+error.message:'Link enviado. Abra o e-mail neste mesmo aparelho e toque em entrar.';
+$('lGoogle').addEventListener('click',async()=>{
+  $('lGoogle').disabled=true;msgLogin('Abrindo o Google…');
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:URL_SITE,queryParams:{prompt:'select_account'}}});
+  if(error){$('lGoogle').disabled=false;msgLogin(erroPT(error),true)}
+});
+async function entrarSenha(){
+  const email=$('lEmail').value.trim(),password=$('lSenha').value;
+  if(!/^\S+@\S+\.\S+$/.test(email))return msgLogin('Digite um e-mail válido.',true);
+  if(!password)return msgLogin('Digite sua senha.',true);
+  $('lEntrar').disabled=true;msgLogin('Entrando…');
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  $('lEntrar').disabled=false;
+  if(error)return msgLogin(erroPT(error),true);
+  msgLogin('');entrar(data.session);
+}
+$('lEntrar').addEventListener('click',entrarSenha);
+$('lSenha').addEventListener('keydown',e=>{if(e.key==='Enter')entrarSenha()});
+$('lEsqueci').addEventListener('click',()=>{modoLogin('lReset');$('lEmailR').value=$('lEmail').value;$('lEmailR').focus()});
+$('lVoltar').addEventListener('click',()=>modoLogin('lForm'));
+$('lEnviarR').addEventListener('click',async()=>{
+  const email=$('lEmailR').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email))return msgLogin('Digite um e-mail válido.',true);
+  $('lEnviarR').disabled=true;
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:URL_SITE});
+  $('lEnviarR').disabled=false;
+  if(error)return msgLogin(erroPT(error),true);
+  msgLogin('Pronto! Se esse e-mail tiver acesso, chega um link em instantes. Abra-o neste aparelho para criar a senha.');
+});
+$('lSalvarSenha').addEventListener('click',async()=>{
+  const s1=$('lSenha1').value,s2=$('lSenha2').value;
+  if(s1.length<8)return msgLogin('Use pelo menos 8 caracteres.',true);
+  if(s1!==s2)return msgLogin('As duas senhas não são iguais.',true);
+  $('lSalvarSenha').disabled=true;
+  const {error}=await sb.auth.updateUser({password:s1});
+  $('lSalvarSenha').disabled=false;
+  if(error)return msgLogin(erroPT(error),true);
+  recuperando=false;toast('Senha salva');
+  const {data:{session}}=await sb.auth.getSession();if(session)entrar(session);
 });
 async function sair(){fechar();await sb.auth.signOut();location.hash='';location.reload()}
 $('lSair').addEventListener('click',sair);
@@ -1698,9 +1773,14 @@ $('lSair').addEventListener('click',sair);
 (async()=>{
   if(!window.supabase||!CFG.url||!CFG.anonKey||CFG.url.includes('COLE_AQUI')){telaLogin('Falta configurar o arquivo config.js com o endereço e a chave do Supabase.',true);return}
   sb=window.supabase.createClient(CFG.url.replace(/\/(rest|auth)\/v1\/?$/,'').replace(/\/$/,''),CFG.anonKey);
+  sb.auth.onAuthStateChange((ev,s)=>{
+    if(ev==='PASSWORD_RECOVERY'){recuperando=true;$('app').hidden=true;$('login').hidden=false;modoLogin('lNova');return}
+    if(ev==='SIGNED_IN'&&s&&!recuperando&&$('app').hidden&&$('lSair').hidden)entrar(s);
+  });
   const {data:{session}}=await sb.auth.getSession();
-  if(session)entrar(session);else telaLogin();
-  sb.auth.onAuthStateChange((ev,s)=>{if(ev==='SIGNED_IN'&&s&&$('app').hidden&&$('lSair').hidden)entrar(s)});
+  if(recuperando&&session){$('app').hidden=true;$('login').hidden=false;modoLogin('lNova');return}
+  const erroUrl=new URLSearchParams(location.hash.slice(1)+'&'+location.search.slice(1)).get('error_description');
+  if(session)entrar(session);else telaLogin(erroUrl?'Não deu para entrar: '+erroUrl.replace(/\+/g,' '):'');
 })();
 })();
 </script>
