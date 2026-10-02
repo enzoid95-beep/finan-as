@@ -350,6 +350,7 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
 .pt-h{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px}.pt-h i{width:10px;height:10px;border-radius:3px}
 .pt-v{font:800 24px/1.1 "Barlow Condensed",sans-serif;color:var(--pos);margin-top:3px}
 .pt-p{font-size:12.5px;color:var(--muted)}
+.pt-l{display:grid;grid-template-columns:auto auto;gap:3px 16px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);font-size:12.5px}.pt-l b{text-align:right;color:var(--pos);font-weight:700}
 .leg{display:flex;flex-direction:column;gap:2px}
 .leg-row{display:grid;grid-template-columns:14px minmax(0,1fr) auto 56px;gap:12px;align-items:center;padding:9px 10px;border-radius:11px;cursor:pointer;transition:background .2s,transform .2s}
 .leg-row.on{background:rgba(255,255,255,.06);transform:translateX(4px)}
@@ -577,11 +578,15 @@ const CAT=Object.fromEntries([...CATS_G,...CATS_E,{id:'meta',nome:'Metas',em:'�
 const EMOJIS_META=['💍','🏡','🛟','✈️','🚗','🎓','👶','🐶','🛋️','🎯'];
 const EMOJIS_DESEJO=['✨','✈️','🛋️','📱','💻','🚗','🏖️','🎮','👗','🍽️','🎁','🏠'];
 const INV=[
-  {id:'poupanca',nome:'Poupança',cor:'#4ade80'},{id:'tesouro',nome:'Tesouro Direto',cor:'#3b82f6'},{id:'cdb',nome:'CDB',cor:'#f97316'},
-  {id:'lci_lca',nome:'LCI e LCA',cor:'#22d3ee'},{id:'cri_cra',nome:'CRI e CRA',cor:'#a855f7'},{id:'lc',nome:'LC',cor:'#f472b6'},
-  {id:'debentures',nome:'Debêntures',cor:'#ef4444'},{id:'lf',nome:'LF',cor:'#14b8a6'},{id:'acoes',nome:'Ações de empresas',cor:'#facc15'},
-  {id:'bdrs',nome:'BDRs',cor:'#6366f1'},{id:'fundos',nome:'Fundos de Investimentos',cor:'#a3e635'},{id:'fiis',nome:'Fundos Imobiliários',cor:'#c2410c'},
-  {id:'etfs',nome:'ETFs',cor:'#94a3b8'}];
+  {id:'renda_fixa',nome:'Renda fixa',curto:'Renda fixa',cor:'#3b82f6',campo:'Produto',produtos:['CDB','Tesouro','LCI','LCA','Poupança','Debênture','Outro'],lbl:'Descrição (opcional)',ph:'Ex.: 110% do CDI, vence em 2028'},
+  {id:'acoes',nome:'Ações',curto:'Ações',cor:'#facc15',lbl:'Ticker ou empresa',ph:'Ex.: ITSA4'},
+  {id:'fundos',nome:'Fundos',curto:'Fundos',cor:'#a855f7',campo:'Tipo do fundo',produtos:['Renda fixa','Multimercado','Ações','Cambial','Previdência','Outro'],lbl:'Nome do fundo (opcional)',ph:'Ex.: Fundo XP Multimercado'},
+  {id:'fiis',nome:'Fundos imobiliários',curto:'FIIs',cor:'#f97316',campo:'Tipo do FII',produtos:['Tijolo','Papel','Fundo de fundos','Híbrido'],lbl:'Ticker',ph:'Ex.: MXRF11'},
+  {id:'etfs',nome:'ETFs',curto:'ETFs',cor:'#22d3ee',lbl:'Ticker',ph:'Ex.: IVVB11'},
+  {id:'bdrs',nome:'BDRs',curto:'BDRs',cor:'#ec4899',lbl:'Ticker',ph:'Ex.: AAPL34'},
+  {id:'cripto',nome:'Criptomoedas',curto:'Cripto',cor:'#14b8a6',campo:'Moeda',produtos:['Bitcoin','Ethereum','Stablecoin','Outra'],lbl:'Descrição (opcional)',ph:'Ex.: carteira na corretora'}];
+/* formato antigo (antes do schema-v7) convertido na hora de exibir */
+const INV_ANTIGO={poupanca:'Poupança',tesouro:'Tesouro',cdb:'CDB',lci_lca:'LCI',cri_cra:'CRI/CRA',lc:'LC',debentures:'Debênture',lf:'LF'};
 const INVT=Object.fromEntries(INV.map(t=>[t.id,t]));
 const CORES_CARTAO=['#7c3aed','#0ea5e9','#f97316','#ef4444','#10b981','#ec4899','#64748b','#111827'];
 
@@ -710,7 +715,7 @@ async function carregarResto(){
   const [mt,ct,cf,mv,tot,base,cc,rc,dv,ds,orc,fut,pd,inv,lv]=r;
   S.temV6=!lv.error;
   S.temV5=!inv.error;
-  S.invest=(inv.data||[]).map(x=>({...x,valor:Number(x.valor)}));
+  S.invest=(inv.data||[]).map(x=>{const v={...x,valor:Number(x.valor),produto:x.produto||''};if(INV_ANTIGO[v.tipo]){v.produto=v.produto||INV_ANTIGO[v.tipo];v.tipo='renda_fixa'}return v});
   S.temV2=!mt.error&&!ct.error;
   S.temV4=!cc.error;
   S.metas=(mt.data||[]).map(m=>({...m,alvo:Number(m.alvo)}));
@@ -1430,7 +1435,7 @@ function vInvestimentos(){
   if(!S.temV5)return head('Investimentos','',null,true)+`<div class="panel">${avisoV(5)}</div>`;
   const tot=totalInvest();
   const por={};S.invest.forEach(x=>{por[x.tipo]=(por[x.tipo]||0)+x.valor});
-  const fatias=INV.filter(t=>por[t.id]).map(t=>({...t,valor:por[t.id],qtd:S.invest.filter(x=>x.tipo===t.id).length})).sort((a,b)=>b.valor-a.valor);
+  const fatias=INV.filter(t=>por[t.id]).map(t=>{const its=S.invest.filter(x=>x.tipo===t.id),pp={};its.forEach(x=>{const k=x.produto||x.nome||t.nome;pp[k]=(pp[k]||0)+x.valor});return {...t,valor:por[t.id],qtd:its.length,partes:Object.entries(pp).sort((a,b)=>b[1]-a[1])}}).sort((a,b)=>b.valor-a.valor);
   S._fatias=fatias;
   const patr=emCaixa()+totalMetas()+tot,maior=fatias[0];
   const pctF=v=>(v/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
@@ -1450,8 +1455,8 @@ function vInvestimentos(){
     </div>
   </div>
   <div class="panel"><h2>Aplicações</h2><p class="sub">Atualizem o valor de cada aplicação sempre que quiserem refletir os rendimentos</p>
-    <div class="tbl-wrap"><table><thead><tr><th>Tipo</th><th>Descrição</th><th class="hide-sm">Instituição</th><th class="hide-sm">Desde</th><th class="r">Valor</th><th class="r"></th></tr></thead><tbody>
-    ${S.invest.map(x=>{const t=INVT[x.tipo]||{nome:x.tipo,cor:'#888'};return `<tr class="row"><td><span class="cat"><i class="dot" style="background:${t.cor}"></i>${esc(t.nome)}</span></td><td class="desc">${esc(x.nome||t.nome)}</td><td class="hide-sm mut">${esc(x.instituicao||'—')}</td><td class="hide-sm mut">${dataBR(x.data)}/${x.data.slice(2,4)}</td><td class="r vl pos">${R(x.valor)}</td>
+    <div class="tbl-wrap"><table><thead><tr><th>Categoria</th><th>Produto</th><th class="hide-sm">Detalhe</th><th class="hide-sm">Instituição</th><th class="hide-sm">Desde</th><th class="r">Valor</th><th class="r"></th></tr></thead><tbody>
+    ${S.invest.map(x=>{const t=INVT[x.tipo]||{nome:x.tipo,cor:'#888'};return `<tr class="row"><td><span class="cat"><i class="dot" style="background:${t.cor}"></i>${esc(t.curto||t.nome)}</span></td><td class="desc">${esc(x.produto||x.nome||t.nome)}</td><td class="hide-sm mut">${esc(x.produto?x.nome||'—':'—')}</td><td class="hide-sm mut">${esc(x.instituicao||'—')}</td><td class="hide-sm mut">${dataBR(x.data)}/${x.data.slice(2,4)}</td><td class="r vl pos">${R(x.valor)}</td>
       <td class="r"><span class="acts"><button class="ic" data-act="inv-editar" data-id="${x.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="inv-apagar" data-id="${x.id}" aria-label="Excluir">${svg('del')}</button></span></td></tr>`}).join('')}
     </tbody></table></div>
     <p class="nota">Se o dinheiro de uma meta (como a reserva de emergência) estiver aplicado em um investimento, cadastrem em só um dos lugares para o patrimônio não contar duas vezes.</p>
@@ -1465,7 +1470,7 @@ function ligarPizza(){
     box.classList.toggle('ativo',i!==null);
     if(i===null){tip.hidden=true;return}
     const f=S._fatias[i];
-    tip.innerHTML=`<div class="pt-h"><i style="background:${f.cor}"></i>${esc(f.nome)}</div><div class="pt-v">${S.priv?'R$ •••':R(f.valor)}</div><div class="pt-p">${(f.valor/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% da carteira · ${plural(f.qtd,'aplicação','aplicações')}</div>`;
+    tip.innerHTML=`<div class="pt-h"><i style="background:${f.cor}"></i>${esc(f.nome)}</div><div class="pt-v">${S.priv?'R$ •••':R(f.valor)}</div><div class="pt-p">${(f.valor/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% da carteira · ${plural(f.qtd,'aplicação','aplicações')}</div>${f.partes.length>1||(f.partes[0]&&f.partes[0][0]!==f.nome)?`<div class="pt-l">${f.partes.slice(0,5).map(([k,v])=>`<span>${esc(k)}</span><b>${S.priv?'•••':R(v)}</b>`).join('')}</div>`:''}`;
     tip.hidden=false;
     const r=box.getBoundingClientRect();
     if(ev&&ev.clientX&&box.contains(ev.target)){tip.style.left=(ev.clientX-r.left)+'px';tip.style.top=(ev.clientY-r.top)+'px'}
@@ -1658,22 +1663,39 @@ function modalReserva(){
     toast('Reserva criada');
   });
 }
+function invDetalhe(tipo,x){
+  const t=INVT[tipo]||INV[0],p=x&&x.tipo===tipo?x.produto:'';
+  const conhecido=t.produtos&&t.produtos.includes(p),outro=t.produtos&&p&&!conhecido;
+  const sel0=t.produtos?(conhecido?p:outro?t.produtos[t.produtos.length-1]:t.produtos[0]):'';
+  return `${t.produtos?`<label style="margin-bottom:0">${t.campo}</label><div class="chips" data-g="prodInv" data-onchange="__trocaProd">${t.produtos.map(v=>`<button type="button" class="chip" data-v="${esc(v)}" aria-pressed="${v===sel0}">${esc(v)}</button>`).join('')}</div>
+    <div id="outroWrap" ${/^Outr[oa]$/.test(sel0)?'':'hidden'}><label>Qual?<input class="field" id="mOutro" maxlength="30" placeholder="Ex.: LC, LF, CRI" value="${esc(outro?p:'')}"></label></div>`:''}
+    <label>${t.lbl}<input class="field" id="mNome" maxlength="60" placeholder="${esc(t.ph)}" value="${esc(x&&x.tipo===tipo?x.nome:'')}"></label>`;
+}
+window.__trocaCatInv=b=>{const x=S._invEdit;$('mdl').querySelector('#invDet').innerHTML=invDetalhe(b.dataset.v,x);ligarChipsMdl($('mdl').querySelector('#invDet'))};
+window.__trocaProd=b=>{const w=$('mdl').querySelector('#outroWrap');if(w){w.hidden=!/^Outr[oa]$/.test(b.dataset.v);if(!w.hidden)setTimeout(()=>$('mdl').querySelector('#mOutro').focus(),30)}};
+function ligarChipsMdl(root){root.querySelectorAll('.seg,.chips').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!g.contains(b))return;g.querySelectorAll(':scope>button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));if(g.dataset.onchange&&window[g.dataset.onchange])window[g.dataset.onchange](b)}))}
 function modalInvest(x){
+  S._invEdit=x||null;const tipo=x?x.tipo:'renda_fixa';
   modal(`<h2>${x?'Editar investimento':'Novo investimento'}</h2>
-    <label style="margin-bottom:0">Tipo</label><div class="chips" data-g="tipoInv">${INV.map(t=>`<button type="button" class="chip" data-v="${t.id}" aria-pressed="${(x?x.tipo:'cdb')===t.id}"><i class="dot" style="background:${t.cor}"></i>${esc(t.nome)}</button>`).join('')}</div>
+    <label style="margin-bottom:0">Categoria</label><div class="chips" data-g="catInv" data-onchange="__trocaCatInv">${INV.map(t=>`<button type="button" class="chip" data-v="${t.id}" aria-pressed="${tipo===t.id}"><i class="dot" style="background:${t.cor}"></i>${esc(t.curto)}</button>`).join('')}</div>
+    <div id="invDet">${invDetalhe(tipo,x)}</div>
+    <label>Instituição<input class="field" id="mInst" maxlength="40" placeholder="Ex.: Banco X" value="${esc(x?x.instituicao:'')}"></label>
     <label>Valor ${x?'atual':'investido'} (R$)<input class="field big" id="mValor" inputmode="decimal" placeholder="0,00" value="${x?fmtInput(x.valor):''}"></label>
-    <div class="row2"><label>Descrição (opcional)<input class="field" id="mNome" maxlength="60" placeholder="Ex.: Tesouro Selic 2029" value="${esc(x?x.nome:'')}"></label>
-    <label>Instituição (opcional)<input class="field" id="mInst" maxlength="40" placeholder="Ex.: Nubank" value="${esc(x?x.instituicao:'')}"></label></div>
-    <label>Data da aplicação<input class="field" id="mData" type="date" value="${x?x.data:HOJE}"></label>
+    <label>Data<input class="field" id="mData" type="date" value="${x?x.data:HOJE}"></label>
     ${x?'':`<label class="chk"><input type="checkbox" id="mDesc"> Descontar do Em caixa (o dinheiro saiu da conta de vocês agora)</label>`}
     ${btns(x?'Salvar alterações':'Adicionar investimento')}`,
   async()=>{
+    const tipo=sel('catInv')||'renda_fixa',t=INVT[tipo];
     const valor=parseValor(val('mValor')),d=val('mData');
+    let produto=t.produtos?(sel('prodInv')||''):'';
+    if(/^Outr[oa]$/.test(produto)&&val('mOutro').trim())produto=val('mOutro').trim().slice(0,30);
+    const nome=val('mNome').trim();
+    if(!t.produtos&&!nome)return `Informe o ${t.lbl.toLowerCase()}.`;
     if(!valor)return 'Digite o valor investido.';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
-    const reg={tipo:sel('tipoInv')||'cdb',valor,nome:val('mNome').trim(),instituicao:val('mInst').trim(),data:d};
+    const reg={tipo,produto,valor,nome,instituicao:val('mInst').trim(),data:d};
     const {error}=x?await sb.from('investimentos').update(reg).eq('id',x.id):await sb.from('investimentos').insert(reg);
-    if(error){if(/investimentos/.test(error.message||''))return 'Falta rodar o arquivo schema-v5.sql no Supabase.';throw error}
+    if(error){if(/produto|investimentos_tipo_check|check constraint/.test(error.message||''))return 'Falta rodar o arquivo schema-v7.sql no Supabase.';if(/investimentos/.test(error.message||''))return 'Falta rodar o arquivo schema-v5.sql no Supabase.';throw error}
     if(!x&&$('mdl').querySelector('#mDesc')?.checked)await sb.from('config').upsert({id:'casal',saldo_inicial:Math.round((S.saldoInicial-valor)*100)/100,atualizado_em:new Date().toISOString()});
     toast(x?'Investimento atualizado':'Investimento adicionado');
   });
@@ -1913,7 +1935,7 @@ document.addEventListener('click',async e=>{
       const msg=$('orcMsg');if(msg){msg.textContent='Valores copiados. Clique em salvar para confirmar.';msg.className='mut'}}break;
     case 'inv-novo':modalInvest();break;
     case 'inv-editar':{const x=S.invest.find(i=>i.id===id);if(x)modalInvest(x)}break;
-    case 'inv-apagar':{const x=S.invest.find(i=>i.id===id);if(x)confirmar('Excluir investimento?',`${esc(x.nome||INVT[x.tipo].nome)} de ${R(x.valor)} sai da carteira.`,'Excluir',async()=>{const {error}=await sb.from('investimentos').delete().eq('id',x.id);if(error)throw error;toast('Investimento excluído')})}break;
+    case 'inv-apagar':{const x=S.invest.find(i=>i.id===id);if(x)confirmar('Excluir investimento?',`${esc(x.nome||x.produto||(INVT[x.tipo]||{nome:''}).nome)} de ${R(x.valor)} sai da carteira.`,'Excluir',async()=>{const {error}=await sb.from('investimentos').delete().eq('id',x.id);if(error)throw error;toast('Investimento excluído')})}break;
     case 'mesadas':modalMesadas();break;
     case 'ajustar-caixa':modalCaixa();break;
     case 'priv':S.priv=!S.priv;try{localStorage.setItem('pf-priv',S.priv?'1':'0')}catch(x){}navHTML();if($('dlg').open)modalMais();break;
