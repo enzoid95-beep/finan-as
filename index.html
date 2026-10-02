@@ -601,6 +601,11 @@ dialog{position:fixed}
 .side .nav-sub{height:clamp(17px,2.55vh,32px)!important;font-size:clamp(12px,1.5vh,14.5px)!important}
 .side>.brand-logo img{max-height:clamp(38px,8vh,88px)!important}
 .novo-side{padding:clamp(5px,1.1vh,11px)!important}
+/* logo horizontal */
+.side>.brand-logo{padding:2px 2px 0}
+.side>.brand-logo img{width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important}
+.topbar .brand-logo img{height:40px!important;width:auto!important;max-width:100%}
+.login-card .brand-logo img{width:100%!important;max-width:330px!important;height:auto}
 /* regra de cores */
 .zero{color:#fff!important}.ref{color:var(--g2)!important}
 .ccard .big.neg{color:#fecaca!important;text-shadow:0 1px 3px rgba(0,0,0,.6)}
@@ -733,7 +738,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <div class="login" id="login" hidden>
   <div class="login-card panel">
-    <div class="brand brand-logo"><img src="logo.png" alt="Controle 360" width="640" height="352"></div>
+    <div class="brand brand-logo"><img src="logo.png" alt="Controle 360" width="1000" height="219"></div>
 
     <div id="lForm">
       <button class="btn-google" id="lGoogle" type="button">
@@ -766,7 +771,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <div class="app" id="app" hidden>
   <aside class="side" aria-label="Navegação">
-    <div class="brand brand-logo"><img src="logo.png" alt="Controle 360" width="640" height="352"></div>
+    <div class="brand brand-logo"><img src="logo.png" alt="Controle 360" width="1000" height="219"></div>
     <button class="btn novo-side" data-act="novo-global"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Novo</button>
     <nav id="sideNav"></nav>
     <div class="side-foot">
@@ -781,7 +786,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
   </aside>
   <main class="main">
     <div class="topbar">
-      <div class="brand brand-logo"><img src="logo.png" alt="Controle 360" width="640" height="352"></div>
+      <div class="brand brand-logo"><img src="logo.png" alt="Controle 360" width="1000" height="219"></div>
       <button class="ic ic-novo" data-act="novo-global" aria-label="Novo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       <button class="ic" id="privTop" data-act="priv" aria-label="Esconder ou mostrar valores"></button>
       <button class="ic" data-act="mais" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
