@@ -455,7 +455,7 @@ dialog::backdrop{background:rgba(2,3,6,.72);backdrop-filter:blur(5px)}
 .nav-g.aberto .nav-seta{transform:rotate(45deg)}
 .nav-btn[data-ativo="1"]{color:#fff;font-weight:600}
 .nav-btn[data-ativo="1"] svg{color:var(--g2)}
-.nav-subs{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px 21px;padding-left:12px;border-left:1px solid var(--line2)}
+.nav-subs{display:flex;flex-direction:column;gap:1px;margin:0 0 8px 21px;padding-left:12px;border-left:1px solid var(--line2)}
 .nav-sub{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;color:var(--muted);font-size:14.5px;font-weight:500;text-align:left;position:relative}
 .nav-sub:hover{color:#fff;background:rgba(255,255,255,.05)}
 .nav-sub[aria-current="page"]{color:#fff;font-weight:600;background:linear-gradient(90deg,color-mix(in srgb,var(--g1) 22%,transparent),transparent)}
@@ -997,9 +997,9 @@ function navHTML(){
   if(S._gAnt!==gAtual){S.abertos[gAtual]=true;S._gAnt=gAtual}
   $('sideNav').innerHTML=GRUPOS.map(g=>{
     const badge=g.id==='g-plan'&&atras?`<span class="badge">${atras}</span>`:'';
-    const multi=g.views.length>1,aberto=multi&&S.abertos[g.id];
+    const multi=g.views.length>1,aberto=multi;
     const subs=multi?`<div class="nav-subs" ${aberto?'':'hidden'}>${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);const b=id==='contas'&&atras?`<span class="badge">${atras}</span>`:'';return `<button class="nav-sub" data-go="${id}" ${S.view===id?'aria-current="page"':''}>${esc(v.nome)}${b}</button>`}).join('')}</div>`:'';
-    return `<div class="nav-g ${aberto?'aberto':''}"><button class="nav-btn" data-grupo-nav="${g.id}" ${gAtual===g.id&&!multi?'aria-current="page"':''} ${multi?`aria-expanded="${!!aberto}"`:''} ${gAtual===g.id&&multi?'data-ativo="1"':''}>${svg(g.ic)}<span>${g.nome}</span>${aberto?'':badge}${multi?'<i class="nav-seta" aria-hidden="true"></i>':''}</button>${subs}</div>`}).join('');
+    return `<div class="nav-g ${aberto?'aberto':''}"><button class="nav-btn" data-grupo-nav="${g.id}" ${gAtual===g.id&&!multi?'aria-current="page"':''}  ${gAtual===g.id&&multi?'data-ativo="1"':''}>${svg(g.ic)}<span>${g.nome}</span>${multi?'':badge}</button>${subs}</div>`}).join('');
   $('tabbar').innerHTML=TABS.map(id=>{const g=GRUPOS.find(x=>x.id===id);return `<button data-grupo="${id}" ${gAtual===id?'aria-current="page"':''}>${svg(g.ic)}<span>${g.curto}</span></button>`}).join('')
     +`<button data-act="mais" ${TABS.includes(gAtual)?'':'aria-current="page"'}>${svg('mais')}<span>Mais</span></button>`;
   $('privBtn').innerHTML=svg(S.priv?'olhoF':'olho')+`<span>${S.priv?'Mostrar valores':'Esconder valores'}</span>`;
@@ -2202,7 +2202,6 @@ if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceW
 async function inserir(t,reg,msg){const {error}=await sb.from(t).insert(reg);if(error){toast('Não deu para salvar: '+error.message);return false}if(msg)toast(msg);recarregar();return true}
 document.addEventListener('click',async e=>{
   const gn=e.target.closest('[data-grupo-nav]');if(gn){const g=GRUPOS.find(x=>x.id===gn.dataset.grupoNav);S.abertos=S.abertos||{};
-    if(g.views.length>1&&grupoDe(S.view).id===g.id){S.abertos[g.id]=!S.abertos[g.id];navHTML();return}
     S.abertos[g.id]=true;irGrupo(g.id);return}
   const gr=e.target.closest('[data-grupo]');if(gr){fechar();irGrupo(gr.dataset.grupo);return}
   const go=e.target.closest('[data-go]');if(go){fechar();ir(go.dataset.go);return}
