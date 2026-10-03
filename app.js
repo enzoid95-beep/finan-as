@@ -130,7 +130,7 @@ try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 function deLinha(r){return {id:r.id,tipo:r.tipo,valor:Number(r.valor),descricao:r.descricao||'',categoria:r.categoria,data:r.data,mes:r.data.slice(0,7),autor:r.autor_email,
   criadoEm:Date.parse(r.criado_em)||0,meta_id:r.meta_id||null,conta_id:r.conta_id||null,cartao_id:r.cartao_id||null,compra_id:r.compra_id||null,
   parcela:r.parcela||null,parcelas:r.parcelas||null,recorrente_id:r.recorrente_id||null,divida_id:r.divida_id||null,livre:!!r.livre||r.categoria==='livre',
-  status:r.status||'pago',data_caixa:r.data_caixa||null,fatura_mes:r.fatura_mes||null,meio:r.meio||'',ref_mes:r.ref_mes||null,investimento_id:r.investimento_id||null,editado:!!r.editado,tags:Array.isArray(r.tags)?r.tags:[],nota:r.nota||'',anexo:r.anexo||null}}
+  status:r.status||'pago',data_caixa:r.data_caixa||null,fatura_mes:r.fatura_mes||null,meio:r.meio||'',ref_mes:r.ref_mes||null,investimento_id:r.investimento_id||null,editado:!!r.editado,tags:Array.isArray(r.tags)?r.tags:[],nota:r.nota||'',anexo:r.anexo||null,dono:r.dono||null}}
 async function carregarItens(){
   const alvo=S.mes,menor=S.mes<MES_ATUAL?S.mes:MES_ATUAL,maior=S.mes>MES_ATUAL?S.mes:addMes(MES_ATUAL,1);
   const ini=addMes(menor,-5)+'-01',fim=addMes(maior,1)+'-01';
@@ -267,7 +267,7 @@ function statusConta(r,m){
   const oc=ocorrencia(r,m),venc=diaNoMes(m,r.dia);
   if(oc&&oc.status==='cancelado')return {k:'idle',txt:'Pulada este mês',venc,oc};
   if(oc&&oc.status==='pago')return {k:'ok',txt:(r.tipo==='entrada'?'Recebida em ':'Paga em ')+dataBR(oc.data_caixa||oc.data),venc,oc,pago:oc};
-  if(oc&&oc.status==='comprometido')return {k:'ok',txt:'No cartão · fatura de '+nomeMes(oc.fatura_mes||m,true).toLowerCase(),venc,oc,pago:oc};
+  if(oc&&oc.status==='comprometido')return {k:'ok',txt:'No cartão · fatura de '+nomeMes(refDoItem(oc)||m,true).toLowerCase(),venc,oc,pago:oc};
   if(!r.ativa)return {k:'idle',txt:'Pausada',venc,oc};
   if(r.inicio>m)return {k:'idle',txt:'Começa em '+mesAno(r.inicio),venc,oc};
   if(r.fim&&m>r.fim)return {k:'idle',txt:'Encerrada em '+mesAno(r.fim),venc,oc};
@@ -306,6 +306,13 @@ function infoFatura(card,fm){
   const k=!it.length?'vazia':aberto<=0?'paga':HOJE>venc?'atrasada':HOJE>=fech?'fechada':'aberta';
   return {it,total,aberto,prev,venc,fech,k:it.length&&aberto<=0&&prev>0?(HOJE>=fech?'fechada':'aberta'):k};
 }
+/* O "mês da fatura" é sempre o mês em que ela FECHA: fecha 27/09 e vence 05/10 = fatura de setembro.
+   Por dentro, a fatura continua guardada pelo mês de vencimento; estas funções fazem a ponte. */
+function refDe(card,fm){return fechamentoFatura(card,fm).slice(0,7)}
+function fmDeRef(card,ref){return card.vencimento>card.fechamento?ref:addMes(ref,1)}
+function faturaRef(card,ref){return infoFatura(card,fmDeRef(card,ref))}
+function totalRef(ref,soAberto){return S.cartoes.reduce((s,c)=>{const f=faturaRef(c,ref);return s+(soAberto?f.aberto:f.total)},0)}
+function refDoItem(x){const cd=S.cartoes.find(c=>c.id===x.cartao_id);return cd&&x.fatura_mes?refDe(cd,x.fatura_mes):(x.fatura_mes||'')}
 function addDia(iso,n){const [y,m,d]=iso.split('-').map(Number);const x=new Date(Date.UTC(y,m-1,d+n));return `${x.getUTCFullYear()}-${pad(x.getUTCMonth()+1)}-${pad(x.getUTCDate())}`}
 /* período coberto: da data de fechamento anterior (inclusive) até o dia antes do fechamento desta fatura */
 function periodoFatura(card,fm){const fech=fechamentoFatura(card,fm),ant=fechamentoFatura(card,addMes(fm,-1));return {ini:ant,fim:addDia(fech,-1),fech}}
@@ -493,7 +500,7 @@ function vGeral(){
   const catsHTML=cats.length?cats.map(([id,v])=>{const c=CAT[id]||{em:'•',nome:id};const lim=Number(pl[id])||0;const ratio=lim?v/lim:v/maxC;
     return pbar(`${c.em} ${esc(c.nome)}`,R(v),lim?RF('de '+R0(lim)):'',ratio,lim?clsLim(ratio):'','neg')}).join(''):vazio('Nenhum gasto ainda','Lance o primeiro gasto do mês.');
   const prox=proximosEventos(45).slice(0,5);
-  const proxHTML=prox.length?`<div class="mini">${prox.map(e=>`<div class="mini-row"><div class="em">${e.ic||e.em}</div><div class="nm"><b>${esc(e.txt)}</b><small>${e.data===HOJE?'Hoje':diasEntre(HOJE,e.data)===1?'Amanhã':dataBR(e.data)} · ${esc(e.k)}</small></div><div class="vl ${e.entra?'pos':'neg'}">${e.entra?'+ ':'− '}${R(e.pend!=null?e.pend:e.valor)}</div></div>`).join('')}</div>`
+  const proxHTML=prox.length?`<div class="mini">${prox.map(e=>`<div class="mini-row"><div class="em">${e.ic||e.em}</div><div class="nm"><b>${esc(e.txt)}</b><small>${e.data===HOJE?'Hoje':diasEntre(HOJE,e.data)===1?'Amanhã':dataBR(e.data)} · ${esc(e.k)}</small>${acaoEvento(e,'btn xs ev-acao')}</div><div class="vl ${e.entra?'pos':'neg'}">${e.entra?'+ ':'− '}${R(e.pend!=null?e.pend:e.valor)}</div></div>`).join('')}</div>`
     :vazio('Nada pela frente','Nenhum vencimento, fatura ou entrada prevista.');
   const ult=[...r.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm).slice(0,5);
   const kpi=(k,v,cls,sub)=>`<div class="kpi"><small>${k}</small><b class="${cls}">${v}</b>${sub?`<span>${sub}</span>`:''}</div>`;
@@ -551,6 +558,14 @@ function vTransf(){
   </tbody></table></div><p class="nota">Apagar uma transferência desfaz o efeito: o dinheiro volta para a origem.</p></div>`;
 }
 /* ================= calendário ================= */
+/* botão de ação de um evento do mês: Recebi, Paguei, Pagar fatura ou Pagar parcela */
+function acaoEvento(e,cls='btn sm'){
+  if(e.feito||e.transf)return '';
+  if(e.cartao)return `<button type="button" class="${cls}" data-act="fatura-pagar" data-id="${e.cartao}" data-fm="${e.fm}">Pagar fatura</button>`;
+  if(e.divida)return `<button type="button" class="${cls}" data-act="div-pagar" data-id="${e.divida}">Pagar parcela</button>`;
+  if(!e.id)return '';
+  return `<button type="button" class="${cls}" data-act="oc-confirmar" data-id="${e.id}">${e.entra?'Recebi':'Paguei'}</button>`;
+}
 function eventosMes(m){
   const ev={};const add=(d,e)=>{(ev[d]=ev[d]||[]).push(e)};
   // lançamentos fora do cartão: realizados e previstos
@@ -563,11 +578,11 @@ function eventosMes(m){
   });
   // faturas no vencimento
   S.cartoes.forEach(c=>{const f=infoFatura(c,m);if(!f.it.length)return;
-    add(f.venc,{em:'💳',txt:'Fatura '+c.nome,valor:f.total,pend:f.aberto+f.prev,sai:true,feito:f.k==='paga',ic:'💳',cartao:c.id,fm:m,
+    add(f.venc,{em:'💳',txt:'Fatura '+c.nome+' ('+soMes(f.fech.slice(0,7))+')',valor:f.total,pend:f.aberto+f.prev,sai:true,feito:f.k==='paga',ic:'💳',cartao:c.id,fm:m,
       k:'Pagamento de fatura · '+(f.k==='paga'?'paga':f.k==='atrasada'?'atrasada':f.k==='fechada'?'fechada, a pagar':'aberta, fecha '+dataBR(f.fech))})});
   // parcela de dívida ainda não paga
   S.dividas.forEach(d=>{const inf=infoDivida(d);if(inf.rest<=0||S.pagDiv.some(p=>p.divida_id===d.id&&p.mes===m)||m<MES_ATUAL)return;if(difMes(MES_ATUAL,m)>=inf.rest)return;
-    add(diaNoMes(m,d.dia),{em:'🏦',txt:'Parcela '+d.nome,valor:d.parcela,sai:true,k:'Pagamento de dívida · a pagar',ic:'🏦'})});
+    add(diaNoMes(m,d.dia),{em:'🏦',txt:'Parcela '+d.nome,valor:d.parcela,sai:true,divida:d.id,k:'Pagamento de dívida · a pagar',ic:'🏦'})});
   // regras que ainda não geraram ocorrência neste mês (meses mais distantes)
   if(m>=MES_ATUAL)S.recorrentes.filter(r=>r.ativa&&r.inicio<=m&&!(r.fim&&m>r.fim)&&!ocorrencia(r,m)).forEach(r=>{const c=CAT[r.categoria]||{em:'🔁'};
     add(diaNoMes(m,r.dia),{em:c.em,txt:r.descricao,valor:r.valor,entra:r.tipo==='entrada',sai:r.tipo==='gasto',k:r.tipo==='entrada'?'Entrada prevista':(r.cartao_id?'Compra recorrente no cartão · prevista':'Conta prevista'),ic:r.auto?'🔁':'🏠'})});
@@ -605,7 +620,7 @@ function vCalendario(){
     <div class="panel"><div class="cal">${cells}</div>
       <div class="cal-leg"><span><i class="lg pos"></i>Entrada</span><span><i class="lg neg"></i>Saída</span><span><i class="lg ref"></i>Compromisso futuro</span><span class="sep"></span><span>🏠 conta</span><span>💳 fatura</span><span>🏦 dívida</span><span>🔁 automática</span><span>📌 agendado</span></div></div>
     <div class="cal-panel"><h2 class="cond" style="margin:0 0 4px;font-size:22px">${diaSemana(S.calDia)}</h2><p class="sub mut" style="margin:0 0 10px;font-size:13.5px">${plural(sel.length,'item','itens')}</p>
-      ${sel.length?sel.map(e=>`<div class="ev"><div class="em">${e.em}</div><div class="nm"><b>${esc(e.txt)}</b><small>${esc(e.k)}</small></div><div class="vl ${e.entra?'pos':e.feito?'neg':'ref'}">${e.entra?'+ ':''}${R(e.valor)}</div></div>`).join(''):vazio('Dia livre','Nada lançado ou previsto.')}
+      ${sel.length?sel.map(e=>`<div class="ev"><div class="em">${e.em}</div><div class="nm"><b>${esc(e.txt)}</b><small>${esc(e.k)}</small>${acaoEvento(e,'btn sm ev-acao')}</div><div class="vl ${e.entra?'pos':e.feito?'neg':'ref'}">${e.entra?'+ ':''}${R(e.pend!=null&&!e.feito?e.pend:e.valor)}</div></div>`).join(''):vazio('Dia livre','Nada lançado ou previsto.')}
       <button class="btn sm ghost" style="margin-top:12px;width:100%;justify-content:center" data-act="novo" data-tipo="gasto" data-data="${S.calDia}">${svg('plus')}Lançar neste dia</button>
     </div>
   </div>`;
@@ -616,7 +631,7 @@ function tabela(itens,tipo){
   if(!itens.length)return vazio('Nada por aqui',`${tipo==='gasto'?'Nenhum gasto':'Nenhuma entrada'} ${S.fCat||S.fBusca?'com esse filtro':'neste mês'}.`);
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="hide-sm hide-md">Quem lançou</th><th class="r">Valor</th><th class="r"></th></tr></thead><tbody>
   ${itens.map(i=>{const c=catVis(i);const cc=i.cartao_id&&S.cartoes.find(x=>x.id===i.cartao_id);
-    const tags=(cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}${i.parcelas>1?' '+i.parcela+'/'+i.parcelas:''}${i.fatura_mes?' · fatura '+nomeMes(i.fatura_mes,true).toLowerCase():''}${i.status==='pago'?' · paga':''}</span>`:'')+(i.recorrente_id?`<span class="badge-s">${(S.recorrentes.find(r=>r.id===i.recorrente_id)||{}).auto?'🔁 automática':'🏠 conta'}${i.editado?' · valor ajustado':''}</span>`:'')+(i.divida_id?'<span class="badge-s">🏦 dívida</span>':'')+(ehLivre(i)&&!outroLivre(i)?'<span class="badge-s">💸 pessoal</span>':'')+(i.tags||[]).map(t=>`<span class="badge-s tg">#${esc(t)}</span>`).join('')+(i.nota?`<span class="badge-s" title="${esc(i.nota)}">📝</span>`:'')+(i.anexo?`<button class="badge-s lnk" data-act="ver-anexo" data-path="${esc(i.anexo)}" title="Ver anexo">📎</button>`:'');
+    const tags=(cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}${i.parcelas>1?' '+i.parcela+'/'+i.parcelas:''}${i.fatura_mes?' · fatura de '+nomeMes(refDoItem(i),true).toLowerCase():''}${i.status==='pago'?' · paga':''}</span>`:'')+(i.recorrente_id?`<span class="badge-s">${(S.recorrentes.find(r=>r.id===i.recorrente_id)||{}).auto?'🔁 automática':'🏠 conta'}${i.editado?' · valor ajustado':''}</span>`:'')+(i.divida_id?'<span class="badge-s">🏦 dívida</span>':'')+(ehLivre(i)&&!outroLivre(i)?'<span class="badge-s">💸 pessoal</span>':'')+(i.tags||[]).map(t=>`<span class="badge-s tg">#${esc(t)}</span>`).join('')+(i.nota?`<span class="badge-s" title="${esc(i.nota)}">📝</span>`:'')+(i.anexo?`<button class="badge-s lnk" data-act="ver-anexo" data-path="${esc(i.anexo)}" title="Ver anexo">📎</button>`:'');
     const meuOuNaoLivre=!outroLivre(i);
     return `<tr class="row"><td class="mut">${dataBR(i.data)}</td><td class="desc">${esc(descVis(i))}${tags}</td><td class="wrap"><span class="cat">${c.em} ${esc(c.nome)}</span></td><td class="hide-sm hide-md mut">${esc(nomeDe(i.autor)||'Automático')}</td><td class="r vl ${tipo==='entrada'?'pos':'neg'}">${R(i.valor)}</td>
     <td class="r"><span class="acts">${meuOuNaoLivre?`<button class="ic" data-act="editar" data-id="${i.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${i.id}" aria-label="Apagar">${svg('del')}</button>`:''}</span></td></tr>`}).join('')}
@@ -651,6 +666,13 @@ function vGastos(){
     </div>
   </div>`;
 }
+/* entradas que ainda não caíram: as do mês (automáticas, agendadas e previstas) e, no mês atual, as atrasadas de meses anteriores */
+function previstasEntrar(){
+  const out=[];
+  Object.entries(eventosMes(S.mes)).forEach(([d,es])=>es.forEach(e=>{if(e.entra&&!e.feito&&!e.transf)out.push({...e,data:d})}));
+  if(S.mes===MES_ATUAL)S.itens.filter(i=>i.tipo==='entrada'&&i.status==='previsto'&&i.mes<MES_ATUAL).forEach(i=>out.push({id:i.id,txt:descVis(i),valor:i.valor,data:i.data,em:catVis(i).em,ic:'📌',k:'Entrada de '+nomeMes(i.mes,true).toLowerCase()+' que ainda não foi confirmada',entra:true}));
+  return out.sort((a,b)=>a.data.localeCompare(b.data));
+}
 function vEntradas(){
   const r=resumo(S.mes),lista=filtrar('entrada'),ent=r.ef.filter(i=>i.tipo==='entrada');
   const porFonte={},porPessoa={};
@@ -660,10 +682,18 @@ function vEntradas(){
   return head('Entradas','Todo dinheiro que entrou no caixa.',BTN('novo','Nova entrada','data-tipo="entrada"'))+`
   <div class="tiles">
     <div class="tile"><div class="k">Recebido no mês</div><div class="v pos">${R(r.entradas)}</div><div class="d">${plural(ent.length,'lançamento','lançamentos')}</div></div>
-    <div class="tile"><div class="k">Ainda previsto</div>${(()=>{const p=Object.values(eventosMes(S.mes)).flat().filter(e=>e.entra&&!e.feito).reduce((s,e)=>s+e.valor,0);return `<div class="v ${p>0?'pos':'zero'}">${R(p)}</div><div class="d">automáticas e agendadas</div>`})()}</div>
+    <div class="tile"><div class="k">Ainda previsto</div>${(()=>{const p=previstasEntrar().reduce((s,e)=>s+e.valor,0);return `<div class="v ${p>0?'pos':'zero'}">${R(p)}</div><div class="d">automáticas e agendadas</div>`})()}</div>
     <div class="tile"><div class="k">Média mensal</div><div class="v pos">${R(med)}</div><div class="d">três meses anteriores</div></div>
     <div class="tile"><div class="k">Variação</div>${ant>0?(()=>{const v=Math.round((r.entradas-ant)/ant*100);return `<div class="v ${v>0?'pos':v<0?'neg':'zero'}">${v>0?'+':''}${v}%</div><div class="d">em relação a ${esc(nomeMes(addMes(S.mes,-1),true).toLowerCase())}</div>`})():`<div class="v zero">—</div><div class="d">sem mês anterior</div>`}</div>
   </div>
+  ${(()=>{const pe=previstasEntrar(),tp=pe.reduce((s,e)=>s+e.valor,0);
+    const cartaoE=e=>{const d=diasEntre(HOJE,e.data),late=d<0,tag=late?`<span class="tag late">Esperada há ${-d} ${-d===1?'dia':'dias'}</span>`:d===0?'<span class="tag soon">Prevista para hoje</span>':`<span class="tag idle">Prevista dia ${Number(e.data.slice(8,10))}</span>`;
+      return `<div class="ct-card ent ${late?'late':''}"><span class="ct-catl">${e.em||'💰'} A receber</span><div class="ct-top"><span class="ct-dia">${dataBR(e.data)}</span>${tag}</div>
+        <b class="ct-nome">${esc(e.txt)}</b><div class="ct-v pos">+ ${R(e.valor)}</div>
+        <div class="ct-meta"><span class="badge-s">${e.ic==='🔁'?'🔁 automática':e.ic==='🏠'?'✋ confirma':'📌 agendada'}</span></div>
+        <div class="ct-acts">${e.id?`<button class="btn sm" data-act="oc-confirmar" data-id="${e.id}">Recebi</button>`:'<span class="mut" style="font-size:12.5px">confirma quando o mês chegar</span>'}</div></div>`};
+    return `<div class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>A receber</h2><p class="sub">Previsto para entrar em ${esc(nomeMes(S.mes))}. Quando o dinheiro cair, toque em “Recebi”.</p></div>${pe.length?`<b class="pos ent-tot">+ ${R0(tp)}</b>`:''}</div>
+      ${pe.length?`<div class="ct-grid ct-full">${pe.map(cartaoE).join('')}</div>`:'<p class="nota" style="margin:6px 0 0">Nenhuma entrada prevista para este mês.</p>'}</div>`})()}
   <div class="grid g21">
     <div class="panel"><h2>Lançamentos</h2><p class="sub">Salários, rendas extras e outros valores.</p>${toolbar(CATS_E)}${tabela(lista,'entrada')}</div>
     <div class="panel"><h2>De onde veio</h2><p class="sub">Por tipo de entrada</p>
@@ -678,22 +708,23 @@ function vCartoes(){
   if(!S.temV4)return head('Cartões','')+`<div class="panel">${avisoV(4)}</div>`;
   if(!S.cartoes.length)return head('Cartões','Faturas, limites e compras parceladas.','',true)+`<div class="panel">${vazio('Nenhum cartão cadastrado','Cadastrem os cartões para lançar compras no crédito e acompanhar as faturas.',BTN('cartao-novo','Cadastrar cartão'))}</div>`;
   const med=media(),fm=S.mes;
-  const prox=[0,1,2,3,4,5].map(k=>addMes(MES_ATUAL,k)).map(m=>({m,v:faturaTotal(m),a:comprometido(m)}));
+  const prox=[0,1,2,3,4,5].map(k=>addMes(MES_ATUAL,k)).map(m=>({m,v:totalRef(m),a:totalRef(m,true)}));
   const maxP=Math.max(1,...prox.map(p=>p.v));
   const totalUsado=S.cartoes.reduce((s,c)=>s+usadoCartao(c.id),0),totalLim=S.cartoes.reduce((s,c)=>s+c.limite,0);
-  const prox1=faturaTotal(addMes(MES_ATUAL,1)),atual=faturaTotal(MES_ATUAL),atualAb=comprometido(MES_ATUAL);
-  const pctRenda=med.ent>0?Math.round(comprometido(addMes(MES_ATUAL,1))/med.ent*100):0;
-  const pf=S.card.filter(x=>x.status==='comprometido'&&x.fatura_mes>addMes(MES_ATUAL,1)).reduce((s,x)=>s+x.valor,0);
+  const prox1=totalRef(addMes(MES_ATUAL,1)),atual=totalRef(MES_ATUAL),atualAb=totalRef(MES_ATUAL,true);
+  const vencDe=ref=>{const v=[...new Set(S.cartoes.map(c=>faturaRef(c,ref)).filter(f=>f.it.length).map(f=>dataBR(f.venc)))];return v.length?'vence '+v.join(' e '):''};
+  const pctRenda=med.ent>0?Math.round(totalRef(addMes(MES_ATUAL,1),true)/med.ent*100):0;
+  const pf=S.card.filter(x=>x.status==='comprometido'&&refDoItem(x)>addMes(MES_ATUAL,1)).reduce((s,x)=>s+x.valor,0);
   const grupos={};S.card.filter(x=>x.compra_id&&x.parcelas>1).forEach(x=>{(grupos[x.compra_id]=grupos[x.compra_id]||[]).push(x)});
   const parc=Object.values(grupos).map(g=>{g.sort((a,b)=>(a.parcela||0)-(b.parcela||0));const rest=g.filter(x=>x.status==='comprometido');if(!rest.length)return null;const x=g[0],cc=S.cartoes.find(c=>c.id===x.cartao_id);
-    return {nome:x.descricao.replace(/\s\(\d+\/\d+\)$/,''),parcela:x.valor,rest:rest.length,de:x.parcelas,fim:g[g.length-1].fatura_mes,cc,total:soma(rest),compra:soma(g)}}).filter(Boolean).sort((a,b)=>b.total-a.total);
+    return {nome:x.descricao.replace(/\s\(\d+\/\d+\)$/,''),parcela:x.valor,rest:rest.length,de:x.parcelas,fim:refDoItem(g[g.length-1])||g[g.length-1].fatura_mes,cc,total:soma(rest),compra:soma(g)}}).filter(Boolean).sort((a,b)=>b.total-a.total);
   const TAG={aberta:['idle','Aberta'],fechada:['soon','Fechada · a pagar'],atrasada:['late','Atrasada'],paga:['ok','Paga'],vazia:['idle','Sem compras']};
   const cards=S.cartoes.map(c=>{
-    const f=infoFatura(c,fm),usado=usadoCartao(c.id),disp=c.limite-usado,t=TAG[f.k];
+    const fm=fmDeRef(c,S.mes),f=infoFatura(c,fm),usado=usadoCartao(c.id),disp=c.limite-usado,t=TAG[f.k];
     return `<div class="ccard-wrap" data-act="faturas" data-id="${c.id}" data-fm="${fm}" role="button" tabindex="0" aria-label="Abrir as faturas do cartão ${esc(c.nome)}">
       <div class="ccard" style="--cc:${esc(c.cor)}">
         <div class="top"><b>${esc(c.nome)}</b><span class="chip-ic"></span></div>
-        <div><div class="lbl">Fatura que fecha ${dataBR(f.fech)} e vence ${dataBR(f.venc)}</div><div class="big ${f.aberto>0?'neg':''}">${R(f.total)}</div></div>
+        <div><div class="lbl"><b>Fatura de ${esc(soMes(f.fech.slice(0,7)))}</b> · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)}</div><div class="big ${f.aberto>0?'neg':''}">${R(f.total)}</div></div>
         <div class="row"><span>Fecha dia ${c.fechamento}</span><span>Vence dia ${c.vencimento}</span></div>
         <div class="ccard-hint">Ver faturas mês a mês ›</div>
         <div class="acts"><button class="ic" data-act="cartao-editar" data-id="${c.id}" aria-label="Editar cartão">${svg('edit')}</button><button class="ic" data-act="cartao-apagar" data-id="${c.id}" aria-label="Excluir cartão">${svg('del')}</button></div>
@@ -702,17 +733,17 @@ function vCartoes(){
       ${c.limite?`<div><div class="lim-bar"><span>Limite usado <b class="m neg">${R0(usado)}</b></span><span>Disponível <b class="m ${cS(disp)}">${R0(disp)}</b></span></div><div class="tr ${clsLim(usado/c.limite)}"><i style="width:${Math.min(100,usado/c.limite*100)}%"></i></div></div>`:''}
       ${f.it.length?`<div class="mini">${[...f.it].sort((a,b)=>b.valor-a.valor).slice(0,5).map(i=>`<div class="mini-row"><div class="em">${catVis(i).em}</div><div class="nm"><b>${esc(descVis(i))}</b><small>${i.parcelas>1?`Parcela ${i.parcela} de ${i.parcelas}`:'À vista'} · gasto em ${dataBR(i.data)}</small></div><div class="vl neg">${R(i.valor)}</div></div>`).join('')}${f.it.length>5?`<p class="nota">+ ${plural(f.it.length-5,'compra','compras')} nesta fatura</p>`:''}</div>`:'<p class="nota">Nenhuma compra nesta fatura.</p>'}
     </div>`}).join('');
-  return head('Cartões','A compra conta como gasto no dia; o caixa só muda quando a fatura é paga.',BTN('compra-cartao','Compra no cartão'))+`
+  return head('Cartões','Cada fatura leva o nome do mês em que fecha: fecha 27/09 e vence 05/10 é a fatura de setembro. A compra conta como gasto no dia; o caixa só muda ao pagar a fatura.',BTN('compra-cartao','Compra no cartão'))+`
   <div class="tiles">
-    <div class="tile"><div class="k">Fatura atual</div><div class="v ${atualAb>0?'neg':'zero'}">${R(atual)}</div><div class="d">${atualAb>0?`<span class="neg">${R0(atualAb)}</span> a pagar em ${esc(soMes(MES_ATUAL))}`:atual?'paga':'sem compras'}</div></div>
-    <div class="tile"><div class="k">Próxima fatura</div><div class="v ${prox1>0?'neg':'zero'}">${R(prox1)}</div><div class="d">${esc(nomeMes(addMes(MES_ATUAL,1)))}</div></div>
+    <div class="tile"><div class="k">Fatura de ${esc(soMes(MES_ATUAL))}</div><div class="v ${atualAb>0?'neg':'zero'}">${R(atual)}</div><div class="d">${atualAb>0?`<span class="neg">${R0(atualAb)}</span> a pagar`:atual?'paga':'sem compras'}${vencDe(MES_ATUAL)?' · '+vencDe(MES_ATUAL):''}</div></div>
+    <div class="tile"><div class="k">Fatura de ${esc(soMes(addMes(MES_ATUAL,1)))}</div><div class="v ${prox1>0?'neg':'zero'}">${R(prox1)}</div><div class="d">${prox1>0?(vencDe(addMes(MES_ATUAL,1))||'em aberto'):'sem compras'}</div></div>
     <div class="tile"><div class="k">Limite disponível</div><div class="v ${cS(totalLim-totalUsado)}">${R0(totalLim-totalUsado)}</div><div class="d">${totalLim?'de '+RF(R0(totalLim))+' no total':'cadastre os limites'}</div></div>
     <div class="tile"><div class="k">Parcelado futuro</div><div class="v ${pf>0?'neg':'zero'}">${R0(pf)}</div><div class="d">depois da próxima fatura · <span class="${pctRenda>30?'neg':''}">${pctRenda}% da renda</span></div></div>
   </div>
   <div class="ccards">${cards}<button class="ccard-add" data-act="cartao-novo">${svg('plus')}Novo cartão</button></div>
   ${histCartoes()}
   <div class="grid g2">
-    <div class="panel"><h2>Próximas faturas</h2><p class="sub">Compromissos já assumidos, por mês de vencimento</p>
+    <div class="panel"><h2>Próximas faturas</h2><p class="sub">Compromissos já assumidos, por mês de fechamento (fatura de setembro = fecha em setembro)</p>
       <div class="chart" style="height:180px">${prox.map(p=>`<div class="cg ${p.m===MES_ATUAL?'atual':''}" title="${R(p.v)}${p.a<p.v?' · '+R(p.v-p.a)+' já pagos':''}"><div class="cpair"><div class="cb" style="max-width:38px;width:60%"><i class="g" style="height:${p.v/maxP*100}%"></i></div></div><small>${nomeMes(p.m,true)}</small></div>`).join('')}</div>
       <p class="nota">${pctRenda>30?'<span class="neg">Mais de 30% da renda já está comprometida no cartão. Segurem novas compras parceladas.</span>':'O ideal é manter o cartão abaixo de 30% da renda mensal.'}</p></div>
     <div class="panel"><h2>Compras parceladas</h2><p class="sub">Em andamento</p>
@@ -723,14 +754,15 @@ function vCartoes(){
 /* histórico de todos os lançamentos dos cartões, por fatura */
 function histCartoes(){
   const f=S.ccF,lim=f.periodo?addMes(MES_ATUAL,-f.periodo):'';
-  const it=S.card.filter(x=>(!f.cartao||x.cartao_id===f.cartao)&&(!lim||x.fatura_mes>lim));
+  const it=S.card.filter(x=>(!f.cartao||x.cartao_id===f.cartao)&&(!lim||refDoItem(x)>lim));
   const grupos={};it.forEach(x=>{const k=x.cartao_id+'|'+x.fatura_mes;(grupos[k]=grupos[k]||[]).push(x)});
-  const ordem=Object.keys(grupos).sort((a,b)=>b.split('|')[1].localeCompare(a.split('|')[1])||a.localeCompare(b));
+  const refK=k=>{const [cid,fm]=k.split('|'),c=S.cartoes.find(y=>y.id===cid);return c?refDe(c,fm):fm};
+  const ordem=Object.keys(grupos).sort((a,b)=>refK(b).localeCompare(refK(a))||a.localeCompare(b));
   const ST={previsto:['idle','Previsto'],lancado:['soon','Lançado'],fechado:['late','Fechado'],pago:['ok','Pago']};
   const stItem=(x,inf)=>x.status==='pago'?'pago':x.status==='previsto'?'previsto':(inf.k==='fechada'||inf.k==='atrasada')?'fechado':'lancado';
   const blocos=ordem.map(k=>{const [cid,fm]=k.split('|'),c=S.cartoes.find(y=>y.id===cid)||{nome:'Cartão',cor:'#555',fechamento:1,vencimento:1},inf=infoFatura(c,fm),xs=grupos[k].sort((a,b)=>a.data.localeCompare(b.data));
     const tf={aberta:['idle','Aberta'],fechada:['soon','Fechada'],atrasada:['late','Atrasada'],paga:['ok','Paga'],vazia:['idle','—']}[inf.k];
-    return `<div class="hc-g"><div class="hc-h"><span class="badge-s cc" style="--cc:${esc(c.cor)}">💳 ${esc(c.nome)}</span><b>Fatura que vence ${dataBR(inf.venc)}/${fm.slice(0,4)}</b><span class="tag ${tf[0]}">${tf[1]}</span><span class="mut">fecha ${dataBR(inf.fech)}</span><b class="neg hc-t">${R(soma(xs))}</b></div>
+    return `<div class="hc-g"><div class="hc-h"><span class="badge-s cc" style="--cc:${esc(c.cor)}">💳 ${esc(c.nome)}</span><b>Fatura de ${esc(soMes(refK(k)))}/${refK(k).slice(0,4)}</b><span class="tag ${tf[0]}">${tf[1]}</span><span class="mut">fecha ${dataBR(inf.fech)} · vence ${dataBR(inf.venc)}</span><b class="neg hc-t">${R(soma(xs))}</b></div>
       ${xs.map(x=>{const s=ST[stItem(x,inf)];return `<div class="hc-i"><span class="mut">${dataBR(x.data)}</span><span>${catVis(x).em} ${esc(descVis(x))}${x.recorrente_id?' <span class="badge-s">🔁 recorrente</span>':''}${x.parcelas>1?` <span class="badge-s">${x.parcela}/${x.parcelas}</span>`:''}</span><span class="tag ${s[0]}">${s[1]}</span><span class="vl neg">${R(x.valor)}</span>${x.status!=='pago'?`<span class="acts"><button class="ic" data-act="editar" data-id="${x.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${x.id}" aria-label="Apagar">${svg('del')}</button></span>`:'<span></span>'}</div>`}).join('')}</div>`}).join('');
   return `<div class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>Histórico dos cartões</h2><p class="sub">Todos os lançamentos, organizados por fatura</p></div>
     <div class="toolbar" style="margin:0"><select class="field" id="ccCartao"><option value="">Todos os cartões</option>${S.cartoes.map(c=>`<option value="${c.id}" ${f.cartao===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select>
@@ -780,24 +812,33 @@ function vOrcamento(){
 }
 /* ================= contas fixas ================= */
 function vContas(){
-  const m=S.mes,f=S.ctF||(S.ctF={dono:'',cartao:'',cat:''});
+  const m=S.mes,f=S.ctF||(S.ctF={dono:'',cartao:'',cat:'',fora:false});
   const regras=S.recorrentes.map(r=>({k:'regra',r,s:statusConta(r,m),cat:r.categoria,dono:r.dono||'',cartao:r.cartao_id||'',tipo:r.tipo}));
   const avulsos=doMes(m).filter(i=>!i.recorrente_id&&i.status==='previsto').map(i=>({k:'avulso',i,cat:i.categoria,dono:i.dono||'',cartao:i.cartao_id||'',tipo:i.tipo}));
-  if(!regras.length&&!avulsos.length)return head('Contas','Tudo que acontece todo mês: aluguel, internet, salário, assinaturas.','',false)+`<div class="panel">${vazio('Nenhuma conta cadastrada','Cadastrem aluguel, internet, luz, salários e assinaturas. Cada uma pode ser lançada automaticamente ou pedir confirmação.',BTN('cr-nova','Cadastrar conta'))}</div>`;
+  /* compras no cartão (à vista ou parcelas) entram aqui no mês da compra; as assinaturas já aparecem pela própria conta */
+  const compras=S.card.filter(x=>!x.recorrente_id&&x.mes===m&&efetivo(x)).map(i=>({k:'compra',i,cat:i.categoria,dono:i.dono||'',cartao:i.cartao_id||'',tipo:'gasto'}));
+  if(!regras.length&&!avulsos.length&&!compras.length)return head('Contas','Tudo que acontece todo mês: aluguel, internet, salário, assinaturas.','',false)+`<div class="panel">${vazio('Nenhuma conta cadastrada','Cadastrem aluguel, internet, luz, salários e assinaturas. Cada uma pode ser lançada automaticamente ou pedir confirmação.',BTN('cr-nova','Cadastrar conta'))}</div>`;
   const passa=x=>(!f.dono||x.dono===f.dono)&&(!f.cartao||(f.cartao==='sem'?!x.cartao:x.cartao===f.cartao));
-  const lista=[...regras,...avulsos].filter(passa);
-  const valor=x=>x.k==='avulso'?x.i.valor:(x.s.oc?x.s.oc.valor:x.r.valor);
-  const ativo=x=>x.k==='avulso'||((x.r.ativa&&x.r.inicio<=m&&!(x.r.fim&&m>x.r.fim))||x.s.oc);
+  const lista=[...regras,...avulsos,...compras].filter(passa);
+  const valor=x=>x.k!=='regra'?x.i.valor:(x.s.oc?x.s.oc.valor:x.r.valor);
+  const ativo=x=>x.k!=='regra'||((x.r.ativa&&x.r.inicio<=m&&!(x.r.fim&&m>x.r.fim))||x.s.oc);
   const pulada=x=>x.k==='regra'&&!!x.s.oc&&x.s.oc.status==='cancelado';
   const conta1=x=>ativo(x)&&!pulada(x);
   const motivoFora=x=>pulada(x)?'pulada este mês':(x.k==='regra'&&x.r.inicio>m)?'começa depois':(x.k==='regra'&&x.r.fim&&m>x.r.fim)?'já encerrada':(x.k==='regra'&&!x.r.ativa)?'pausada':'';
   const conta=lista.filter(conta1);
+  /* o que não vale para este mês (pulada, ainda não começou, encerrada, pausada) fica escondido; um botão mostra de novo */
+  const nFora=lista.filter(x=>!conta1(x)).length,visiveis=f.fora?lista:lista.filter(conta1);
   const sai=conta.filter(x=>x.tipo==='gasto'),ent=conta.filter(x=>x.tipo==='entrada');
-  const pago=x=>x.k==='regra'&&(x.s.k==='ok'||(x.s.oc&&x.s.oc.status==='comprometido'));
+  const pago=x=>x.k==='compra'||(x.k==='regra'&&(x.s.k==='ok'||(x.s.oc&&x.s.oc.status==='comprometido')));
   const pagas=sai.filter(pago),atras=sai.filter(x=>x.k==='regra'&&x.s.k==='late');
   const tot=a=>a.reduce((s,x)=>s+valor(x),0);
   const card=x=>{
-    const c=CAT[x.cat]||CAT.contas,cc=x.cartao&&S.cartoes.find(y=>y.id===x.cartao),entra=x.tipo==='entrada';
+    const c=x.k==='compra'?catVis(x.i):(CAT[x.cat]||CAT.contas),cc=x.cartao&&S.cartoes.find(y=>y.id===x.cartao),entra=x.tipo==='entrada';
+    if(x.k==='compra'){const i=x.i,paga=i.status==='pago',meu=!outroLivre(i),ref=refDoItem(i);
+      return `<div class="ct-card compra ${paga?'ok':''}"><span class="ct-catl">${c.em} ${esc(c.nome)}</span><div class="ct-top"><span class="ct-dia">dia ${Number(i.data.slice(8,10))}</span><span class="tag ${paga?'ok':'idle'}">${paga?'Fatura paga':'No cartão'}</span></div>
+      <b class="ct-nome">${esc(descVis(i))}</b><div class="ct-v neg">${R(i.valor)}</div>
+      <div class="ct-meta">${donoBadge(x.dono)}${cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}</span>`:''}${i.parcelas>1?`<span class="badge-s">parcela ${i.parcela}/${i.parcelas}</span>`:''}${ref&&cc?`<span class="badge-s">fatura de ${esc(soMes(ref))} · vence ${dataBR(vencFatura(cc,i.fatura_mes))}</span>`:''}</div>
+      <div class="ct-acts">${cc?`<button class="btn sm ghost" data-act="faturas" data-id="${cc.id}" data-fm="${i.fatura_mes}">Ver fatura</button>`:''}<span class="acts">${meu?`<button class="ic" data-act="editar" data-id="${i.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${i.id}" aria-label="Excluir">${svg('del')}</button>`:''}</span></div></div>`}
     if(x.k==='avulso'){const i=x.i;return `<div class="ct-card ag"><span class="ct-catl">${c.em} ${esc(c.nome)}</span><div class="ct-top"><span class="ct-dia">${dataBR(i.data)}</span><span class="tag soon">📌 agendado</span></div>
       <b class="ct-nome">${esc(descVis(i))}</b><div class="ct-v ${entra?'pos':'neg'}">${entra?'+ ':''}${R(i.valor)}</div>
       <div class="ct-meta">${donoBadge(x.dono)}${cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}</span>`:''}</div>
@@ -810,13 +851,14 @@ function vContas(){
       <div class="ct-meta">${donoBadge(x.dono)}${cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}</span>`:''}<span class="badge-s">${r.auto?'🔁 automática':'✋ confirma'}</span>${rest!=null?`<span class="badge-s ${rest<=2?'ref':''}">${rest?`faltam ${rest}`:'última cobrada'}</span>`:''}${oc&&oc.editado?'<span class="badge-s ref">valor ajustado</span>':''}</div>
       <div class="ct-acts">${acao}<span class="acts">${prev?`<button class="lnk" data-act="oc-pular" data-id="${oc.id}" title="Pular este mês">Pular</button><button class="ic" data-act="oc-editar" data-id="${oc.id}" aria-label="Alterar só este mês" title="Alterar só este mês">${svg('edit')}</button>`:''}<button class="ic" data-act="rec-editar" data-id="${r.id}" aria-label="Editar a conta (todos os meses)" title="Editar a conta (todos os meses)">⚙️</button><button class="ic del" data-act="rec-apagar" data-id="${r.id}" aria-label="Excluir">${svg('del')}</button></span></div></div>`};
   const ordem=[...CATS_G,...CATS_E].map(c=>c.id);
-  const grupos={};lista.forEach(x=>{(grupos[x.cat]=grupos[x.cat]||[]).push(x)});
+  const grupos={};visiveis.forEach(x=>{(grupos[x.cat]=grupos[x.cat]||[]).push(x)});
   const cats=Object.keys(grupos).sort((a,b)=>(ordem.indexOf(a)+99*(ordem.indexOf(a)<0))-(ordem.indexOf(b)+99*(ordem.indexOf(b)<0)));
   const pessoas=Object.keys(S.nomes);
-  return head('Contas','Tudo que acontece todo mês, organizado por categoria.',BTN('cr-nova','Nova conta'))+`
+  return head('Contas','Contas do mês e compras no cartão, organizadas por categoria. Tudo que vocês lançam aparece aqui.',BTN('cr-nova','Nova conta'))+`
   <div class="ct-filtros">
     <div class="seg-inline" style="margin:0"><button data-act="ct-dono" data-v="" aria-pressed="${!f.dono}">Todos</button>${pessoas.map(e=>`<button data-act="ct-dono" data-v="${esc(e)}" aria-pressed="${f.dono===e}" class="seg-dono" style="--dc:${corDono(e)}"><i class="dono-dot"></i>${esc((S.nomes[e]||e).split(' ')[0])}</button>`).join('')}</div>
     <select class="field" id="ctCartao" aria-label="Filtrar por cartão"><option value="">Todas as formas de pagamento</option><option value="sem" ${f.cartao==='sem'?'selected':''}>Fora do cartão</option>${S.cartoes.map(c=>`<option value="${c.id}" ${f.cartao===c.id?'selected':''}>💳 ${esc(c.nome)}</option>`).join('')}</select>
+    ${nFora?`<button type="button" class="ct-tog" data-act="ct-fora" aria-pressed="${!!f.fora}">${f.fora?'🙈 Ocultar contas fora do mês':`👁 Mostrar contas fora do mês (${nFora})`}</button>`:''}
   </div>
   <div class="tiles">
     <div class="tile"><div class="k">Saídas do mês</div><div class="v ${tot(sai)?'neg':'zero'}">${R(tot(sai))}</div><div class="d">${plural(sai.length,'conta','contas')}</div></div>
@@ -827,7 +869,7 @@ function vContas(){
   <div class="ct-cats">${cats.map(id=>{const c=CAT[id]||{em:'•',nome:id},xs=grupos[id],cont=xs.filter(conta1),tc=cont.reduce((s,x)=>s+valor(x),0),nc=cont.length;return `<button class="ct-cat" data-act="ct-cat" data-v="${id}" aria-pressed="${f.cat===id}"><span>${c.em} ${esc(c.nome)}</span><b class="${tc?(xs[0].tipo==='entrada'?'pos':'neg'):'zero'}">${R0(tc)}</b><small>${plural(nc,'conta','contas')} no mês${xs.length>nc?` · ${xs.length-nc} fora`:''}</small></button>`}).join('')}${f.cat?'<button class="ct-cat limpar" data-act="ct-cat" data-v="">✕ Ver todas</button>':''}</div>
   ${cats.length?'<div class="ct-grid ct-full">'+cats.filter(id=>!f.cat||id===f.cat).map(id=>grupos[id].sort((a,b)=>((a.r&&a.r.dia)||Number((a.i&&a.i.data||'').slice(8,10)))-((b.r&&b.r.dia)||Number((b.i&&b.i.data||'').slice(8,10)))).map(card).join('')).join('')+'</div>'
     :`<div class="panel">${vazio('Nada com esse filtro','Troquem a pessoa ou a forma de pagamento.')}</div>`}
-  <p class="nota">✏️ altera só a ocorrência deste mês. ⚙️ altera a conta em todos os próximos meses.</p>`;
+  <p class="nota">✏️ altera só a ocorrência deste mês. ⚙️ altera a conta em todos os próximos meses. As compras no cartão aparecem no mês da compra; o caixa só muda quando a fatura é paga.</p>`;
 }
 /* ================= dívidas ================= */
 function vDividas(){
@@ -933,14 +975,15 @@ function simular(valor,forma,n){
       ['Seu dinheiro pessoal',mm?`<b class="${cS(livre)}">${R0(livre)}</b> disponível${valor<=livre?' (dá para pagar com ele)':''}`:'<span class="mut">não definido</span>'],
       ['Metas do mês',valor<=disp?'<b class="pos">mantidas</b>':'<b class="neg">podem ficar sem aporte</b>']];
   }else{
-    n=Math.max(2,Math.min(48,n||2));const parc=valor/n,prox=comprometido(addMes(MES_ATUAL,1)),comp=med.ent>0?(prox+parc)/med.ent:null;
+    n=Math.max(2,Math.min(48,n||2));const c0=S.cartoes[0],ref0=c0?refDe(c0,mesFatura(c0,HOJE)):addMes(MES_ATUAL,1);
+    const parc=valor/n,prox=totalRef(ref0,true),comp=med.ent>0?(prox+parc)/med.ent:null;
     if(med.sobra<=0||parc>med.sobra){k='no';t='Melhor esperar';s=med.sobra<=0?'Hoje os gastos já consomem toda a renda; uma parcela nova aumentaria o aperto.':`A parcela de ${R(parc)} é maior que a sobra média de ${R(med.sobra)} por mês.`}
     else if(parc>med.sobra*.5||(comp!==null&&comp>.3)){k='at';t='Cabe, mas aperta';s=comp>.3?`Com essa parcela, ${Math.round(comp*100)}% da renda fica comprometida no cartão (o ideal é até 30%).`:`A parcela consome ${Math.round(parc/med.sobra*100)}% do que sobra por mês.`}
     else{k='ok';t='Cabe no orçamento';s='A parcela cabe com folga na sobra mensal.'}
     linhas=[['Parcela',`<b class="neg">${n}× ${R(parc)}</b>`],['Sobra média por mês',`${R0(med.sobra)} → <b class="${cS(med.sobra-parc)}">${R0(med.sobra-parc)}</b>`],
       ['Renda comprometida no cartão',comp===null?'—':`<b class="${comp>.3?'neg':comp>.2?'warn':'pos'}">${Math.round(comp*100)}%</b>`],
-      ['Meses afetados',`<b class="ref">${mesAno(addMes(MES_ATUAL,1))} a ${mesAno(addMes(MES_ATUAL,n))}</b>`],
-      ['Maior fatura no período',(()=>{let mx=0,mm='';for(let k=1;k<=n;k++){const m=addMes(MES_ATUAL,k),v=faturaTotal(m)+parc;if(v>mx){mx=v;mm=m}}return `<b class="neg">${R0(mx)}</b> em ${mesAno(mm)}`})()]];
+      ['Faturas afetadas',`<b class="ref">${mesAno(ref0)} a ${mesAno(addMes(ref0,n-1))}</b>`],
+      ['Maior fatura no período',(()=>{let mx=0,mm='';for(let k=0;k<n;k++){const m=addMes(ref0,k),v=totalRef(m)+parc;if(v>mx){mx=v;mm=m}}return `<b class="neg">${R0(mx)}</b> na fatura de ${mesAno(mm)}`})()]];
   }
   const meio=med.sobra/2;
   const dica=meio>0?`Guardando metade da sobra média (${R0(meio)} por mês), vocês juntam o valor em <b>${plural(Math.ceil(valor/meio),'mês','meses')}</b> e compram à vista.`:'Para juntar o valor, primeiro é preciso que sobre dinheiro no fim do mês.';
@@ -1486,7 +1529,7 @@ const donoBox=(atual)=>S.temV11?`<label style="margin-bottom:0">De quem é?</lab
 /* fatura escolhida pela pessoa (item 2): por padrão, a fatura em que a data da compra cai */
 function opcoesFatura(card,dataISO,escolhida){
   const auto=mesFatura(card,dataISO);const lista=[];for(let k=-1;k<=6;k++)lista.push(addMes(auto,k));
-  return lista.map(fm=>`<option value="${fm}" ${fm===(escolhida||auto)?'selected':''}>Vence ${dataBR(vencFatura(card,fm))}/${fm.slice(0,4)} · fecha ${dataBR(fechamentoFatura(card,fm))}${fm===auto?' ✓':''}</option>`).join('');
+  return lista.map(fm=>`<option value="${fm}" ${fm===(escolhida||auto)?'selected':''}>Fatura de ${soMes(refDe(card,fm))} · fecha ${dataBR(fechamentoFatura(card,fm))} · vence ${dataBR(vencFatura(card,fm))}${fm===auto?' ✓':''}</option>`).join('');
 }
 function parseTags(s){return [...new Set(String(s||'').split(/[,;]+/).map(t=>t.trim().replace(/^#+/,'').toLowerCase().slice(0,24)).filter(Boolean))].slice(0,6)}
 const extrasBox=(x)=>S.temV10?`<div class="fg extras"><label>Tags (opcional)<input class="field" id="mTags" maxlength="120" placeholder="Ex.: viagem, casamento" value="${esc((x&&x.tags||[]).join(', '))}"></label>
@@ -1555,8 +1598,9 @@ async function salvarCompraCredito(c){
     const linhas=parcelasCompra(card,c.valor,n,c.d,c.fm).map(p=>({tipo:'gasto',valor:p.valor,descricao:(c.desc||CAT[c.categoria].nome)+(n>1?` (${p.k}/${n})`:''),categoria:c.categoria,data:p.data,
       cartao_id:card.id,compra_id:p.compra,parcela:p.k,parcelas:n,fatura_mes:p.fm,status:'comprometido',meio:'credito',...(c.livre?{livre:true}:{}),...(c.extras||{}),...dono}));
     const {error}=await sb.from('lancamentos').insert(linhas);if(error){if(/dono/.test(error.message||''))return 'Falta rodar o arquivo schema-v11.sql no Supabase.';throw error}
-    toast(n>1?`Compra lançada em ${n}x de ${R(linhas[n>1?1:0].valor)}`:`Compra lançada na fatura que vence ${dataBR(vencFatura(card,linhas[0].fatura_mes))}`);
+    toast(n>1?`Compra lançada em ${n}x de ${R(linhas[n>1?1:0].valor)}`:`Compra lançada na fatura de ${soMes(refDe(card,linhas[0].fatura_mes))} (vence ${dataBR(vencFatura(card,linhas[0].fatura_mes))})`);
   }
+  if(['contas','gastos','orcamento','calendario'].includes(S.view)&&c.d.slice(0,7)!==S.mes)S.mes=c.d.slice(0,7);
   if(c.after)await c.after();
 }
 /* compra no crédito: gasto no dia da compra; caixa só muda ao pagar a fatura */
@@ -1591,9 +1635,9 @@ function modalCompraCartao(o={}){
     if(card&&/^\d{4}-\d{2}-\d{2}$/.test(d)){const keep=manual?fatSel.value:null;fatSel.innerHTML=opcoesFatura(card,d,keep)}
     if(!card||!v||!/^\d{4}-\d{2}-\d{2}$/.test(d)){el.innerHTML='<span class="mut">Preencham o valor para ver onde a compra cai.</span>';return}
     const fm=rec?null:fatSel.value,ps=parcelasCompra(card,v,n,d,fm),rst=parseInt(val('mRest'),10)||0;
-    el.innerHTML=rec?`<div class="sd-l"><span>Conta como gasto</span><span><b class="neg">${R(v)} por mês</b> · ${rst?`${rst} cobranças, de ${mesAno(d.slice(0,7))} a ${mesAno(addMes(d.slice(0,7),rst-1))}`:'a partir de '+mesAno(d.slice(0,7))}</span></div><div class="sd-l"><span>Primeira fatura</span><span>vence <b class="ref">${dataBR(vencFatura(card,ps[0].fm))}/${ps[0].fm.slice(0,4)}</b></span></div><div class="sd-l"><span>Caixa hoje</span><span><b class="pos">não muda</b> · sai ao pagar cada fatura</span></div>`
+    el.innerHTML=rec?`<div class="sd-l"><span>Conta como gasto</span><span><b class="neg">${R(v)} por mês</b> · ${rst?`${rst} cobranças, de ${mesAno(d.slice(0,7))} a ${mesAno(addMes(d.slice(0,7),rst-1))}`:'a partir de '+mesAno(d.slice(0,7))}</span></div><div class="sd-l"><span>Primeira fatura</span><span>de <b class="ref">${soMes(refDe(card,ps[0].fm))}</b> · vence ${dataBR(vencFatura(card,ps[0].fm))}</span></div><div class="sd-l"><span>Caixa hoje</span><span><b class="pos">não muda</b> · sai ao pagar cada fatura</span></div>`
      :`<div class="sd-l"><span>Conta como gasto em</span><span><b class="neg">${n>1?R(ps[0].valor)+' por mês':R(v)}</b> · ${n>1?mesAno(ps[0].data.slice(0,7))+' a '+mesAno(ps[n-1].data.slice(0,7)):mesAno(d.slice(0,7))}</span></div>
-      <div class="sd-l"><span>${n>1?'Primeira fatura':'Fatura'}</span><span>fecha ${dataBR(fechamentoFatura(card,ps[0].fm))} · vence <b class="ref">${dataBR(vencFatura(card,ps[0].fm))}/${ps[0].fm.slice(0,4)}</b></span></div><div class="sd-l"><span>Caixa hoje</span><span><b class="pos">não muda</b> · sai ao pagar a fatura</span></div>`};
+      <div class="sd-l"><span>${n>1?'Primeira fatura':'Fatura'}</span><span>de <b class="ref">${soMes(refDe(card,ps[0].fm))}</b> · fecha ${dataBR(fechamentoFatura(card,ps[0].fm))} · vence ${dataBR(vencFatura(card,ps[0].fm))}</span></div><div class="sd-l"><span>Caixa hoje</span><span><b class="pos">não muda</b> · sai ao pagar a fatura</span></div>`};
   ['mValor','mParc','mData','mRest'].forEach(id=>$('mdl').querySelector('#'+id).addEventListener('input',upd));$('mdl').querySelector('#mRec').addEventListener('change',upd);$('mdl').querySelector('[data-g="cartao"]').addEventListener('click',()=>{manual=false;setTimeout(upd,0)});upd();
 }
 function parcelasCompra(card,valor,n,d,fmEscolhida){
@@ -1825,7 +1869,7 @@ function modalConfirmarOc(item){
 }
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
-  modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(fm))}, vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
+  modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
     <div class="sim-depois" style="margin-bottom:14px"><div class="sd-l"><span>Valor a pagar</span><span><b class="neg">${R(f.aberto)}</b></span></div><div class="sd-l"><span>Caixa</span><span>${R0(emCaixa())} → <b class="${cS(emCaixa()-f.aberto)}">${R0(emCaixa()-f.aberto)}</b></span></div><div class="sd-l"><span>Gastos do mês</span><span><b class="pos">não mudam</b> · já foram contados nas compras</span></div></div>
     <label>Data do pagamento<input class="field" id="mData" type="date" value="${HOJE}"></label>${btns('Pagar fatura')}`,
   async()=>{const d=val('mData');if(d>HOJE)return 'A data não pode ser no futuro.';
@@ -2008,7 +2052,7 @@ function abrirFaturas(cid,fm){
     <div class="fat-view" data-fm="${fm}">
       <div class="fv-nav">
         <button type="button" class="fv-arrow" data-act="fat-nav" data-d="-1" aria-label="Fatura anterior"><span>‹</span><small>${esc(sub(ant))}</small></button>
-        <div class="fv-title"><b>${esc(nomeMes(d.mesFech))}</b><span>Fatura que fecha <b>${dataBR(d.fech)}</b> e vence <b>${dataBR(d.venc)}/${fm.slice(0,4)}</b></span><span>Compras de ${dataBR(d.per.ini)} a ${dataBR(d.per.fim)}</span><span class="tag ${t[0]}">${t[1]}</span></div>
+        <div class="fv-title"><span class="fv-cap">Fatura de</span><b>${esc(nomeMes(d.mesFech))}</b><span>Fatura que fecha <b>${dataBR(d.fech)}</b> e vence <b>${dataBR(d.venc)}/${fm.slice(0,4)}</b></span><span>Compras de ${dataBR(d.per.ini)} a ${dataBR(d.per.fim)}</span><span class="tag ${t[0]}">${t[1]}</span></div>
         <button type="button" class="fv-arrow dir" data-act="fat-nav" data-d="1" aria-label="Próxima fatura"><span>›</span><small>${esc(sub(pro))}</small></button>
       </div>
       <div class="fv-tiles">
@@ -2233,8 +2277,9 @@ document.addEventListener('click',async e=>{
     case 'oc-confirmar':if(item)modalConfirmarOc(item);break;
     case 'oc-editar':if(item)modalEditarLanc(item);break;
     case 'oc-pular':case 'oc-reativar':case 'oc-desfazer':if(item){a.disabled=true;const {error}=await sb.from('lancamentos').update({status:act==='oc-pular'?'cancelado':'previsto'}).eq('id',id);
-      if(error){toast('Não deu para alterar agora.');a.disabled=false}else{toast(act==='oc-pular'?'Mês pulado':act==='oc-desfazer'?'Confirmação desfeita':'Ocorrência reativada');recarregar()}}break;
+      if(error){toast('Não deu para alterar agora.');a.disabled=false}else{toast(act==='oc-pular'?'Mês pulado. Ela some desta tela; para rever, use “Mostrar contas fora do mês”.':act==='oc-desfazer'?'Confirmação desfeita':'Ocorrência reativada');recarregar()}}break;
     case 'ct-cat':S.ctF=S.ctF||{dono:'',cartao:'',cat:''};S.ctF.cat=a.dataset.v===S.ctF.cat?'':a.dataset.v;render();break;
+    case 'ct-fora':S.ctF=S.ctF||{dono:'',cartao:'',cat:'',fora:false};S.ctF.fora=!S.ctF.fora;render();break;
     case 'ct-dono':S.ctF=S.ctF||{dono:'',cartao:''};S.ctF.dono=a.dataset.v;render();break;
     case 'faturas':abrirFaturas(id,a.dataset.fm||mesFatura(S.cartoes.find(c=>c.id===id)||{fechamento:28,vencimento:5},HOJE));break;
     case 'fat-nav':abrirFaturas(S.fatView.cartao,addMes(S.fatView.fm,Number(a.dataset.d)));break;

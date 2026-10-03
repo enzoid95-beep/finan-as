@@ -879,7 +879,8 @@ dialog[open]{animation:dlgIn .25s cubic-bezier(.2,.9,.3,1.1)}
 .fv-arrow:hover{background:rgba(240,180,30,.14);border-color:var(--borda);transform:translateY(-2px)}
 .fv-title{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;min-width:0}
 .fv-title>b{font:800 36px/1.05 "Barlow Condensed",sans-serif;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.9),0 3px 8px rgba(0,0,0,.4)}
-.fv-title>span:not(.tag){font-size:13.5px;color:var(--muted)}.fv-title>span b{color:#fff}
+.fv-title>span:not(.tag){font-size:13.5px;color:var(--muted)}
+.fv-title>.fv-cap{font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--g2)}.fv-title>span b{color:#fff}
 .fv-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .fv-acoes{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fv-lista{max-height:min(36vh,340px);overflow-y:auto;border-radius:14px;border:1px solid var(--line2);background:rgba(255,255,255,.025);scrollbar-width:thin;scrollbar-color:rgba(240,180,30,.5) transparent}
@@ -894,6 +895,15 @@ dialog[open]{animation:dlgIn .25s cubic-bezier(.2,.9,.3,1.1)}
 .fv-v{font:800 20px "Saira Condensed",sans-serif;white-space:nowrap}
 .fv-l .acts{display:flex;justify-content:flex-end;gap:2px}
 @media (max-width:900px){.fv-nav{grid-template-columns:64px minmax(0,1fr) 64px}.fv-arrow small{display:none}.fv-arrow{align-items:center;text-align:center;padding:8px}.fv-arrow.dir{align-items:center}.fv-tiles{grid-template-columns:1fr 1fr}.fv-title>b{font-size:28px}.fv-l{grid-template-columns:44px minmax(0,1fr) auto;row-gap:2px}.fv-l .acts{grid-column:2/4;justify-content:flex-start}}
+/* ações dentro de eventos (Recebi, Paguei, Pagar fatura) */
+.ev .nm .ev-acao,.mini-row .nm .ev-acao{display:flex;width:fit-content;margin-top:6px}
+.btn.xs{padding:4px 11px;font-size:12.5px;border-radius:9px}
+.ent-tot{font:800 26px "Saira Condensed",sans-serif;text-shadow:0 0 14px rgba(22,242,122,.3)}
+.ct-card.ent.late{border-color:rgba(255,205,80,.75)!important}
+.ct-tog{padding:8px 14px;border-radius:20px;font-size:13.5px;font-weight:700;color:var(--g2);border:1px dashed rgba(240,180,30,.5);background:rgba(240,180,30,.05)}
+.ct-tog:hover{background:rgba(240,180,30,.14)}
+.ct-tog[aria-pressed="true"]{border-style:solid;color:#fff}
+.ct-card.compra{border-color:rgba(120,170,255,.45)!important}
 /* regra de cores */
 .zero{color:#fff!important}.ref{color:var(--g2)!important}
 .ccard .big.neg{color:#fecaca!important;text-shadow:0 1px 3px rgba(0,0,0,.6)}
