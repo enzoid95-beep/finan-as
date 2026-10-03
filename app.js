@@ -222,6 +222,11 @@ async function gerarOcorrencias(){
   const caixa=autos.filter(r=>!r.cartao_id).map(r=>r.id),cred=autos.filter(r=>r.cartao_id).map(r=>r.id);
   if(caixa.length){const {data,error}=await sb.from('lancamentos').update({status:'pago'}).eq('status','previsto').in('recorrente_id',caixa).lte('data',HOJE).select('id');if(!error&&data)n+=data.length}
   if(cred.length){const {data,error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('status','previsto').in('recorrente_id',cred).lte('data',HOJE).select('id');if(!error&&data)n+=data.length}
+  /* cobranças recorrentes no cartão sempre seguem a regra do fechamento: corrige as que ficaram com datas antigas do cartão */
+  for(const x of S.card.filter(x=>x.recorrente_id&&x.cartao_id&&x.status!=='pago')){
+    const card=S.cartoes.find(c=>c.id===x.cartao_id);if(!card)continue;const certo=mesFatura(card,x.data);
+    if(x.fatura_mes!==certo){const {error}=await sb.from('lancamentos').update({fatura_mes:certo}).eq('id',x.id);if(!error)n++}
+  }
   return n;
 }
 /* ================= cálculos ================= */
@@ -301,6 +306,25 @@ function infoFatura(card,fm){
   const k=!it.length?'vazia':aberto<=0?'paga':HOJE>venc?'atrasada':HOJE>=fech?'fechada':'aberta';
   return {it,total,aberto,prev,venc,fech,k:it.length&&aberto<=0&&prev>0?(HOJE>=fech?'fechada':'aberta'):k};
 }
+function addDia(iso,n){const [y,m,d]=iso.split('-').map(Number);const x=new Date(Date.UTC(y,m-1,d+n));return `${x.getUTCFullYear()}-${pad(x.getUTCMonth()+1)}-${pad(x.getUTCDate())}`}
+/* período coberto: da data de fechamento anterior (inclusive) até o dia antes do fechamento desta fatura */
+function periodoFatura(card,fm){const fech=fechamentoFatura(card,fm),ant=fechamentoFatura(card,addMes(fm,-1));return {ini:ant,fim:addDia(fech,-1),fech}}
+/* cobranças de assinaturas no cartão que ainda não viraram lançamento (meses mais distantes) */
+function previstasFatura(card,fm){
+  const out=[];
+  S.recorrentes.filter(r=>r.ativa&&r.cartao_id===card.id&&r.tipo==='gasto').forEach(r=>{
+    for(const m of [addMes(fm,-2),addMes(fm,-1),fm]){
+      if(m<MES_ATUAL||r.inicio>m||(r.fim&&m>r.fim))continue;
+      const d=diaNoMes(m,r.dia);if(mesFatura(card,d)!==fm)continue;
+      if(S.card.some(x=>x.recorrente_id===r.id&&x.ref_mes===m)||S.itens.some(x=>x.recorrente_id===r.id&&x.ref_mes===m))continue;
+      out.push({id:'prev-'+r.id+'-'+m,descricao:r.descricao,valor:r.valor,data:d,categoria:r.categoria,dono:r.dono||null,prevista:true,recorrente_id:r.id,ref_mes:m,status:'previsto',autor:null,livre:false,cartao_id:card.id});
+    }
+  });
+  return out.sort((a,b)=>a.data.localeCompare(b.data));
+}
+function dadosFatura(card,fm){const inf=infoFatura(card,fm),prev=previstasFatura(card,fm),per=periodoFatura(card,fm);
+  return {...inf,prev,per,totalPrev:soma(prev),pago:soma(inf.it.filter(x=>x.status==='pago')),mesFech:per.fech.slice(0,7)}}
+function foraDoPeriodo(x,per){return x.data<per.ini||x.data>=per.fech}
 function usadoCartao(id){return S.card.filter(x=>x.cartao_id===id&&x.status==='comprometido').reduce((s,x)=>s+x.valor,0)}
 function faturaMes(id,m){return itensFatura(id,m)}
 function comprometido(m){return S.card.filter(x=>x.fatura_mes===m&&x.status==='comprometido').reduce((s,x)=>s+x.valor,0)}
@@ -502,7 +526,7 @@ function vGeral(){
     <div class="panel"><div class="panel-head"><div><h2>Entradas e gastos</h2><p class="sub">Seis meses até ${esc(soMes(S.mes))}</p></div>
       <div class="mesnav"><button data-act="mes-1" aria-label="Mês anterior">‹</button><span>${nomeMes(S.mes)}</span><button data-act="mes+1" aria-label="Próximo mês">›</button></div></div>
       <div class="chart">${chart}</div>
-      <div class="legend"><span><i style="background:#22c55e"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
+      <div class="legend"><span><i style="background:#16f27a"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
     <div class="panel"><div class="panel-head"><div><h2>Últimos lançamentos</h2><p class="sub">${esc(nomeMes(S.mes))}</p></div><button class="lnk" data-go="gastos">Ver todos →</button></div>${ult.length?`<div class="mini">${ult.map(linhaMini).join('')}</div>`:vazio('Mês vazio','Nada lançado em '+esc(soMes(S.mes))+'.')}</div>
   </div>`;
 }
@@ -666,11 +690,12 @@ function vCartoes(){
   const TAG={aberta:['idle','Aberta'],fechada:['soon','Fechada · a pagar'],atrasada:['late','Atrasada'],paga:['ok','Paga'],vazia:['idle','Sem compras']};
   const cards=S.cartoes.map(c=>{
     const f=infoFatura(c,fm),usado=usadoCartao(c.id),disp=c.limite-usado,t=TAG[f.k];
-    return `<div class="ccard-wrap">
+    return `<div class="ccard-wrap" data-act="faturas" data-id="${c.id}" data-fm="${fm}" role="button" tabindex="0" aria-label="Abrir as faturas do cartão ${esc(c.nome)}">
       <div class="ccard" style="--cc:${esc(c.cor)}">
         <div class="top"><b>${esc(c.nome)}</b><span class="chip-ic"></span></div>
         <div><div class="lbl">Fatura que fecha ${dataBR(f.fech)} e vence ${dataBR(f.venc)}</div><div class="big ${f.aberto>0?'neg':''}">${R(f.total)}</div></div>
         <div class="row"><span>Fecha dia ${c.fechamento}</span><span>Vence dia ${c.vencimento}</span></div>
+        <div class="ccard-hint">Ver faturas mês a mês ›</div>
         <div class="acts"><button class="ic" data-act="cartao-editar" data-id="${c.id}" aria-label="Editar cartão">${svg('edit')}</button><button class="ic" data-act="cartao-apagar" data-id="${c.id}" aria-label="Excluir cartão">${svg('del')}</button></div>
       </div>
       <div class="fat-bar"><span class="tag ${t[0]}">${t[1]}</span><button class="btn sm ghost" data-act="fatura-add" data-id="${c.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${f.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${c.id}" data-fm="${fm}">Pagar fatura · ${R0(f.aberto)}</button>`:f.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${c.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
@@ -687,7 +712,7 @@ function vCartoes(){
   <div class="ccards">${cards}<button class="ccard-add" data-act="cartao-novo">${svg('plus')}Novo cartão</button></div>
   ${histCartoes()}
   <div class="grid g2">
-    <div class="panel"><h2>Próximas faturas</h2><p class="sub">Compromissos já assumidos nos cartões</p>
+    <div class="panel"><h2>Próximas faturas</h2><p class="sub">Compromissos já assumidos, por mês de vencimento</p>
       <div class="chart" style="height:180px">${prox.map(p=>`<div class="cg ${p.m===MES_ATUAL?'atual':''}" title="${R(p.v)}${p.a<p.v?' · '+R(p.v-p.a)+' já pagos':''}"><div class="cpair"><div class="cb" style="max-width:38px;width:60%"><i class="g" style="height:${p.v/maxP*100}%"></i></div></div><small>${nomeMes(p.m,true)}</small></div>`).join('')}</div>
       <p class="nota">${pctRenda>30?'<span class="neg">Mais de 30% da renda já está comprometida no cartão. Segurem novas compras parceladas.</span>':'O ideal é manter o cartão abaixo de 30% da renda mensal.'}</p></div>
     <div class="panel"><h2>Compras parceladas</h2><p class="sub">Em andamento</p>
@@ -1026,7 +1051,7 @@ function vRetro(){
   <div class="grid g21">
     <div class="panel"><h2>Mês a mês</h2><p class="sub">Entradas e gastos de ${ano}</p>
       <div class="chart12" style="grid-template-columns:repeat(${Math.max(meses.length,6)},1fr)">${meses.map(x=>`<div class="cg" title="${esc(nomeMes(x.m))}: entrou ${R(x.ent)}, saiu ${R(x.gas)}"><div class="cpair"><div class="cb"><i class="e" style="height:${x.ent/maxV*100}%"></i></div><div class="cb"><i class="g" style="height:${x.gas/maxV*100}%"></i></div></div><small>${nomeMes(x.m,true).charAt(0)}</small></div>`).join('')}</div>
-      <div class="legend"><span><i style="background:#22c55e"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
+      <div class="legend"><span><i style="background:#16f27a"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
     <div class="panel"><h2>Para onde foi o dinheiro</h2><p class="sub">Categorias do ano</p>
       ${topC.slice(0,8).map(([id,v])=>{const c=CAT[id]||{em:'•',nome:id};return pbar(`${c.em} ${esc(c.nome)}`,R0(v),Math.round(v/gas*100)+'%',v/topC[0][1],'','neg')}).join('')}</div>
   </div>
@@ -1274,8 +1299,9 @@ function melhorarDatas(root){
   });
 }
 function fecharDP(){document.querySelectorAll('.dp-pop').forEach(p=>p.remove())}
+function fecharSel(){document.querySelectorAll('.sel-pop').forEach(p=>p.remove());document.querySelectorAll('.sel-btn[aria-expanded="true"]').forEach(b=>b.setAttribute('aria-expanded','false'))}
 function abrirDP(inp,btn){
-  fecharDP();
+  fecharDP();fecharSel();
   const host=btn.closest('dialog')||document.body,pop=document.createElement('div');pop.className='dp-pop';host.append(pop);
   const mes=inp.dataset.dp==='month',min=inp.min||'',max=inp.max||'';
   let ref=(inp.value||HOJE).slice(0,7);
@@ -1301,8 +1327,45 @@ function abrirDP(inp,btn){
     if(b.dataset.v)escolher(mes?b.dataset.v:b.dataset.v)});
   desenha();
 }
-document.addEventListener('click',e=>{if(!e.target.closest('.dp-pop,.dp-btn'))fecharDP()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelector('.dp-pop')){e.stopPropagation();e.preventDefault();fecharDP()}},true);
+document.addEventListener('click',e=>{if(!e.target.closest('.dp-pop,.dp-btn'))fecharDP();if(!e.target.closest('.sel-pop,.sel-btn'))fecharSel()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(document.querySelector('.dp-pop')||document.querySelector('.sel-pop'))){e.stopPropagation();e.preventDefault();fecharDP();fecharSel()}},true);
+addEventListener('resize',()=>fecharSel());addEventListener('scroll',e=>{if(!(e.target&&e.target.closest&&e.target.closest('.sel-pop')))fecharSel()},true);
+/* listas de seleção no visual do site: substituem as caixas brancas do navegador */
+const SEL_CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+function melhorarSelects(root){
+  root.querySelectorAll('select:not([data-sx])').forEach(sel=>{
+    sel.dataset.sx='1';sel.classList.add('sx-oculto');sel.tabIndex=-1;
+    const b=document.createElement('button');b.type='button';b.className='field sel-btn';b.setAttribute('aria-haspopup','listbox');b.setAttribute('aria-expanded','false');
+    if(sel.id)b.dataset.for=sel.id;
+    b.innerHTML='<span class="sel-txt"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    sel.after(b);
+    const sync=()=>{const o=sel.options[sel.selectedIndex];b.querySelector('.sel-txt').textContent=o?o.textContent:'';b.disabled=sel.disabled};
+    sync();sel.addEventListener('change',sync);new MutationObserver(sync).observe(sel,{childList:true,subtree:true,attributes:true});
+    b.addEventListener('click',e=>{e.stopPropagation();if(b.getAttribute('aria-expanded')==='true')return fecharSel();abrirSel(sel,b)});
+    b.addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();abrirSel(sel,b)}});
+  });
+}
+function abrirSel(sel,btn){
+  fecharSel();fecharDP();
+  const host=btn.closest('dialog')||document.body,pop=document.createElement('div');pop.className='sel-pop';pop.setAttribute('role','listbox');pop.tabIndex=-1;host.append(pop);
+  btn.setAttribute('aria-expanded','true');
+  const ops=[...sel.options];let hi=Math.max(0,sel.selectedIndex);
+  pop.innerHTML=ops.map((o,k)=>`<button type="button" role="option" class="sel-op ${k===sel.selectedIndex?'sel':''}" data-k="${k}" aria-selected="${k===sel.selectedIndex}" ${o.disabled?'disabled':''}><span>${esc(o.textContent)}</span>${SEL_CHECK}</button>`).join('');
+  const r=btn.getBoundingClientRect();
+  pop.style.minWidth=Math.max(r.width,190)+'px';pop.style.maxWidth=Math.min(innerWidth-16,480)+'px';
+  const pos=()=>{const ph=pop.offsetHeight,pw=pop.offsetWidth,abaixo=innerHeight-r.bottom-14,acima=r.top-14;let top,mh;
+    if(abaixo>=Math.min(ph,240)||abaixo>=acima){top=r.bottom+6;mh=Math.max(120,abaixo)}else{mh=Math.max(120,acima);top=Math.max(8,r.top-6-Math.min(ph,mh,360))}
+    pop.style.maxHeight=Math.min(mh,360)+'px';pop.style.top=top+'px';pop.style.left=Math.max(8,Math.min(r.left,innerWidth-pw-8))+'px'};
+  pos();requestAnimationFrame(pos);
+  const marca=()=>{const l=pop.querySelectorAll('.sel-op');l.forEach((o,k)=>o.classList.toggle('hi',k===hi));if(l[hi])l[hi].scrollIntoView({block:'nearest'})};marca();
+  const escolher=k=>{const o=ops[k];if(!o||o.disabled)return;sel.selectedIndex=k;sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}));fecharSel();btn.focus()};
+  pop.addEventListener('click',e=>{e.stopPropagation();const o=e.target.closest('.sel-op');if(o)escolher(+o.dataset.k)});
+  pop.addEventListener('keydown',e=>{const n=ops.length;
+    if(e.key==='ArrowDown'){e.preventDefault();hi=Math.min(n-1,hi+1);marca()}else if(e.key==='ArrowUp'){e.preventDefault();hi=Math.max(0,hi-1);marca()}
+    else if(e.key==='Home'){e.preventDefault();hi=0;marca()}else if(e.key==='End'){e.preventDefault();hi=n-1;marca()}
+    else if(e.key==='Enter'||e.key===' '){e.preventDefault();escolher(hi)}else if(e.key==='Tab'){fecharSel()}});
+  pop.focus({preventScroll:true});
+}
 /* campo de comprovante com botão próprio, em português */
 function melhorarArquivos(root){
   root.querySelectorAll('input[type=file]:not([data-fx])').forEach(inp=>{
@@ -1333,7 +1396,7 @@ function render(){
   ligarPizza();
   animar();
   const ctc=$('ctCartao');if(ctc)ctc.addEventListener('change',()=>{S.ctF.cartao=ctc.value;render()});
-  marcarValores($('view'));melhorarDatas($('view'));soNumeros($('view'));
+  marcarValores($('view'));melhorarDatas($('view'));melhorarSelects($('view'));soNumeros($('view'));
   const b=$('fBusca'),c=$('fCat');
   if(b)b.addEventListener('input',()=>{S.fBusca=b.value;clearTimeout(b._t);b._t=setTimeout(()=>{const pos=b.selectionStart;render();const nb=$('fBusca');nb.focus();nb.setSelectionRange(pos,pos)},250)});
   if(c)c.addEventListener('change',()=>{S.fCat=c.value;render()});
@@ -1349,11 +1412,11 @@ function render(){
 /* ================= modal ================= */
 let onSave=null;
 function modal(html,salvar){
-  $('mdl').innerHTML=html;onSave=salvar||null;fecharDP();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('mdl').scrollTop=0;marcarValores($('mdl'));caberModal();
+  S.fatAtiva=false;$('mdl').innerHTML=html;onSave=salvar||null;fecharDP();fecharSel();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarSelects($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('mdl').scrollTop=0;marcarValores($('mdl'));caberModal();
   const f=$('mdl').querySelector('input.big,input:not([type=checkbox])');if(f&&salvar)setTimeout(()=>f.focus(),40);
   $('mdl').querySelectorAll('.seg,.chips').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!g.contains(b))return;g.querySelectorAll(':scope>button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));if(g.dataset.onchange&&window[g.dataset.onchange])window[g.dataset.onchange](b)}));
 }
-function fechar(){if($('dlg').open)$('dlg').close()}
+function fechar(){S.fatAtiva=false;S.fatVoltar=null;if($('dlg').open)$('dlg').close()}
 /* feedback visual de "salvo": selo animado no centro da tela */
 function feedbackSalvo(txt){
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -1361,7 +1424,8 @@ function feedbackSalvo(txt){
   d.innerHTML=`<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23"/><path d="M15 27l7.5 7.5L38 19"/></svg><span>${esc(txt||'Salvo!')}</span>`;
   document.body.append(d);setTimeout(()=>d.classList.add('sai'),1050);setTimeout(()=>d.remove(),1500);
 }
-$('mdlX').addEventListener('click',fechar);
+$('mdlX').addEventListener('click',()=>voltarOuFechar());
+$('dlg').addEventListener('cancel',e=>{if(S.fatVoltar){e.preventDefault();voltarOuFechar()}});
 /* encaixa a janela na tela: compacta em etapas e, se preciso, usa mais colunas */
 function caberModal(){
   const d=$('dlg'),m=$('mdl');if(!d.open)return;
@@ -1381,12 +1445,12 @@ function layoutModal(){
   const blocos=[...m.children].filter(el=>!el.matches('h2,.btns,.erro'));
   const pesado=blocos.reduce((s,el)=>s+(el.querySelectorAll('.chip').length>8?2:1),0);
   const d=$('dlg');d.classList.remove('c1','c2','c3','mg');
-  if(m.querySelector('.novo-grid,.mais,.pj-facts'))d.classList.add('mg');
+  if(m.querySelector('.novo-grid,.mais,.pj-facts,.fat-view'))d.classList.add('mg');
   else d.classList.add(pesado<=3?'c1':pesado<=7?'c2':'c3');
 }
 $('mdl').addEventListener('click',async e=>{
   const b=e.target.closest('[data-m]');if(!b)return;
-  if(b.dataset.m==='cancelar')return fechar();
+  if(b.dataset.m==='cancelar')return voltarOuFechar();
   if((b.dataset.m==='res-devolver'||b.dataset.m==='res-apagar')&&S._resExcluir){const {m,g}=S._resExcluir;b.disabled=true;let error;
     if(b.dataset.m==='res-devolver'){({error}=await sb.from('lancamentos').insert({tipo:'resgate',valor:g,descricao:'Resgate: '+m.nome,categoria:'meta',data:HOJE,meta_id:m.id,status:'pago'}));
       if(!error)({error}=await sb.from('metas').update(S.temV10?{arquivada:true,reserva:false}:{reserva:false}).eq('id',m.id))}
@@ -1396,7 +1460,7 @@ $('mdl').addEventListener('click',async e=>{
   if(b.dataset.m==='ir-cartao'){const o={valor:parseValor(val('mValor')),desc:val('mDesc'),cat:sel('cat'),data:val('mData'),livre:!!$('mdl').querySelector('#mLivre')?.checked};return modalCompraCartao(o)}
   if(b.dataset.m==='salvar'&&onSave){
     const err=$('mdl').querySelector('.erro');err.textContent='';b.disabled=true;
-    try{const msg=await onSave();if(msg){err.textContent=msg}else{fechar();feedbackSalvo();recarregar()}}
+    try{const msg=await onSave();if(msg){err.textContent=msg}else{const v=S.fatVoltar;fechar();feedbackSalvo();await recarregar();if(v)abrirFaturas(v.cartao,v.fm)}}
     catch(x){err.textContent='Não deu para salvar: '+(x&&x.message||'tente de novo.')}
     finally{b.disabled=false}
   }
@@ -1555,6 +1619,7 @@ function modalEditarLanc(item){
     if(item.tipo==='gasto'&&$('mdl').querySelector('#mLivre'))up.livre=!!$('mdl').querySelector('#mLivre').checked;
     if(item.recorrente_id&&(valor!==item.valor||d!==item.data))up.editado=true;
     if(item.status==='pago'&&!item.cartao_id&&d!==item.data)up.data_caixa=d;
+    if(item.cartao_id&&d!==item.data){const cd=S.cartoes.find(c=>c.id===item.cartao_id);if(cd&&item.fatura_mes===mesFatura(cd,item.data))up.fatura_mes=mesFatura(cd,d)}
     Object.assign(up,await lerExtras());
     const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast('Lançamento atualizado');
   });
@@ -1924,6 +1989,47 @@ function modalDesejo(d){
     if(error)throw error;toast(d?'Desejo atualizado':'Desejo adicionado');
   });
 }
+/* ---------- faturas do cartão, mês a mês ---------- */
+const TAG_FAT={aberta:['idle','Aberta'],fechada:['soon','Fechada · a pagar'],atrasada:['late','Atrasada'],paga:['ok','Paga'],vazia:['idle','Sem compras']};
+function abrirFaturas(cid,fm){
+  const card=S.cartoes.find(c=>c.id===cid);if(!card)return;
+  const d=dadosFatura(card,fm),t=TAG_FAT[d.k]||TAG_FAT.vazia;
+  const ant=dadosFatura(card,addMes(fm,-1)),pro=dadosFatura(card,addMes(fm,1)),sub=x=>`${cap(soMes(x.mesFech))} · ${R0(x.total+x.totalPrev)}`;
+  const linha=(x,prev)=>{
+    const c=catVis(x),fora=!prev&&foraDoPeriodo(x,d.per),certo=fora?mesFatura(card,x.data):null,meu=!outroLivre(x);
+    const st=prev?'<span class="badge-s ref">prevista</span>':x.status==='pago'?'<span class="badge-s">paga</span>':x.status==='previsto'?'<span class="badge-s ref">a confirmar</span>':'';
+    return `<div class="fv-l ${prev?'prev':''} ${fora?'fora':''}"><span class="fv-d">${dataBR(x.data)}</span>
+      <div class="fv-t"><b>${c.em} ${esc(descVis(x))}</b><div class="fv-b">${x.parcelas>1?`<span class="badge-s">parcela ${x.parcela}/${x.parcelas}</span>`:''}${x.recorrente_id?'<span class="badge-s">🔁 recorrente</span>':''}${donoBadge(x.dono)}${st}${fora?`<span class="badge-s ref">⚠ data fora do período</span><button type="button" class="lnk" data-act="item-mover" data-id="${x.id}" data-fm="${certo}">Mover para a fatura certa</button>`:''}</div></div>
+      <b class="fv-v neg">${R(x.valor)}</b>
+      <span class="acts">${prev||!meu?'':`<button class="ic" data-act="editar" data-id="${x.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${x.id}" aria-label="Excluir">${svg('del')}</button>`}</span></div>`};
+  const fact=(k,v,c,s)=>`<div class="fact"><small>${k}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
+  const vazio_=!d.it.length&&!d.prev.length;
+  modal(`<h2>💳 ${esc(card.nome)}</h2>
+    <div class="fat-view" data-fm="${fm}">
+      <div class="fv-nav">
+        <button type="button" class="fv-arrow" data-act="fat-nav" data-d="-1" aria-label="Fatura anterior"><span>‹</span><small>${esc(sub(ant))}</small></button>
+        <div class="fv-title"><b>${esc(nomeMes(d.mesFech))}</b><span>Fatura que fecha <b>${dataBR(d.fech)}</b> e vence <b>${dataBR(d.venc)}/${fm.slice(0,4)}</b></span><span>Compras de ${dataBR(d.per.ini)} a ${dataBR(d.per.fim)}</span><span class="tag ${t[0]}">${t[1]}</span></div>
+        <button type="button" class="fv-arrow dir" data-act="fat-nav" data-d="1" aria-label="Próxima fatura"><span>›</span><small>${esc(sub(pro))}</small></button>
+      </div>
+      <div class="fv-tiles">
+        ${fact('Total da fatura',R(d.total),d.total?'neg':'zero',d.prev.length?`+ ${R0(d.totalPrev)} previstos`:'')}
+        ${fact('Já paga',R(d.pago),d.pago?'neg':'zero')}
+        ${fact('A pagar',R(d.aberto),d.aberto?'neg':'zero')}
+        ${fact('Lançamentos',String(d.it.length+d.prev.length),'zero',d.prev.length?`${d.prev.length} prevista${d.prev.length>1?'s':''}`:'')}
+      </div>
+      <div class="fv-acoes"><button class="btn sm ghost" data-act="fatura-add" data-id="${card.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${d.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${card.id}" data-fm="${fm}">Pagar fatura · ${R0(d.aberto)}</button>`:d.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${card.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
+      <div class="fv-lista">${vazio_?'<p class="nota" style="padding:18px 6px">Nenhuma compra nesta fatura.</p>':[...d.it].sort((a,b)=>a.data.localeCompare(b.data)||a.criadoEm-b.criadoEm).map(x=>linha(x,false)).join('')+d.prev.map(x=>linha(x,true)).join('')}</div>
+    </div>
+    <div class="btns"><button class="btn" data-m="cancelar">Fechar</button></div>`);
+  S.fatView={cartao:cid,fm};S.fatAtiva=true;
+}
+function voltarOuFechar(){const v=S.fatVoltar;if(v){S.fatVoltar=null;abrirFaturas(v.cartao,v.fm)}else fechar()}
+document.addEventListener('keydown',e=>{
+  if(!S.fatAtiva||!$('dlg').open||document.querySelector('.dp-pop,.sel-pop'))return;
+  if(/^(INPUT|SELECT|TEXTAREA)$/.test((e.target&&e.target.tagName)||''))return;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();abrirFaturas(S.fatView.cartao,addMes(S.fatView.fm,e.key==='ArrowLeft'?-1:1))}
+});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.matches&&e.target.matches('.ccard-wrap[role=button]')){e.preventDefault();e.target.click()}});
 /* ---------- segurança: verificação em 2 etapas ---------- */
 function qrSrc(q){if(!q)return '';const m=String(q).match(/^data:image\/svg\+xml;(?:charset=)?utf-8,(.*)$/is);return m&&!/%3C/i.test(m[1])?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(m[1]):q}
 async function modalSeguranca(){
@@ -2055,6 +2161,7 @@ document.addEventListener('click',async e=>{
   if(!e.target.closest('[data-fatia]')&&document.querySelector('#view .fatia.on')){document.querySelectorAll('#view [data-fatia].on').forEach(x=>x.classList.remove('on'));$('pieBox')?.classList.remove('ativo');const t=$('pieTip');if(t)t.hidden=true}
   const a=e.target.closest('[data-act]');if(!a||a.disabled)return;
   const id=a.dataset.id,act=a.dataset.act;
+  if(a.closest('.fat-view')&&['editar','apagar','fatura-pagar','fatura-add'].includes(act))S.fatVoltar={...S.fatView};
   const item=S.itens.find(i=>i.id===id)||S.card.find(i=>i.id===id),meta=S.metas.find(m=>m.id===id),conta=S.contas.find(c=>c.id===id),cartao=S.cartoes.find(c=>c.id===id),
     rec=S.recorrentes.find(r=>r.id===id),div=S.dividas.find(d=>d.id===id),des=S.desejos.find(d=>d.id===id);
   switch(act){
@@ -2129,10 +2236,17 @@ document.addEventListener('click',async e=>{
       if(error){toast('Não deu para alterar agora.');a.disabled=false}else{toast(act==='oc-pular'?'Mês pulado':act==='oc-desfazer'?'Confirmação desfeita':'Ocorrência reativada');recarregar()}}break;
     case 'ct-cat':S.ctF=S.ctF||{dono:'',cartao:'',cat:''};S.ctF.cat=a.dataset.v===S.ctF.cat?'':a.dataset.v;render();break;
     case 'ct-dono':S.ctF=S.ctF||{dono:'',cartao:''};S.ctF.dono=a.dataset.v;render();break;
+    case 'faturas':abrirFaturas(id,a.dataset.fm||mesFatura(S.cartoes.find(c=>c.id===id)||{fechamento:28,vencimento:5},HOJE));break;
+    case 'fat-nav':abrirFaturas(S.fatView.cartao,addMes(S.fatView.fm,Number(a.dataset.d)));break;
+    case 'item-mover':{const x=S.card.find(i=>i.id===id);if(!x)break;a.disabled=true;const delta=difMes(x.fatura_mes,a.dataset.fm);
+      const lote=x.compra_id&&x.parcelas>1?S.card.filter(i=>i.compra_id===x.compra_id):[x];let falhou=false;
+      for(const y of lote){const {error}=await sb.from('lancamentos').update({fatura_mes:addMes(y.fatura_mes,delta)}).eq('id',y.id);if(error)falhou=true}
+      toast(falhou?'Não deu para mover agora.':(lote.length>1?`${lote.length} parcelas movidas`:'Movida para a fatura certa'));
+      const v={...S.fatView};await recarregar();abrirFaturas(v.cartao,v.fm)}break;
     case 'fatura-add':if(cartao){const fm=a.dataset.fm,fech=fechamentoFatura(cartao,fm);modalCompraCartao({cartao:cartao.id,fm,data:HOJE<=fech?HOJE:fech})}break;
     case 'fatura-pagar':if(cartao)modalPagarFatura(cartao,a.dataset.fm);break;
-    case 'fatura-desfazer':if(cartao){a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
-      if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');recarregar()}}break;
+    case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
+      if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');await recarregar();if(volta)abrirFaturas(volta.cartao,volta.fm)}}break;
     case 'sim-comprar':{const v=parseValor(S.sim.valor);if(!v)break;if(S.sim.forma==='parc')modalCompraCartao({valor:v,desc:S.sim.nome,n:parseInt(S.sim.n,10)||2});else modalLancamento('gasto',null,{valor:v,desc:S.sim.nome,cat:'compras'})}break;
     case 'n-divida':modalEscolherDivida();break;
     case 'ver-anexo':{const p=a.dataset.path;if(!p)break;const {data,error}=await sb.storage.from('anexos').createSignedUrl(p,300);if(error||!data){toast('Não deu para abrir o anexo.');break}window.open(data.signedUrl,'_blank','noopener')}break;
