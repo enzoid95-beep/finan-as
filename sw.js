@@ -1,6 +1,6 @@
 // Planejamento Financeiro · service worker
 // Sempre tenta a versão mais nova na internet; usa a cópia salva só se estiver sem conexão.
-const CACHE = 'pf-v16';
+const CACHE = 'pf-v17';
 const ARQUIVOS = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './logo.png', './logo-horizontal.png'];
 
 self.addEventListener('install', e => {
