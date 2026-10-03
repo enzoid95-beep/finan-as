@@ -1,7 +1,7 @@
 // Planejamento Financeiro · service worker
 // Sempre tenta a versão mais nova na internet; usa a cópia salva só se estiver sem conexão.
-const CACHE = 'pf-v17';
-const ARQUIVOS = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './logo.png', './logo-horizontal.png'];
+const CACHE = 'pf-v19';
+const ARQUIVOS = ['./', './index.html', './app.js', './supabase.js', './config.js', './fonts.css', './manifest.webmanifest', './icon-192.png', './icon-512.png', './logo-horizontal.png', './fonts/barlow-condensed-latin-600-normal.woff2', './fonts/barlow-condensed-latin-700-normal.woff2', './fonts/barlow-condensed-latin-800-normal.woff2', './fonts/barlow-latin-400-normal.woff2', './fonts/barlow-latin-500-normal.woff2', './fonts/barlow-latin-600-normal.woff2', './fonts/barlow-latin-700-normal.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).catch(() => {}));
