@@ -2193,7 +2193,14 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+const VERSAO='22';
+if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
+/* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  const tinhaControle=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then(r=>{if(r&&r.update)r.update().catch(()=>{})}).catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!tinhaControle)return;toast('Versão nova disponível. Atualizando…');const rec=()=>setTimeout(()=>location.reload(),900);$('dlg').open?$('dlg').addEventListener('close',rec,{once:true}):rec()});
+}
 
 /* ================= ações ================= */
 async function inserir(t,reg,msg){const {error}=await sb.from(t).insert(reg);if(error){toast('Não deu para salvar: '+error.message);return false}if(msg)toast(msg);recarregar();return true}
@@ -2368,7 +2375,7 @@ async function entrar(sessao){
   const {data,error}=await sb.from('membros').select('email,nome');
   if(error||!data||!data.length){telaLogin('A conta '+S.me+' não está na lista de quem pode usar este site.',true);$('lSair').hidden=false;return}
   S.nomes=Object.fromEntries(data.map(m=>[m.email.toLowerCase(),m.nome]));
-  $('whoName').textContent=S.nomes[S.me]||S.me.split('@')[0];$('whoMail').textContent=S.me;
+  $('whoName').textContent=S.nomes[S.me]||S.me.split('@')[0];if($('ver'))$('ver').textContent='Versão '+VERSAO;$('whoMail').textContent=S.me;
   if(standalone())$('instBtn').hidden=true;
   if(/access_token|type=/.test(location.hash))history.replaceState(null,'',location.pathname);
   let h=location.hash.slice(1);h=ALIAS[h]||h;if(VIEWS.some(v=>v.id===h)){S.view=h;S.ultima[grupoDe(h).id]=h}

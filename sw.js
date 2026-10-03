@@ -1,6 +1,6 @@
-// Planejamento Financeiro · service worker
-// Sempre tenta a versão mais nova na internet; usa a cópia salva só se estiver sem conexão.
-const CACHE = 'pf-v21';
+// Controle 360 · service worker
+// Sempre confere com a internet se há versão nova (revalida o cache do navegador) e só usa a cópia salva sem conexão.
+const CACHE = 'pf-v22';
 const ARQUIVOS = ['./', './index.html', './app.js', './supabase.js', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './logo-horizontal.png'];
 
 self.addEventListener('install', e => {
@@ -13,12 +13,12 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // Supabase e CDNs passam direto
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // Supabase passa direto
   e.respondWith(
-    fetch(e.request).then(r => {
-      const copia = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copia)).catch(() => {});
+    // "no-cache" = pergunta ao servidor se mudou, em vez de confiar nos 10 minutos de cache do GitHub Pages
+    fetch(e.request, { cache: 'no-cache' }).then(r => {
+      if (r.ok) { const copia = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)).catch(() => {}); }
       return r;
-    }).catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+    }).catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match('./index.html')))
   );
 });
