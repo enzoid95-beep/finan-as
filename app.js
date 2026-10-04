@@ -609,12 +609,13 @@ function vCalendario(){
   const tot=Object.values(ev).flat();
   const entM=tot.filter(e=>e.entra).reduce((s,e)=>s+e.valor,0),saiM=tot.filter(e=>e.sai).reduce((s,e)=>s+e.valor,0);
   const pendM=tot.filter(e=>!e.feito&&e.sai).reduce((s,e)=>s+e.valor,0);
+  const entRec=tot.filter(e=>e.entra&&e.feito).reduce((s,e)=>s+e.valor,0);
   return head('Calendário','Tudo que entra e sai, dia a dia.',BTN('novo','Novo lançamento','data-tipo="gasto"'))+`
   <div class="tiles">
-    <div class="tile"><div class="k">Entradas no mês</div><div class="v pos">${R(entM)}</div><div class="d">realizadas e previstas</div></div>
+    <div class="tile"><div class="k">Entradas previstas no mês</div><div class="v pos">${R(entM)}</div><div class="d">${R0(entRec)} recebido + ${R0(entM-entRec)} previsto</div></div>
     <div class="tile"><div class="k">Saídas no mês</div><div class="v neg">${R(saiM)}</div><div class="d">gastos, faturas e contas</div></div>
     <div class="tile"><div class="k">Ainda a pagar</div><div class="v neg">${R(pendM)}</div><div class="d">contas, faturas e parcelas</div></div>
-    <div class="tile">${selo(entM-saiM)}<div class="k">Saldo do mês</div><div class="v ${cS(entM-saiM)}">${R(entM-saiM)}</div><div class="d">entradas menos saídas</div></div>
+    <div class="tile">${selo(entM-saiM)}<div class="k">Resultado do mês</div><div class="v ${cS(entM-saiM)}">${R(entM-saiM)}</div><div class="d">entradas menos saídas do mês (não é o caixa)</div></div>
   </div>
   <div class="cal-wrap">
     <div class="panel"><div class="cal">${cells}</div>
@@ -652,7 +653,7 @@ function vGastos(){
   const gs=r.ef.filter(i=>i.tipo==='gasto'),maior=[...gs].sort((a,b)=>b.valor-a.valor)[0];
   const noCartao=soma(gs.filter(i=>i.cartao_id));
   const cats=Object.entries(pc).sort((a,b)=>b[1]-a[1]);
-  return head('Gastos','Tudo que saiu do caixa no mês.',BTN('novo','Novo gasto','data-tipo="gasto"'))+`
+  return head('Gastos','Tudo que vocês gastaram no mês, independentemente da forma de pagamento.',BTN('novo','Novo gasto','data-tipo="gasto"'))+`
   <div class="tiles">
     <div class="tile"><div class="k">Total gasto</div><div class="vrow"><div class="v neg">${R(r.gastos)}</div>${delta(r.gastos,ant.gastos,true)}</div><div class="d">${plural(gs.length,'lançamento','lançamentos')}</div></div>
     <div class="tile"><div class="k">Orçamento usado</div>${(()=>{const tp=CATS_G.reduce((s,c)=>s+(Number(planejado(S.mes).gastos[c.id])||0),0);return tp?`<div class="v ${r.gastos>tp?'neg':''}">${Math.round(r.gastos/tp*100)}%</div><div class="d"><span class="neg">${R0(r.gastos)}</span> de ${RF(R0(tp))}</div>`:`<div class="v zero">—</div><div class="d"><button class="lnk" data-go="orcamento">Definir orçamento →</button></div>`})()}</div>
@@ -800,7 +801,7 @@ function vOrcamento(){
     :vazio('Sem entradas previstas','Definam as entradas previstas no topo da tela para calcular a divisão 50/30/20.');
   return head('Orçamento','Quanto vocês planejam gastar em cada categoria. Clique no valor para editar.')+`
   <div class="orc-resumo panel" data-ak="orc-resumo">
-    <div><small>Entradas previstas</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês':'média dos últimos meses'}</small></div>
+    <div><small>${pl.entradas?'Entradas previstas':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês':'média dos últimos meses'}</small></div>
     <div><small>Planejado para gastar</small><b class="ref">${R0(totPl)}</b><small class="mut">${totPl&&entPl>0?pctF(totPl/entPl)+' das entradas':'defina abaixo'}</small></div>
     <div><small>Realizado + comprometido</small><b class="${r.gastos+totComp>0?'neg':'zero'}">${R0(r.gastos+totComp)}</b><small class="mut">${R0(r.gastos)} realizados · ${R0(totComp)} comprometidos</small></div>
     <div><small>Disponível no planejado</small><b class="${cS(totPl-r.gastos-totComp)}">${R0(totPl-r.gastos-totComp)}</b><small class="mut">sobra planejada ${R0(entPl-totPl)}</small></div>
@@ -830,6 +831,8 @@ function vContas(){
   const nFora=lista.filter(x=>!conta1(x)).length,visiveis=f.fora?lista:lista.filter(conta1);
   const sai=conta.filter(x=>x.tipo==='gasto'),ent=conta.filter(x=>x.tipo==='entrada');
   const pago=x=>x.k==='compra'||(x.k==='regra'&&(x.s.k==='ok'||(x.s.oc&&x.s.oc.status==='comprometido')));
+  /* lançada no cartão, mas a fatura ainda não foi paga: virou despesa, o caixa não mudou */
+  const noCartaoAberto=x=>x.k==='compra'?x.i.status==='comprometido':(x.k==='regra'&&!!x.s.oc&&x.s.oc.status==='comprometido');
   const pagas=sai.filter(pago),atras=sai.filter(x=>x.k==='regra'&&x.s.k==='late');
   const tot=a=>a.reduce((s,x)=>s+valor(x),0);
   const card=x=>{
@@ -862,7 +865,7 @@ function vContas(){
   </div>
   <div class="tiles">
     <div class="tile"><div class="k">Saídas do mês</div><div class="v ${tot(sai)?'neg':'zero'}">${R(tot(sai))}</div><div class="d">${plural(sai.length,'conta','contas')}</div></div>
-    <div class="tile"><div class="k">Já pago ou lançado</div><div class="v ${pagas.length?'neg':'zero'}">${R(tot(pagas))}</div><div class="d">${pagas.length} de ${sai.length}</div></div>
+    <div class="tile"><div class="k">Já realizado como despesa</div><div class="v ${pagas.length?'neg':'zero'}">${R(tot(pagas))}</div><div class="d">${pagas.length} de ${sai.length} · <b>${R0(tot(pagas)-tot(pagas.filter(noCartaoAberto)))}</b> já pago${tot(pagas.filter(noCartaoAberto))>0?` · <span class="neg">${R0(tot(pagas.filter(noCartaoAberto)))}</span> no cartão, ainda a pagar`:''}</div></div>
     <div class="tile"><div class="k">Falta pagar</div><div class="v ${tot(sai)-tot(pagas)>0?'neg':'zero'}">${R(tot(sai)-tot(pagas))}</div><div class="d">${atras.length?`<span class="neg">${plural(atras.length,'atrasada','atrasadas')}</span>`:'nenhuma atrasada'}</div></div>
     <div class="tile"><div class="k">Entradas previstas</div><div class="v ${ent.length?'pos':'zero'}">${R(tot(ent))}</div><div class="d">${ent.filter(pago).length} de ${ent.length} recebidas</div></div>
   </div>
@@ -1133,15 +1136,17 @@ function vInvestimentos(){
   if(!S.temV5)return head('Investimentos','',null,true)+`<div class="panel">${avisoV(5)}</div>`;
   const tot=totalInvest();
   const por={};S.invest.forEach(x=>{por[x.tipo]=(por[x.tipo]||0)+x.valor});
-  const fatias=INV.filter(t=>por[t.id]).map(t=>{const its=S.invest.filter(x=>x.tipo===t.id),pp={};its.forEach(x=>{const k=x.produto||x.nome||t.nome;pp[k]=(pp[k]||0)+x.valor});return {...t,valor:por[t.id],qtd:its.length,partes:Object.entries(pp).sort((a,b)=>b[1]-a[1])}}).sort((a,b)=>b.valor-a.valor);
+  const fatiasTipo=INV.filter(t=>por[t.id]).map(t=>{const its=S.invest.filter(x=>x.tipo===t.id),pp={};its.forEach(x=>{const k=x.produto||x.nome||t.nome;pp[k]=(pp[k]||0)+x.valor});return {...t,valor:por[t.id],qtd:its.length,partes:Object.entries(pp).sort((a,b)=>b[1]-a[1])}}).sort((a,b)=>b.valor-a.valor);
+  /* com uma classe só (ex.: 100% renda fixa) o gráfico não informa nada: divide por produto até haver mais classes */
+  const fatias=fatiasTipo.length===1?fatiasTipo[0].partes.map(([k,v],i)=>({...fatiasTipo[0],nome:k,valor:v,qtd:S.invest.filter(x=>x.tipo===fatiasTipo[0].id&&(x.produto||x.nome||fatiasTipo[0].nome)===k).length,cor:mixHex(fatiasTipo[0].cor,i%2?'#000000':'#ffffff',Math.min(.5,.18*Math.ceil(i/1.5))),partes:[[k,v]]})):fatiasTipo;
   S._fatias=fatias;
-  const patr=emCaixa()+totalMetas()+tot,maior=fatias[0];
+  const maior=fatias[0];
   const pctF=v=>(v/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
   if(!S.invest.length)return head('Investimentos','Onde o dinheiro de vocês está rendendo.',null,true)+`<div class="panel">${vazio('Nenhum investimento cadastrado','Cadastrem poupança, Tesouro, CDB, ações e outros para ver a divisão no gráfico.',BTN('inv-novo','Adicionar investimento'))}</div>`;
   return head('Investimentos','Onde o dinheiro de vocês está rendendo.',BTN('inv-novo','Novo investimento'),true)+`
   <div class="tiles">
     ${(()=>{const apl=S.invest.reduce((s,x)=>s+x.aplicado,0),evo=tot-apl,rent=apl>0?evo/apl*100:0,mesA=S.invest.filter(x=>(x.data||'').slice(0,7)===MES_ATUAL).reduce((s,x)=>s+x.aplicado,0);
-      return `<div class="tile"><div class="k">Patrimônio investido</div><div class="v ${cS(tot)}">${R(tot)}</div><div class="d">${patr>0?Math.round(tot/patr*100)+'% do patrimônio':''} · ${plural(S.invest.length,'aplicação','aplicações')}</div></div>
+      return `<div class="tile"><div class="k">Patrimônio investido</div><div class="v ${cS(tot)}">${R(tot)}</div><div class="d">em ${plural(S.invest.length,'aplicação','aplicações')}</div></div>
     <div class="tile"><div class="k">Aportes no mês</div>${(()=>{const r0=resumo(MES_ATUAL);return `<div class="v ${r0.investido>0?'pos':r0.investido<0?'neg':'zero'}">${R(r0.investido)}</div><div class="d">saiu do caixa em ${esc(soMes(MES_ATUAL))} · não conta como gasto</div>`})()}</div>
     <div class="tile"><div class="k">Rentabilidade</div><div class="v ${cS(evo)}">${evo>0?'+':''}${rent.toLocaleString('pt-BR',{maximumFractionDigits:2})}%</div><div class="d">sobre ${RF(R0(apl))} aplicados</div></div>
     <div class="tile">${selo(evo)}<div class="k">Resultado</div><div class="v ${cS(evo)}">${evo>0?'+ ':''}${R(evo)}</div><div class="d">valor atual menos o aplicado</div></div>`})()}
@@ -1300,17 +1305,18 @@ function vRelMes(){
   const fechavel=m<=MES_ATUAL;
   const linhaCmp=(k,a,b,inv)=>`<div class="sd-l"><span>${k}</span><span><b class="${inv?'neg':'pos'}">${R0(a)}</b> <span class="mut">vs ${R0(b)}</span> ${delta(a,b,inv)}</span></div>`;
   const orcRows=CATS_G.filter(c=>Number(pl[c.id])||pc[c.id]).map(c=>{const lim=Number(pl[c.id])||0,v=pc[c.id]||0;return `<tr class="row"><td>${c.em} ${esc(c.nome)}</td><td class="r vl ref">${lim?R0(lim):'—'}</td><td class="r vl ${v?'neg':'zero'}">${R0(v)}</td><td class="r vl ${lim?cS(lim-v):'zero'}">${lim?R0(lim-v):'—'}</td></tr>`}).join('');
-  return head('Resumo mensal',`${esc(nomeMes(m))}${f?' · mês fechado em '+dataBR((f.criado_em||HOJE).slice(0,10)):''}`,fechavel?(f?`<button class="btn ghost" data-act="reabrir-mes">Reabrir mês</button>`:`<button class="btn novo" data-act="fechar-mes">Fechar mês</button>`):'')+`
+  const emAndamento=m===MES_ATUAL&&!f;
+  return head('Resumo mensal',`${esc(nomeMes(m))}${f?' · mês fechado em '+dataBR((f.criado_em||HOJE).slice(0,10)):emAndamento?' · <b class="ref">mês em andamento</b>':''}`,fechavel?(f?`<button class="btn ghost" data-act="reabrir-mes">Reabrir mês</button>`:`<button class="btn novo" data-act="fechar-mes">Fechar mês</button>`):'')+`
   ${f?`<div class="panel fech-p"><h2>🔒 Resumo salvo no fechamento</h2><p class="sub">Valores preservados como estavam em ${dataBR((f.criado_em||HOJE).slice(0,10))}</p><div class="facts" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
     ${[['Entradas',f.resumo.entradas,'pos'],['Gastos',f.resumo.gastos,'neg'],['Investimentos',f.resumo.investimentos,'ref'],['Metas',f.resumo.metas,'ref'],['Saldo final',f.resumo.saldo_final,null]].map(x=>`<div class="fact"><small>${x[0]}</small><b class="${x[2]||cS(x[1]||0)}">${x[1]==null?'—':R0(x[1])}</b></div>`).join('')}</div></div>`:''}
   <div class="tiles">
     <div class="tile"><div class="k">Entradas</div><div class="vrow"><div class="v ${r.entradas?'pos':'zero'}">${R(r.entradas)}</div>${delta(r.entradas,ra.entradas)}</div><div class="d">média 3 meses: ${R0(me)}</div></div>
     <div class="tile"><div class="k">Gastos</div><div class="vrow"><div class="v ${r.gastos?'neg':'zero'}">${R(r.gastos)}</div>${delta(r.gastos,ra.gastos,true)}</div><div class="d">média 3 meses: ${R0(mg)}</div></div>
     <div class="tile"><div class="k">Investimentos e metas</div><div class="v ${cS(r.investido+r.guardado)}">${R(r.investido+r.guardado)}</div><div class="d">investido ${R0(r.investido)} · metas ${R0(r.guardado)}</div></div>
-    <div class="tile">${p?selo(p.caixa):''}<div class="k">Saldo final do mês</div><div class="v ${p?cS(p.caixa):'zero'}">${p?R(p.caixa):'…'}</div><div class="d">caixa no último dia</div></div>
+    <div class="tile">${p?selo(p.caixa):''}<div class="k">${emAndamento?'Caixa atual':'Saldo final do mês'}</div><div class="v ${p?cS(p.caixa):'zero'}">${p?R(p.caixa):'…'}</div><div class="d">${emAndamento?'o mês ainda não terminou':'caixa no último dia'}</div></div>
   </div>
   <div class="grid g2">
-    <div class="panel"><h2>Comparativo</h2><p class="sub">${esc(nomeMes(m,true))} contra ${esc(nomeMes(ant,true))}</p>
+    <div class="panel"><h2>Comparativo</h2><p class="sub">${emAndamento?`${esc(nomeMes(m,true))} até ${dataBR(HOJE)} contra ${esc(nomeMes(ant,true))} completo`:`${esc(nomeMes(m,true))} contra ${esc(nomeMes(ant,true))}`}</p>
       <div class="sim-depois">${linhaCmp('Entradas',r.entradas,ra.entradas)}${linhaCmp('Gastos',r.gastos,ra.gastos,true)}
         <div class="sd-l"><span>Gastos vs média de 3 meses</span><span><b class="neg">${R0(r.gastos)}</b> <span class="mut">vs ${R0(mg)}</span> ${delta(r.gastos,mg,true)}</span></div>
         <div class="sd-l"><span>Categoria que mais cresceu</span><span>${cresceu?`${cresceu.c.em} ${esc(cresceu.c.nome)} <b class="neg">+${R0(cresceu.d)}</b>`:'<span class="mut">nenhuma</span>'}</span></div>
@@ -2303,7 +2309,7 @@ document.addEventListener('click',async e=>{
     case 'n-divida':modalEscolherDivida();break;
     case 'ver-anexo':{const p=a.dataset.path;if(!p)break;const {data,error}=await sb.storage.from('anexos').createSignedUrl(p,300);if(error||!data){toast('Não deu para abrir o anexo.');break}window.open(data.signedUrl,'_blank','noopener')}break;
     case 'fechar-mes':{if(!S.temV10){toast('Falta rodar o arquivo schema-v10.sql no Supabase.');break}if(!S.hist){await carregarHist()}const m=S.mes,res=resumoFech(m);
-      confirmar('Fechar '+soMes(m)+'?',`O resumo do mês fica salvo como está agora: entradas <b class="pos">${R0(res.entradas)}</b>, gastos <b class="neg">${R0(res.gastos)}</b>, investimentos <b class="ref">${R0(res.investimentos)}</b>, metas <b class="ref">${R0(res.metas)}</b>${res.saldo_final!=null?`, saldo final <b>${R0(res.saldo_final)}</b>`:''}. ${S.orc[addMes(m,1)]?'':'O orçamento deste mês também é copiado para '+soMes(addMes(m,1))+', para começar o próximo período. '}Os lançamentos continuam editáveis; dá para reabrir o mês depois.`,'Fechar mês',
+      confirmar('Fechar '+soMes(m)+'?',`${m===MES_ATUAL&&HOJE<m+'-'+pad(ultimoDia(m))?`<b class="neg">O mês ainda não terminou</b> (hoje é ${dataBR(HOJE)}). Fechar agora salva um resumo parcial. `:''}O resumo do mês fica salvo como está agora: entradas <b class="pos">${R0(res.entradas)}</b>, gastos <b class="neg">${R0(res.gastos)}</b>, investimentos <b class="ref">${R0(res.investimentos)}</b>, metas <b class="ref">${R0(res.metas)}</b>${res.saldo_final!=null?`, saldo final <b>${R0(res.saldo_final)}</b>`:''}. ${S.orc[addMes(m,1)]?'':'O orçamento deste mês também é copiado para '+soMes(addMes(m,1))+', para começar o próximo período. '}Os lançamentos continuam editáveis; dá para reabrir o mês depois.`,'Fechar mês',
         async()=>{const {error}=await sb.from('fechamentos').upsert({mes:m,resumo:res,criado_em:new Date().toISOString()});if(error)throw error;
           const prox=addMes(m,1);if(!S.orc[prox]){const p=planejado(m);await sb.from('orcamentos').upsert({mes:prox,gastos:p.gastos,entradas:p.entradas||0,atualizado_em:new Date().toISOString()})}
           toast(cap(soMes(m))+' fechado')})}break;
