@@ -123,7 +123,7 @@ const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
 const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
   fCat:'',fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
-  fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
+  pagPrev:{},temV12:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 
 /* ================= carregamento ================= */
@@ -167,6 +167,7 @@ async function carregarResto(){
   S.metas=(mt.data||[]).filter(m=>!m.arquivada).map(m=>({...m,alvo:Number(m.alvo)}));
   S.limites=(cf.data&&cf.data.limites)||{};
   S.mesadas=(cf.data&&cf.data.mesadas)||{};
+  S.temV12=!!(cf.data&&'pag_previstos' in cf.data);S.pagPrev=(cf.data&&cf.data.pag_previstos)||{};
   S.saldoInicial=Number(cf.data&&cf.data.saldo_inicial)||0;
   S.movMetas=(mv.data||[]).map(x=>({meta_id:x.meta_id,tipo:x.tipo,valor:Number(x.valor),mes:(x.data||'').slice(0,7)}));
   S.movCaixa=(tot.data||[]).reduce((s,x)=>{const v=Number(x.valor);return s+(x.tipo==='entrada'||x.tipo==='resgate'?v:-v)},0);
@@ -299,6 +300,8 @@ function descVis(i){const c=CAT[i.categoria]||{nome:''};if(outroLivre(i))return 
 function mesFatura(card,dataISO){let fm=dataISO.slice(0,7);if(Number(dataISO.slice(8,10))>=card.fechamento)fm=addMes(fm,1);if(card.vencimento<=card.fechamento)fm=addMes(fm,1);return fm}
 function fechamentoFatura(card,fm){return diaNoMes(card.vencimento>card.fechamento?fm:addMes(fm,-1),card.fechamento)}
 function vencFatura(card,fm){return diaNoMes(fm,card.vencimento)}
+/* dia em que vocês pretendem pagar a fatura (só vale no mês do vencimento, enquanto não passou e não foi paga) */
+function pagPrevisto(card,fm){const d=S.pagPrev&&S.pagPrev[card.id+'|'+fm];if(!d||d<HOJE||d.slice(0,7)!==vencFatura(card,fm).slice(0,7))return null;return d}
 function itensFatura(id,fm){return S.card.filter(x=>x.cartao_id===id&&x.fatura_mes===fm)}
 function infoFatura(card,fm){
   const it=itensFatura(card.id,fm),total=soma(it),aberto=soma(it.filter(x=>x.status==='comprometido')),prev=soma(it.filter(x=>x.status==='previsto'));
@@ -577,9 +580,9 @@ function eventosMes(m){
       k:tipoTxt+(feito?'':entra?' · previsto':' · a pagar'),ic:reg?(reg.auto?'🔁':'🏠'):(!feito?'📌':'')});
   });
   // faturas no vencimento
-  S.cartoes.forEach(c=>{const f=infoFatura(c,m);if(!f.it.length)return;
-    add(f.venc,{em:'💳',txt:'Fatura '+c.nome+' ('+soMes(f.fech.slice(0,7))+')',valor:f.total,pend:f.aberto+f.prev,sai:true,feito:f.k==='paga',ic:'💳',cartao:c.id,fm:m,
-      k:'Pagamento de fatura · '+(f.k==='paga'?'paga':f.k==='atrasada'?'atrasada':f.k==='fechada'?'fechada, a pagar':'aberta, fecha '+dataBR(f.fech))})});
+  S.cartoes.forEach(c=>{const f=infoFatura(c,m);if(!f.it.length)return;const pp=f.k==='paga'?null:pagPrevisto(c,m);
+    add(pp||f.venc,{em:'💳',txt:'Fatura '+c.nome+' ('+soMes(f.fech.slice(0,7))+')',valor:f.total,pend:f.aberto+f.prev,sai:true,feito:f.k==='paga',ic:'💳',cartao:c.id,fm:m,
+      k:'Pagamento de fatura · '+(f.k==='paga'?'paga':f.k==='atrasada'?'atrasada':f.k==='fechada'?'fechada, a pagar':'aberta, fecha '+dataBR(f.fech))+(pp?' · pagamento previsto, vence '+dataBR(f.venc):'')})});
   // parcela de dívida ainda não paga
   S.dividas.forEach(d=>{const inf=infoDivida(d);if(inf.rest<=0||S.pagDiv.some(p=>p.divida_id===d.id&&p.mes===m)||m<MES_ATUAL)return;if(difMes(MES_ATUAL,m)>=inf.rest)return;
     add(diaNoMes(m,d.dia),{em:'🏦',txt:'Parcela '+d.nome,valor:d.parcela,sai:true,divida:d.id,k:'Pagamento de dívida · a pagar',ic:'🏦'})});
@@ -730,7 +733,7 @@ function vCartoes(){
         <div class="ccard-hint">Ver faturas mês a mês ›</div>
         <div class="acts"><button class="ic" data-act="cartao-editar" data-id="${c.id}" aria-label="Editar cartão">${svg('edit')}</button><button class="ic" data-act="cartao-apagar" data-id="${c.id}" aria-label="Excluir cartão">${svg('del')}</button></div>
       </div>
-      <div class="fat-bar"><span class="tag ${t[0]}">${t[1]}</span><button class="btn sm ghost" data-act="fatura-add" data-id="${c.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${f.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${c.id}" data-fm="${fm}">Pagar fatura · ${R0(f.aberto)}</button>`:f.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${c.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
+      <div class="fat-bar"><span class="tag ${t[0]}">${t[1]}</span><button class="btn sm ghost" data-act="fatura-add" data-id="${c.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${f.aberto>0?`<button class="btn sm ghost" data-act="fatura-prev" data-id="${c.id}" data-fm="${fm}">📅 ${pagPrevisto(c,fm)?'Pagar em '+dataBR(pagPrevisto(c,fm)):'Data prevista de pagamento'}</button>`:''}${f.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${c.id}" data-fm="${fm}">Pagar fatura · ${R0(f.aberto)}</button>`:f.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${c.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
       ${c.limite?`<div><div class="lim-bar"><span>Limite usado <b class="m neg">${R0(usado)}</b></span><span>Disponível <b class="m ${cS(disp)}">${R0(disp)}</b></span></div><div class="tr ${clsLim(usado/c.limite)}"><i style="width:${Math.min(100,usado/c.limite*100)}%"></i></div></div>`:''}
       ${f.it.length?`<div class="mini">${[...f.it].sort((a,b)=>b.valor-a.valor).slice(0,5).map(i=>`<div class="mini-row"><div class="em">${catVis(i).em}</div><div class="nm"><b>${esc(descVis(i))}</b><small>${i.parcelas>1?`Parcela ${i.parcela} de ${i.parcelas}`:'À vista'} · gasto em ${dataBR(i.data)}</small></div><div class="vl neg">${R(i.valor)}</div></div>`).join('')}${f.it.length>5?`<p class="nota">+ ${plural(f.it.length-5,'compra','compras')} nesta fatura</p>`:''}</div>`:'<p class="nota">Nenhuma compra nesta fatura.</p>'}
     </div>`}).join('');
@@ -1873,6 +1876,19 @@ function modalConfirmarOc(item){
     const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast(ent?'Recebimento confirmado':'Pagamento registrado');
   });
 }
+/* data prevista de pagamento: só muda onde a fatura aparece no Calendário e na Projeção; o caixa muda ao pagar */
+function modalPagPrev(card,fm){
+  if(!S.temV12){toast('Falta rodar o arquivo schema-v12.sql no Supabase.');return}
+  const f=infoFatura(card,fm),atual=pagPrevisto(card,fm),mesV=f.venc.slice(0,7);
+  modal(`<h2>Data prevista de pagamento</h2><p class="mut" style="margin:-6px 0 16px">Fatura ${esc(card.nome)} de ${esc(soMes(refDe(card,fm)))} · vence ${dataBR(f.venc)} · ${R(f.aberto+f.prev)}</p>
+    <label>Quando vocês pretendem pagar<input class="field" id="mData" type="date" value="${atual||''}"></label>
+    <p class="mut" style="font-size:13px;margin:-6px 0 14px">Vale entre hoje e o dia do vencimento, dentro de ${esc(soMes(mesV))}. Deixe em branco para voltar à data de vencimento. O caixa só muda quando vocês usarem <b>Pagar fatura</b>.</p>${btns('Salvar')}`,
+  async()=>{const d=val('mData');
+    if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||d<HOJE||d>f.venc))return 'Escolha uma data entre hoje e '+dataBR(f.venc)+'.';
+    const novo={...S.pagPrev},k=card.id+'|'+fm;if(d)novo[k]=d;else delete novo[k];
+    const {error}=await sb.from('config').upsert({id:'casal',pag_previstos:novo,atualizado_em:new Date().toISOString()});if(error)throw error;
+    S.pagPrev=novo;toast(d?'Pagamento previsto para '+dataBR(d):'Voltou para o vencimento');});
+}
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
   modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
@@ -2067,7 +2083,7 @@ function abrirFaturas(cid,fm){
         ${fact('A pagar',R(d.aberto),d.aberto?'neg':'zero')}
         ${fact('Lançamentos',String(d.it.length+d.prev.length),'zero',d.prev.length?`${d.prev.length} prevista${d.prev.length>1?'s':''}`:'')}
       </div>
-      <div class="fv-acoes"><button class="btn sm ghost" data-act="fatura-add" data-id="${card.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${d.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${card.id}" data-fm="${fm}">Pagar fatura · ${R0(d.aberto)}</button>`:d.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${card.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
+      <div class="fv-acoes"><button class="btn sm ghost" data-act="fatura-add" data-id="${card.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${d.aberto>0?`<button class="btn sm ghost" data-act="fatura-prev" data-id="${card.id}" data-fm="${fm}">📅 ${pagPrevisto(card,fm)?'Pagar em '+dataBR(pagPrevisto(card,fm)):'Data prevista de pagamento'}</button>`:''}${d.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${card.id}" data-fm="${fm}">Pagar fatura · ${R0(d.aberto)}</button>`:d.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${card.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
       <div class="fv-lista">${vazio_?'<p class="nota" style="padding:18px 6px">Nenhuma compra nesta fatura.</p>':[...d.it].sort((a,b)=>a.data.localeCompare(b.data)||a.criadoEm-b.criadoEm).map(x=>linha(x,false)).join('')+d.prev.map(x=>linha(x,true)).join('')}</div>
     </div>
     <div class="btns"><button class="btn" data-m="cancelar">Fechar</button></div>`);
@@ -2218,7 +2234,7 @@ document.addEventListener('click',async e=>{
   if(!e.target.closest('[data-fatia]')&&document.querySelector('#view .fatia.on')){document.querySelectorAll('#view [data-fatia].on').forEach(x=>x.classList.remove('on'));$('pieBox')?.classList.remove('ativo');const t=$('pieTip');if(t)t.hidden=true}
   const a=e.target.closest('[data-act]');if(!a||a.disabled)return;
   const id=a.dataset.id,act=a.dataset.act;
-  if(a.closest('.fat-view')&&['editar','apagar','fatura-pagar','fatura-add'].includes(act))S.fatVoltar={...S.fatView};
+  if(a.closest('.fat-view')&&['editar','apagar','fatura-pagar','fatura-add','fatura-prev'].includes(act))S.fatVoltar={...S.fatView};
   const item=S.itens.find(i=>i.id===id)||S.card.find(i=>i.id===id),meta=S.metas.find(m=>m.id===id),conta=S.contas.find(c=>c.id===id),cartao=S.cartoes.find(c=>c.id===id),
     rec=S.recorrentes.find(r=>r.id===id),div=S.dividas.find(d=>d.id===id),des=S.desejos.find(d=>d.id===id);
   switch(act){
@@ -2303,6 +2319,7 @@ document.addEventListener('click',async e=>{
       const v={...S.fatView};await recarregar();abrirFaturas(v.cartao,v.fm)}break;
     case 'fatura-add':if(cartao){const fm=a.dataset.fm,fech=fechamentoFatura(cartao,fm);modalCompraCartao({cartao:cartao.id,fm,data:HOJE<=fech?HOJE:fech})}break;
     case 'fatura-pagar':if(cartao)modalPagarFatura(cartao,a.dataset.fm);break;
+    case 'fatura-prev':if(cartao)modalPagPrev(cartao,a.dataset.fm);break;
     case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
       if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');await recarregar();if(volta)abrirFaturas(volta.cartao,volta.fm)}}break;
     case 'sim-comprar':{const v=parseValor(S.sim.valor);if(!v)break;if(S.sim.forma==='parc')modalCompraCartao({valor:v,desc:S.sim.nome,n:parseInt(S.sim.n,10)||2});else modalLancamento('gasto',null,{valor:v,desc:S.sim.nome,cat:'compras'})}break;
