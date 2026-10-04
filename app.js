@@ -451,29 +451,23 @@ function linhaMini(i){
   return `<div class="mini-row"><div class="em">${c.em}</div><div class="nm"><b>${esc(descVis(i))}</b><small>${dataBR(i.data)} · ${esc(nomeDe(i.autor)||'Automático')}${extra}</small></div><div class="vl ${cls}">${sinal}${R(i.valor)}</div></div>`;
 }
 /* ================= visão geral ================= */
-/* central de alertas: só avisos que pedem uma ação */
+/* central de alertas: só contas, faturas e parcelas que vencem nos próximos dias (ou já venceram e não foram pagas) */
+const JANELA_ALERTA=7;
 function alertas(){
-  const al=[],amanha=(()=>{const d=new Date(hojeD);d.setDate(d.getDate()+1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})();
-  S.cartoes.forEach(c=>{const fm=mesFatura(c,HOJE),f=infoFatura(c,fm),dias=diasEntre(HOJE,f.fech);
-    if(f.it.length&&dias>=0&&dias<=3)al.push({k:'at',ic:'💳',t:`Fatura ${esc(c.nome)} fecha ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'} (${R0(f.total)} até agora)`,go:'cartoes'});
-    S.card.filter(x=>x.cartao_id===c.id&&x.status==='comprometido'&&vencFatura(c,x.fatura_mes)<HOJE).length&&al.push({k:'no',ic:'💳',t:`Fatura ${esc(c.nome)} vencida e ainda não paga`,go:'cartoes'});});
-  const ev=eventosMes(MES_ATUAL);
-  Object.entries(ev).forEach(([d,es])=>es.forEach(e=>{if(e.feito||!e.sai||e.cartao)return;
-    if(d<HOJE)al.push({k:'no',ic:'⏰',t:`${esc(e.txt)} venceu em ${dataBR(d)} (${R0(e.valor)})`,go:'contas'});
-    else if(d===HOJE||d===amanha)al.push({k:'at',ic:'⏰',t:`${esc(e.txt)} vence ${d===HOJE?'hoje':'amanhã'} (${R0(e.valor)})`,go:'contas'})}));
-  const pl=planejado(MES_ATUAL).gastos;
-  CATS_G.forEach(c=>{const lim=Number(pl[c.id])||0;if(!lim)return;const u=orcUso(c.id,MES_ATUAL),r=(u.realizado+u.comprometido)/lim;
-    if(r>1)al.push({k:'no',ic:c.em,t:`${esc(c.nome)} passou ${R0(u.realizado+u.comprometido-lim)} do orçamento`,go:'orcamento'});
-    else if(r>=.8)al.push({k:'at',ic:c.em,t:`${esc(c.nome)} já usou ${Math.round(r*100)}% do orçamento`,go:'orcamento'})});
-  S.metas.filter(m=>!m.reserva&&m.prazo).forEach(m=>{const g=guardadoMeta(m.id);if(g>=m.alvo)return;
-    if(m.prazo<HOJE){al.push({k:'no',ic:m.emoji,t:`Meta ${esc(m.nome)} passou do prazo sem ser batida`,go:'metas'});return}
-    const ini=(m.criado_em||HOJE).slice(0,7),total=Math.max(1,difMes(ini,m.prazo.slice(0,7))),dec=difMes(ini,MES_ATUAL);if(dec<1)return;
-    const esperado=m.alvo*Math.min(1,dec/total);if(g<esperado*.9)al.push({k:'at',ic:m.emoji,t:`Meta ${esc(m.nome)} está atrasada: o esperado até agora era ${R0(esperado)} e há ${R0(g)}`,go:'metas'})});
-  const res=S.metas.find(m=>m.reserva);
-  if(res&&guardadoMeta(res.id)<res.alvo)al.push({k:'at',ic:'🛟',t:`Reserva abaixo do alvo: ${R0(guardadoMeta(res.id))} de ${R0(res.alvo)}`,go:'reserva'});
-  const sm=situacaoMes();if(sm.previsao<0)al.push({k:'no',ic:'📉',t:`A projeção do mês termina negativa em ${R0(-sm.previsao)}`,go:'calendario'});
-  if(!CATS_G.some(c=>Number(pl[c.id])>0))al.push({k:'at',ic:'🎯',t:`Orçamento de ${esc(soMes(MES_ATUAL))} ainda não definido`,go:'orcamento'});
-  return al.sort((a,b)=>(a.k==='no'?0:1)-(b.k==='no'?0:1));
+  const al=[],fimD=new Date(hojeD);fimD.setDate(fimD.getDate()+JANELA_ALERTA);
+  const fimISO=`${fimD.getFullYear()}-${pad(fimD.getMonth()+1)}-${pad(fimD.getDate())}`;
+  const quando=d=>{const n=diasEntre(HOJE,d);return n<0?(n===-1?'venceu ontem':`venceu há ${-n} dias`):n===0?'vence hoje':n===1?'vence amanhã':`vence em ${n} dias (${dataBR(d)})`};
+  /* contas, faturas (na data de pagamento prevista ou no vencimento) e parcelas de dívida do mês e do próximo */
+  [MES_ATUAL,addMes(MES_ATUAL,1)].forEach(m=>Object.entries(eventosMes(m)).forEach(([d,es])=>es.forEach(e=>{
+    if(e.feito||!e.sai||e.transf||d>fimISO)return;
+    const v=e.pend!=null?e.pend:e.valor;if(!(v>0))return;
+    al.push({k:d<HOJE?'no':'at',d,ic:e.em,t:`${esc(e.txt)} ${quando(d)} · <b>${R0(v)}</b>`,go:e.cartao?'cartoes':e.divida?'dividas':'contas'})})));
+  /* o que ficou para trás em meses anteriores */
+  S.cartoes.forEach(c=>[...new Set(S.card.filter(x=>x.cartao_id===c.id&&x.status==='comprometido'&&x.fatura_mes<MES_ATUAL).map(x=>x.fatura_mes))].forEach(fm=>{
+    const f=infoFatura(c,fm);al.push({k:'no',d:f.venc,ic:'💳',t:`Fatura ${esc(c.nome)} (${esc(soMes(f.fech.slice(0,7)))}) ${quando(f.venc)} · <b>${R0(f.aberto)}</b>`,go:'cartoes'})}));
+  S.itens.filter(i=>i.status==='previsto'&&i.mes<MES_ATUAL&&!i.cartao_id&&(i.tipo==='gasto'||i.tipo==='divida')).forEach(i=>
+    al.push({k:'no',d:i.data,ic:catVis(i).em,t:`${esc(descVis(i))} ${quando(i.data)} · <b>${R0(i.valor)}</b>`,go:'contas'}));
+  return al.sort((a,b)=>(a.k==='no'?0:1)-(b.k==='no'?0:1)||a.d.localeCompare(b.d));
 }
 /* linhas da projeção do mês: hoje → pendências → eventos futuros, com o saldo acumulado */
 function linhasProjecao(sm){
@@ -531,8 +525,8 @@ function vGeral(){
     </div>
     ${projHTML}
   </div>
-  <div class="panel alertas-p"><div class="panel-head"><div><h2>Central de alertas</h2><p class="sub">${al.length?plural(al.length,'aviso pede','avisos pedem')+' atenção':'Nada pedindo atenção agora'}</p></div></div>
-    ${al.length?`<div class="avisos">${al.slice(0,8).map(a=>`<div class="aviso-i ${a.k}"><span>${a.ic} ${a.t}</span><button class="lnk" data-go="${a.go}">Ver →</button></div>`).join('')}</div>`:`<div class="ck ok">✅ Contas, faturas, orçamento e metas em dia</div>`}
+  <div class="panel alertas-p"><div class="panel-head"><div><h2>Central de alertas</h2><p class="sub">${al.length?`${plural(al.length,'conta ou fatura','contas e faturas')} perto do pagamento`:`Nada vencendo nos próximos ${JANELA_ALERTA} dias`}</p></div></div>
+    ${al.length?`<div class="avisos">${al.slice(0,10).map(a=>`<div class="aviso-i ${a.k}"><span>${a.ic} ${a.t}</span><button class="lnk" data-go="${a.go}">Ver →</button></div>`).join('')}</div>`:`<div class="ck ok">✅ Nenhuma conta ou fatura vence nos próximos ${JANELA_ALERTA} dias</div>`}
   </div>
   <div class="grid g2">
     <div class="panel"><div class="panel-head"><div><h2>Próximos compromissos</h2><p class="sub">O que vence e o que vai entrar</p></div><button class="lnk" data-go="calendario">Ver calendário →</button></div>${proxHTML}</div>
