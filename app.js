@@ -124,7 +124,7 @@ const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
 const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
   fCat:'',fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
-  pagPrev:{},temV12:false,patrIni:'',temPatr:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
+  pagPrev:{},temV12:false,patrIni:'',temPatr:false,rendaMedia:0,temRenda:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 
 /* ================= carregamento ================= */
@@ -169,6 +169,7 @@ async function carregarResto(){
   S.limites=(cf.data&&cf.data.limites)||{};
   S.mesadas=(cf.data&&cf.data.mesadas)||{};
   S.temV12=!!(cf.data&&'pag_previstos' in cf.data);S.pagPrev=(cf.data&&cf.data.pag_previstos)||{};
+  S.temRenda=!!(cf.data&&'renda_media' in cf.data);S.rendaMedia=Number(cf.data&&cf.data.renda_media)||0;
   S.temPatr=!!(cf.data&&'patr_inicial' in cf.data);S.patrIni=(cf.data&&cf.data.patr_inicial)||'';
   S.saldoInicial=Number(cf.data&&cf.data.saldo_inicial)||0;
   S.movMetas=(mv.data||[]).map(x=>({meta_id:x.meta_id,tipo:x.tipo,valor:Number(x.valor),mes:(x.data||'').slice(0,7)}));
@@ -256,9 +257,11 @@ function media(){
   if(!per.length)per=[S.base.filter(x=>x.mes===MES_ATUAL)];
   const f=(a,t)=>a.filter(x=>x.tipo===t).reduce((s,x)=>s+x.valor,0);
   const n=per.length;
-  const ent=per.reduce((s,a)=>s+f(a,'entrada'),0)/n, gas=per.reduce((s,a)=>s+f(a,'gasto'),0)/n;
+  const entHist=per.reduce((s,a)=>s+f(a,'entrada'),0)/n, gas=per.reduce((s,a)=>s+f(a,'gasto'),0)/n;
+  /* a renda média que vocês definem vale mais que o histórico; sem ela, usa a média dos últimos meses */
+  const ent=S.rendaMedia>0?S.rendaMedia:entHist;
   const ap=per.reduce((s,a)=>s+f(a,'aporte')-f(a,'resgate'),0)/n;
-  return {ent,gas,ap,sobra:ent-gas,meses:per[0].length?n:0};
+  return {ent,gas,ap,sobra:ent-gas,meses:per[0].length?n:0,definida:S.rendaMedia>0,hist:entHist};
 }
 function planejado(m){const o=S.orc[m];return {gastos:o?o.gastos:(S.limites||{}),entradas:o?o.entradas:0,proprio:!!o}}
 /* primeiro mês ainda não cobrado de uma regra e quantas cobranças faltam até o fim */
@@ -520,7 +523,7 @@ function vGeral(){
         ${kpi(`Patrimônio líquido ${selo(pat.liquido,{inl:1})}`,R0(pat.liquido),cS(pat.liquido),'caixa + metas + investimentos − dívidas')}
       </div>
       <div class="kpis-bot">
-        ${kpi('Entradas',R0(r0.entradas),r0.entradas>0?'pos':'zero','recebidas em '+esc(mc))}
+        ${kpi('Entradas',R0(r0.entradas),r0.entradas>0?'pos':'zero','recebidas em '+esc(mc)+` · <button class="lnk" data-act="renda-media">${S.rendaMedia>0?'renda média '+R0(S.rendaMedia):'definir renda média'}</button>`)}
         ${kpi('Gastos realizados',R0(r0.gastos),r0.gastos>0?'neg':'zero','em '+esc(mc)+(aCartaoMes>0?` · ${R0(aCartaoMes)} no cartão a pagar`:''))}
         ${kpi('Vence hoje / em atraso',R0(sm.aPagar),sm.aPagar>0?'neg':'zero',sm.aPagar>0?'pede pagamento agora':'nada vencido')}
       </div>
@@ -810,12 +813,13 @@ function vOrcamento(){
     :vazio('Sem entradas previstas','Definam as entradas previstas no topo da tela para calcular a divisão 50/30/20.');
   return head('Orçamento','Quanto vocês planejam gastar em cada categoria. Clique no valor para editar.')+`
   <div class="orc-resumo panel" data-ak="orc-resumo">
-    <div><small>${pl.entradas?'Entradas previstas':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês':'média dos últimos meses'}</small></div>
+    <div><small>${pl.entradas?'Entradas previstas':med.definida?'Renda média mensal':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês para este mês':med.definida?'definida por vocês':'média dos últimos meses'}</small></div>
     <div><small>Planejado para gastar</small><b class="ref">${R0(totPl)}</b><small class="mut">${totPl&&entPl>0?pctF(totPl/entPl)+' das entradas':'defina abaixo'}</small></div>
     <div><small>Realizado + comprometido</small><b class="${r.gastos+totComp>0?'neg':'zero'}">${R0(r.gastos+totComp)}</b><small class="mut">${R0(r.gastos)} realizados · ${R0(totComp)} comprometidos</small></div>
     <div><small>Disponível no planejado</small>${totPl>0?`<b class="${cS(totPl-r.gastos-totComp)}">${R0(totPl-r.gastos-totComp)}</b><small class="mut">sobra planejada ${R0(entPl-totPl)}</small>`:`<b class="zero">—</b><small class="mut">defina o orçamento primeiro</small>`}</div>
   </div>
   <div class="orc-acoes"><span class="mut">${pl.proprio?'Orçamento próprio de '+esc(soMes(S.mes))+'.':'Usando o orçamento padrão.'}</span>
+    <button class="btn sm ghost" data-act="renda-media">💰 ${med.definida?'Renda média: '+R0(S.rendaMedia):'Definir renda média'}</button>
     <button class="btn sm ghost" data-act="orc-copiar">Copiar do mês anterior</button><button class="btn sm ghost" data-act="orc-padrao">Usar como padrão</button></div>
   <div class="orc-grid">${cards}</div>
   <div class="panel" style="margin-top:16px"><h2>Referência 50/30/20</h2><p class="sub">Até 50% da renda no essencial, até 30% no estilo de vida e pelo menos 20% para o futuro</p>${ref503020}</div>`;
@@ -1912,6 +1916,18 @@ function modalPatrIni(){
     const {error}=await sb.from('config').upsert({id:'casal',patr_inicial:d||null,atualizado_em:new Date().toISOString()});if(error)throw error;
     S.patrIni=d;toast(d?'Patrimônio inicial definido':'Patrimônio inicial removido');});
 }
+/* renda média mensal: o app usa para orçamento, % da renda no cartão, simulador, dívidas e desejos */
+function modalRendaMedia(){
+  if(!S.temRenda){toast('Falta rodar o arquivo schema-v12.sql no Supabase.');return}
+  const hist=media().hist;
+  modal(`<h2>Renda média mensal</h2><p class="mut" style="margin:-6px 0 16px">Quanto vocês recebem por mês, somando os salários e as entradas que se repetem. O app usa esse valor para calcular o orçamento, quanto do cartão compromete a renda e se uma compra cabe.</p>
+    <label>Renda média por mês (R$)<input class="field big" id="mValor" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${S.rendaMedia>0?fmtInput(S.rendaMedia):''}"></label>
+    <p class="mut" style="font-size:13px;margin:-6px 0 14px">${hist>0?`Pelo histórico, a média dos últimos meses é ${R0(hist)}. `:''}Deixe em branco para o app usar a média do que entrou nos últimos meses. Isso não lança nenhuma entrada no caixa.</p>${btns('Salvar')}`,
+  async()=>{const t=val('mValor').trim(),v=t?parseValor(t):null;
+    if(t&&!v)return 'Digite um valor válido.';
+    const {error}=await sb.from('config').upsert({id:'casal',renda_media:v||null,atualizado_em:new Date().toISOString()});if(error)throw error;
+    S.rendaMedia=v||0;toast(v?'Renda média definida':'Voltou a usar a média dos últimos meses');});
+}
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
   modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
@@ -2344,6 +2360,7 @@ document.addEventListener('click',async e=>{
     case 'fatura-pagar':if(cartao)modalPagarFatura(cartao,a.dataset.fm);break;
     case 'fatura-prev':if(cartao)modalPagPrev(cartao,a.dataset.fm);break;
     case 'patr-ini':modalPatrIni();break;
+    case 'renda-media':modalRendaMedia();break;
     case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
       if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');await recarregar();if(volta)abrirFaturas(volta.cartao,volta.fm)}}break;
     case 'sim-comprar':{const v=parseValor(S.sim.valor);if(!v)break;if(S.sim.forma==='parc')modalCompraCartao({valor:v,desc:S.sim.nome,n:parseInt(S.sim.n,10)||2});else modalLancamento('gasto',null,{valor:v,desc:S.sim.nome,cat:'compras'})}break;

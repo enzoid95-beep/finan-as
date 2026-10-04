@@ -9,3 +9,8 @@ alter table public.config add column if not exists pag_previstos jsonb not null 
 -- Data a partir da qual os investimentos já cadastrados contam no gráfico de Patrimônio
 -- (para o cadastro de hoje não aparecer como se fosse crescimento de hoje).
 alter table public.config add column if not exists patr_inicial date;
+
+-- v12 (parte 3): renda média mensal
+-- Quanto o casal recebe por mês, em média. O site usa no orçamento, no cartão (% da renda),
+-- no simulador de compras, nas dívidas e nos desejos.
+alter table public.config add column if not exists renda_media numeric(12,2);
