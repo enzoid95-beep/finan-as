@@ -195,7 +195,7 @@ async function carregarResto(){
   S.invest=(inv.data||[]).map(x=>{const v={...x,valor:Number(x.valor),aplicado:x.aplicado==null?Number(x.valor):Number(x.aplicado),produto:x.produto||''};if(INV_ANTIGO[v.tipo]){v.produto=v.produto||INV_ANTIGO[v.tipo];v.tipo='renda_fixa'}return v});
 }
 async function recarregar(){
-  S.hist=null;
+  S.hist=null;S._histV=(S._histV||0)+1;S._histC=false;
   await Promise.all([carregarItens(),carregarResto()]);
   render();
   if(!gerando&&S.temV9){gerando=true;try{if(await gerarOcorrencias()>0){await Promise.all([carregarItens(),carregarResto()]);render()}}finally{gerando=false}}
@@ -1278,15 +1278,18 @@ function ligarOrcamento(){
 }
 /* ================= relatórios ================= */
 async function carregarHist(){
-  if(S._histC)return;S._histC=true;
-  const {data,error}=await sb.from('lancamentos').select('tipo,valor,data,data_caixa,status,meta_id,investimento_id,divida_id,categoria,tags,livre');
-  S.hist=error?[]:(data||[]).map(x=>({...x,valor:Number(x.valor)}));S._histC=false;if(['relmes','patrimonio'].includes(S.view))render();
+  if(S._histC)return;S._histC=true;const v0=S._histV=(S._histV||0)+1;
+  const {data,error}=await sb.from('lancamentos').select('tipo,valor,data,data_caixa,status,meta_id,investimento_id,divida_id,categoria,tags,livre').limit(20000);
+  S._histC=false;
+  if(v0!==S._histV)return; /* chegou uma resposta mais nova */
+  S.hist=error?[]:(data||[]).map(x=>({...x,valor:Number(x.valor)}));if(['relmes','patrimonio'].includes(S.view))render();
 }
 function fimMes(m){return m+'-'+pad(ultimoDia(m))}
 /* patrimônio no fim de um mês = caixa + metas + investimentos − dívidas */
 function patrimonioEm(m){
   const fim=fimMes(m),H=S.hist||[],sg=x=>x.tipo==='entrada'||x.tipo==='resgate'?x.valor:-x.valor;
-  const caixa=S.saldoInicial+H.filter(x=>x.status==='pago'&&x.data_caixa&&x.data_caixa<=fim).reduce((s,x)=>s+sg(x),0);
+  /* o mês atual usa o mesmo caixa da Visão geral: um conceito, um valor */
+  const caixa=m===MES_ATUAL?cent(emCaixa()):cent(S.saldoInicial+H.filter(x=>x.status==='pago'&&x.data_caixa&&x.data_caixa<=fim).reduce((s,x)=>s+Math.round(sg(x)*100),0)/100);
   const metas=H.filter(x=>x.meta_id&&x.status==='pago'&&x.data<=fim).reduce((s,x)=>s+(x.tipo==='aporte'?x.valor:-x.valor),0);
   const invest=S.invest.reduce((s,x)=>{if(m>=MES_ATUAL)return s+x.valor;const depois=H.filter(l=>l.investimento_id===x.id&&l.status==='pago'&&l.data>fim).reduce((a,l)=>a+(l.tipo==='aporte'?l.valor:-l.valor),0);
     /* com "patrimônio inicial" definido, o que foi cadastrado sem movimentar o caixa já existia nessa data */
