@@ -1212,7 +1212,11 @@ function ligarPizza(){
 }
 
 /* ================= movimento: números e barras ================= */
+/* Os números e barras só se mexem quando o valor muda. O último valor visto fica guardado no aparelho, então abrir a tela (ou recarregar) não anima. */
 const ANIM=new Map();
+try{const o=JSON.parse(localStorage.getItem('pf-anim')||'{}');Object.entries(o).forEach(([k,v])=>ANIM.set(k,v))}catch(e){}
+let animTimer=null;
+function guardarAnim(){clearTimeout(animTimer);animTimer=setTimeout(()=>{try{const o={};let n=0;ANIM.forEach((v,k)=>{if(n++<600)o[k]=v});localStorage.setItem('pf-anim',JSON.stringify(o))}catch(e){}},400)}
 const SEM_MOV=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RX_MOEDA=/^(\s*[+−→]?\s*)(-?)R\$\s?([\d.]+)(,(\d{2}))?(\s*)$/;
 function animar(){
@@ -1225,7 +1229,7 @@ function animar(){
     const t=n.nodeValue;if(t.indexOf('R$')<0)continue;
     const m=t.match(RX_MOEDA);if(!m)continue;
     const val=(m[2]?-1:1)*Number(m[3].replace(/\./g,'')+(m[5]?'.'+m[5]:''));
-    const dono=n.parentElement&&n.parentElement.closest('[data-ak]'),key=dono?v+'|'+dono.dataset.ak+'|'+(ANIM._c[dono.dataset.ak]=(ANIM._c[dono.dataset.ak]||0)+1):v+'|n'+(i++),ja=ANIM.has(key),de=ja?ANIM.get(key):0;ANIM.set(key,val);
+    const dono=n.parentElement&&n.parentElement.closest('[data-ak]'),key=dono?v+'|'+dono.dataset.ak+'|'+(ANIM._c[dono.dataset.ak]=(ANIM._c[dono.dataset.ak]||0)+1):v+'|n'+(i++),ja=ANIM.has(key),de=ja?ANIM.get(key):val;ANIM.set(key,val);
     if(Math.abs(de-val)<0.005)continue;
     if(ja&&n.parentElement){const el=n.parentElement;el.classList.remove('val-flash');void el.offsetWidth;el.classList.add('val-flash');setTimeout(()=>el.classList.remove('val-flash'),1300)}
     const fmt=m[4]?brl:brl0;
@@ -1242,7 +1246,7 @@ function animar(){
   root.querySelectorAll('.tr i,.cb i,.ring circle[stroke-dasharray]').forEach((b,k)=>{
     const key=v+'|b'+k,anel=b.tagName.toLowerCase()==='circle',prop=anel?'strokeDashoffset':b.closest('.cb')?'height':'width';
     const alvo=anel?b.getAttribute('stroke-dashoffset'):b.style[prop];
-    const ini=ANIM.has(key)?ANIM.get(key):(anel?b.getAttribute('stroke-dasharray'):'0%');
+    const ini=ANIM.has(key)?ANIM.get(key):alvo;
     ANIM.set(key,alvo);
     if(ini===alvo||alvo==null)return;
     b.style.transition='none';b.style[prop]=ini;
@@ -1251,8 +1255,7 @@ function animar(){
     requestAnimationFrame(()=>{b.style[prop]=alvo});
   });
   // pizza: gira e abre ao entrar na tela
-  const pie=root.querySelector('.pie-box svg');
-  if(pie&&!ANIM.has(v+'|pie')){ANIM.set(v+'|pie',1);pie.classList.add('pie-entra')}
+  guardarAnim();
 }
 
 /* orçamento: clique no valor para editar; salva sozinho */
