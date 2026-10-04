@@ -1097,6 +1097,28 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .bi-t b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bi-t small{color:var(--muted);font-size:12px}
 .bi-v{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* ===== v38: barra lateral — sem sobreposição, maior e mais legível ===== */
+:root{--side:276px}
+@media (max-width:1000px){:root{--side:248px}}
+.side{height:100vh!important;height:100dvh!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;gap:12px!important;padding:max(18px,env(safe-area-inset-top,0px)) 14px max(14px,env(safe-area-inset-bottom,0px))!important}
+.side>*{flex:none}
+.side>.brand-logo{padding:2px 6px 4px!important;justify-content:center}
+.side>.brand-logo img{width:auto!important;max-width:100%!important;height:auto!important;max-height:64px!important}
+.novo-side{padding:11px!important;font-size:16px!important;margin:0!important}
+.busca-side{padding:10px!important;font-size:15px!important;margin:0!important}
+#sideNav{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:block!important;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;padding-right:2px}
+#sideNav::-webkit-scrollbar{width:4px}
+#sideNav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:4px}
+.side .nav-btn{height:42px!important;min-height:42px!important;font-size:16.5px!important;font-weight:600;gap:12px}
+.side .nav-btn svg{width:21px!important;height:21px!important}
+.side .nav-subs{margin:2px 0 10px 22px!important;gap:2px!important;padding-left:12px}
+.side .nav-sub{height:36px!important;min-height:36px!important;font-size:15.5px!important;font-weight:600!important}
+.side .nav-g{margin-bottom:2px!important}
+.side-foot{flex:none!important;margin-top:0!important;padding:10px 12px!important}
+.side-foot .who{font-size:14px!important}
+.side-foot .who span{font-size:12.5px!important}
+.side-foot .tool-i{width:36px!important;height:36px!important}
+.side-foot .tool-i svg{width:19px!important;height:19px!important}
 </style>
 </head>
 <body>
@@ -1177,6 +1199,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
