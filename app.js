@@ -494,7 +494,7 @@ function vGeral(){
       <div class="pj-res">
         <span>Hoje em caixa</span><b class="${cS(sm.caixa)}">${R0(sm.caixa)}</b>
         <span>Ainda entra</span><b class="${sm.entra?'pos':'zero'}">+ ${R0(sm.entra)}</b>
-        <span>Ainda sai</span><b class="${sm.sai?'neg':'zero'}">− ${R0(sm.sai)}</b>
+        <span>Ainda sai</span><b class="${sm.sai?'ref':'zero'}">− ${R0(sm.sai)}</b>
       </div>
       <div class="pj-fim"><span>Previsão para ${dataBR(fimMes)}</span><b class="${cS(sm.previsao)}">${R0(sm.previsao)}</b></div>
       ${proxP.length?`<div class="pj-prox"><small>Próximos</small>${proxP.map(l=>`<div><span>${dataBR(l.d)}</span><span class="tl-t">${l.ic?l.ic+' ':''}${esc(l.t)}</span><b class="${l.v>0?'pos':'neg'}">${l.v>0?'+':'−'}${R0(Math.abs(l.v))}</b></div>`).join('')}</div>`:'<div class="pj-prox"><small>Nada mais previsto até o fim do mês</small></div>'}
@@ -524,7 +524,7 @@ function vGeral(){
       </div>
       <div class="kpis-bot">
         ${kpi('Entradas',R0(r0.entradas),r0.entradas>0?'pos':'zero','recebidas em '+esc(mc)+` · <button class="lnk" data-act="renda-media">${S.rendaMedia>0?'renda média '+R0(S.rendaMedia):'definir renda média'}</button>`)}
-        ${kpi('Gastos realizados',R0(r0.gastos),r0.gastos>0?'neg':'zero','em '+esc(mc)+(aCartaoMes>0?` · ${R0(aCartaoMes)} no cartão a pagar`:''))}
+        ${kpi('Gastos realizados',R0(r0.gastos),r0.gastos>0?'neg':'zero','em '+esc(mc)+(aCartaoMes>0?` · <span class="ref">${R0(aCartaoMes)}</span> no cartão a pagar`:''))}
         ${kpi('Vence hoje / em atraso',R0(sm.aPagar),sm.aPagar>0?'neg':'zero',sm.aPagar>0?'pede pagamento agora':'nada vencido')}
       </div>
       ${sm.sugestaoMetas>0?`<p class="hv3-nota">🎯 Sugestão para as metas neste mês: <b class="ref">${R0(sm.sugestaoMetas)}</b>. Só sai do caixa quando vocês registrarem "Guardar na meta".</p>`:''}
@@ -623,7 +623,7 @@ function vCalendario(){
   <div class="tiles">
     <div class="tile"><div class="k">Entradas previstas no mês</div><div class="v pos">${R(entM)}</div><div class="d">${R0(entRec)} recebido + ${R0(entM-entRec)} previsto</div></div>
     <div class="tile"><div class="k">Saídas no mês</div><div class="v neg">${R(saiM)}</div><div class="d">gastos, faturas e contas</div></div>
-    <div class="tile"><div class="k">Ainda a pagar</div><div class="v neg">${R(pendM)}</div><div class="d">contas, faturas e parcelas</div></div>
+    <div class="tile"><div class="k">Ainda a pagar</div><div class="v ref">${R(pendM)}</div><div class="d">contas, faturas e parcelas</div></div>
     <div class="tile">${selo(entM-saiM)}<div class="k">Resultado do mês</div><div class="v ${cS(entM-saiM)}">${R(entM-saiM)}</div><div class="d">entradas menos saídas do mês (não é o caixa)</div></div>
   </div>
   <div class="cal-wrap">
@@ -667,10 +667,10 @@ function vGastos(){
   const cats=Object.entries(pc).sort((a,b)=>b[1]-a[1]);
   return head('Gastos','Tudo que vocês gastaram no mês, independentemente da forma de pagamento.',BTN('novo','Novo gasto','data-tipo="gasto"'))+`
   <div class="tiles">
-    <div class="tile"><div class="k">Total gasto</div><div class="vrow"><div class="v neg">${R(r.gastos)}</div>${delta(r.gastos,ant.gastos,true)}</div><div class="d">${plural(gs.length,'lançamento','lançamentos')}${aPagar>0?`<br>${R0(jaSaiu)} já saíram do caixa · <span class="neg">${R0(aPagar)} a pagar</span>`:''}</div></div>
+    <div class="tile"><div class="k">Total gasto</div><div class="vrow"><div class="v neg">${R(r.gastos)}</div>${delta(r.gastos,ant.gastos,true)}</div><div class="d">${plural(gs.length,'lançamento','lançamentos')}${aPagar>0?`<br>${R0(jaSaiu)} já saíram do caixa · <span class="ref">${R0(aPagar)} a pagar</span>`:''}</div></div>
     <div class="tile"><div class="k">Orçamento usado</div>${(()=>{const tp=CATS_G.reduce((s,c)=>s+(Number(planejado(S.mes).gastos[c.id])||0),0);return tp?`<div class="v ${r.gastos>tp?'neg':''}">${Math.round(r.gastos/tp*100)}%</div><div class="d"><span class="neg">${R0(r.gastos)}</span> de ${RF(R0(tp))}</div>`:`<div class="v zero">—</div><div class="d"><button class="lnk" data-go="orcamento">Definir orçamento →</button></div>`})()}</div>
     <div class="tile"><div class="k">Maior gasto</div><div class="v neg">${maior?R(maior.valor):'—'}</div><div class="d">${maior?esc(descVis(maior)):'Nenhum gasto'}</div></div>
-    <div class="tile"><div class="k">A ser pago no cartão</div><div class="v ${aPagar>0?'neg':'zero'}">${R(aPagar)}</div><div class="d">${aPagar>0?`já é gasto, mas o caixa só muda ao pagar a fatura${datasPag.length?' · pagamento '+(datasPag.length>1?'a partir de ':'previsto em ')+dataBR(datasPag[0]):''}`:`nada pendente · ${R0(noCartao)} no cartão, tudo pago`}</div></div>
+    <div class="tile"><div class="k">A ser pago no cartão</div><div class="v ${aPagar>0?'ref':'zero'}">${R(aPagar)}</div><div class="d">${aPagar>0?`já é gasto, mas o caixa só muda ao pagar a fatura${datasPag.length?' · pagamento '+(datasPag.length>1?'a partir de ':'previsto em ')+dataBR(datasPag[0]):''}`:`nada pendente · ${R0(noCartao)} no cartão, tudo pago`}</div></div>
   </div>
   <div class="grid g21">
     <div class="panel"><h2>Lançamentos</h2><p class="sub">Toque no lápis para corrigir um lançamento.</p>${toolbar(CATS_G)}${tabela(lista,'gasto')}</div>
@@ -748,10 +748,10 @@ function vCartoes(){
     </div>`}).join('');
   return head('Cartões','Cada fatura leva o nome do mês em que fecha: fecha 27/09 e vence 05/10 é a fatura de setembro. A compra conta como gasto no dia; o caixa só muda ao pagar a fatura.',BTN('compra-cartao','Compra no cartão'))+`
   <div class="tiles">
-    <div class="tile"><div class="k">Fatura de ${esc(soMes(MES_ATUAL))}</div><div class="v ${atualAb>0?'neg':'zero'}">${R(atual)}</div><div class="d">${atualAb>0?`<span class="neg">${R0(atualAb)}</span> a pagar`:atual?'paga':'sem compras'}${vencDe(MES_ATUAL)?' · '+vencDe(MES_ATUAL):''}</div></div>
-    <div class="tile"><div class="k">Fatura de ${esc(soMes(addMes(MES_ATUAL,1)))}</div><div class="v ${prox1>0?'neg':'zero'}">${R(prox1)}</div><div class="d">${prox1>0?(vencDe(addMes(MES_ATUAL,1))||'em aberto'):'sem compras'}</div></div>
+    <div class="tile"><div class="k">Fatura de ${esc(soMes(MES_ATUAL))}</div><div class="v ${atualAb>0?'ref':'zero'}">${R(atual)}</div><div class="d">${atualAb>0?`<span class="ref">${R0(atualAb)}</span> a pagar`:atual?'paga':'sem compras'}${vencDe(MES_ATUAL)?' · '+vencDe(MES_ATUAL):''}</div></div>
+    <div class="tile"><div class="k">Fatura de ${esc(soMes(addMes(MES_ATUAL,1)))}</div><div class="v ${prox1>0?'ref':'zero'}">${R(prox1)}</div><div class="d">${prox1>0?(vencDe(addMes(MES_ATUAL,1))||'em aberto'):'sem compras'}</div></div>
     <div class="tile"><div class="k">Limite disponível</div><div class="v ${cS(totalLim-totalUsado)}">${R0(totalLim-totalUsado)}</div><div class="d">${totalLim?'de '+RF(R0(totalLim))+' no total':'cadastre os limites'}</div></div>
-    <div class="tile"><div class="k">Parcelado futuro</div><div class="v ${pf>0?'neg':'zero'}">${R0(pf)}</div><div class="d">depois da próxima fatura · <span class="${pctRenda>30?'neg':''}">${med.ent>0?pctRenda+'%':'—'} da renda</span></div></div>
+    <div class="tile"><div class="k">Parcelado futuro</div><div class="v ${pf>0?'ref':'zero'}">${R0(pf)}</div><div class="d">depois da próxima fatura · <span class="${pctRenda>30?'neg':''}">${med.ent>0?pctRenda+'%':'—'} da renda</span></div></div>
   </div>
   <div class="ccards">${cards}<button class="ccard-add" data-act="cartao-novo">${svg('plus')}Novo cartão</button></div>
   ${histCartoes()}
@@ -815,7 +815,7 @@ function vOrcamento(){
   <div class="orc-resumo panel" data-ak="orc-resumo">
     <div><small>${pl.entradas?'Entradas previstas':med.definida?'Renda média mensal':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês para este mês':med.definida?'definida por vocês':'média dos últimos meses'}</small></div>
     <div><small>Planejado para gastar</small><b class="ref">${R0(totPl)}</b><small class="mut">${totPl&&entPl>0?pctF(totPl/entPl)+' das entradas':'defina abaixo'}</small></div>
-    <div><small>Realizado + comprometido</small><b class="${r.gastos+totComp>0?'neg':'zero'}">${R0(r.gastos+totComp)}</b><small class="mut">${R0(r.gastos)} realizados · ${R0(totComp)} comprometidos</small></div>
+    <div><small>Realizado + comprometido</small><b class="${r.gastos+totComp>0?'neg':'zero'}">${R0(r.gastos+totComp)}</b><small class="mut">${R0(r.gastos)} realizados · <span class="ref">${R0(totComp)}</span> comprometidos</small></div>
     <div><small>Disponível no planejado</small>${totPl>0?`<b class="${cS(totPl-r.gastos-totComp)}">${R0(totPl-r.gastos-totComp)}</b><small class="mut">sobra planejada ${R0(entPl-totPl)}</small>`:`<b class="zero">—</b><small class="mut">defina o orçamento primeiro</small>`}</div>
   </div>
   <div class="orc-acoes"><span class="mut">${pl.proprio?'Orçamento próprio de '+esc(soMes(S.mes))+'.':'Usando o orçamento padrão.'}</span>
@@ -880,8 +880,8 @@ function vContas(){
   </div>
   <div class="tiles">
     <div class="tile"><div class="k">Saídas do mês</div><div class="v ${tot(sai)?'neg':'zero'}">${R(tot(sai))}</div><div class="d">${plural(sai.length,'conta','contas')}</div></div>
-    <div class="tile"><div class="k">Já realizado como despesa</div><div class="v ${pagas.length?'neg':'zero'}">${R(tot(pagas))}</div><div class="d">${pagas.length} de ${sai.length} · <b>${R0(tot(pagas)-tot(pagas.filter(noCartaoAberto)))}</b> já pago${tot(pagas.filter(noCartaoAberto))>0?` · <span class="neg">${R0(tot(pagas.filter(noCartaoAberto)))}</span> no cartão, ainda a pagar`:''}</div></div>
-    <div class="tile"><div class="k">Falta pagar</div><div class="v ${faltaPagar>0?'neg':'zero'}">${R(faltaPagar)}</div><div class="d">${tot(sai.filter(x=>!pago(x)))>0&&tot(pagas.filter(noCartaoAberto))>0?`${R0(tot(sai.filter(x=>!pago(x))))} em contas + ${R0(tot(pagas.filter(noCartaoAberto)))} no cartão · `:''}${atras.length?`<span class="neg">${plural(atras.length,'atrasada','atrasadas')}</span>`:'nenhuma atrasada'}</div></div>
+    <div class="tile"><div class="k">Já realizado como despesa</div><div class="v ${pagas.length?'neg':'zero'}">${R(tot(pagas))}</div><div class="d">${pagas.length} de ${sai.length} · <b>${R0(tot(pagas)-tot(pagas.filter(noCartaoAberto)))}</b> já pago${tot(pagas.filter(noCartaoAberto))>0?` · <span class="ref">${R0(tot(pagas.filter(noCartaoAberto)))}</span> no cartão, ainda a pagar`:''}</div></div>
+    <div class="tile"><div class="k">Falta pagar</div><div class="v ${faltaPagar>0?'ref':'zero'}">${R(faltaPagar)}</div><div class="d">${tot(sai.filter(x=>!pago(x)))>0&&tot(pagas.filter(noCartaoAberto))>0?`${R0(tot(sai.filter(x=>!pago(x))))} em contas + ${R0(tot(pagas.filter(noCartaoAberto)))} no cartão · `:''}${atras.length?`<span class="neg">${plural(atras.length,'atrasada','atrasadas')}</span>`:'nenhuma atrasada'}</div></div>
     <div class="tile"><div class="k">Entradas previstas</div><div class="v ${ent.length?'pos':'zero'}">${R(tot(ent))}</div><div class="d">${ent.filter(pago).length} de ${ent.length} recebidas</div></div>
   </div>
   <div class="ct-cats">${cats.map(id=>{const c=CAT[id]||{em:'•',nome:id},xs=grupos[id],cont=xs.filter(conta1),tc=cont.reduce((s,x)=>s+valor(x),0),nc=cont.length;return `<button class="ct-cat" data-act="ct-cat" data-v="${id}" aria-pressed="${f.cat===id}"><span>${c.em} ${esc(c.nome)}</span><b class="${tc?(xs[0].tipo==='entrada'?'pos':'neg'):'zero'}">${R0(tc)}</b><small>${plural(nc,'conta','contas')} no mês${xs.length>nc?` · ${xs.length-nc} fora`:''}</small></button>`}).join('')}${f.cat?'<button class="ct-cat limpar" data-act="ct-cat" data-v="">✕ Ver todas</button>':''}</div>
@@ -1931,7 +1931,7 @@ function modalRendaMedia(){
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
   modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
-    <div class="sim-depois" style="margin-bottom:14px"><div class="sd-l"><span>Valor a pagar</span><span><b class="neg">${R(f.aberto)}</b></span></div><div class="sd-l"><span>Caixa</span><span>${R0(emCaixa())} → <b class="${cS(emCaixa()-f.aberto)}">${R0(emCaixa()-f.aberto)}</b></span></div><div class="sd-l"><span>Gastos do mês</span><span><b class="pos">não mudam</b> · já foram contados nas compras</span></div></div>
+    <div class="sim-depois" style="margin-bottom:14px"><div class="sd-l"><span>Valor a pagar</span><span><b class="ref">${R(f.aberto)}</b></span></div><div class="sd-l"><span>Caixa</span><span>${R0(emCaixa())} → <b class="${cS(emCaixa()-f.aberto)}">${R0(emCaixa()-f.aberto)}</b></span></div><div class="sd-l"><span>Gastos do mês</span><span><b class="pos">não mudam</b> · já foram contados nas compras</span></div></div>
     <label>Data do pagamento<input class="field" id="mData" type="date" value="${HOJE}"></label>${btns('Pagar fatura')}`,
   async()=>{const d=val('mData');if(d>HOJE)return 'A data não pode ser no futuro.';
     const {error}=await sb.from('lancamentos').update({status:'pago',data_caixa:d}).eq('cartao_id',card.id).eq('fatura_mes',fm).eq('status','comprometido');if(error)throw error;toast('Fatura paga');});
@@ -2119,7 +2119,7 @@ function abrirFaturas(cid,fm){
       <div class="fv-tiles">
         ${fact('Total da fatura',R(d.total),d.total?'neg':'zero',d.prev.length?`+ ${R0(d.totalPrev)} previstos`:'')}
         ${fact('Já paga',R(d.pago),d.pago?'neg':'zero')}
-        ${fact('A pagar',R(d.aberto),d.aberto?'neg':'zero')}
+        ${fact('A pagar',R(d.aberto),d.aberto?'ref':'zero')}
         ${fact('Lançamentos',String(d.it.length+d.prev.length),'zero',d.prev.length?`${d.prev.length} prevista${d.prev.length>1?'s':''}`:'')}
       </div>
       <div class="fv-acoes"><button class="btn sm ghost" data-act="fatura-add" data-id="${card.id}" data-fm="${fm}">${svg('plus')}Adicionar compra nesta fatura</button>${d.aberto>0?`<button class="btn sm ghost" data-act="fatura-prev" data-id="${card.id}" data-fm="${fm}">📅 ${pagPrevisto(card,fm)?'Pagar em '+dataBR(pagPrevisto(card,fm)):'Data prevista de pagamento'}</button>`:''}${d.aberto>0?`<button class="btn sm" data-act="fatura-pagar" data-id="${card.id}" data-fm="${fm}">Pagar fatura · ${R0(d.aberto)}</button>`:d.k==='paga'?`<button class="lnk" data-act="fatura-desfazer" data-id="${card.id}" data-fm="${fm}">Desfazer pagamento</button>`:''}</div>
