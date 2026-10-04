@@ -4,3 +4,8 @@
 -- Rode uma vez no SQL Editor do Supabase. Pode rodar de novo sem problema.
 
 alter table public.config add column if not exists pag_previstos jsonb not null default '{}'::jsonb;
+
+-- v12 (parte 2): patrimônio inicial
+-- Data a partir da qual os investimentos já cadastrados contam no gráfico de Patrimônio
+-- (para o cadastro de hoje não aparecer como se fosse crescimento de hoje).
+alter table public.config add column if not exists patr_inicial date;

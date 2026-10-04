@@ -123,7 +123,7 @@ const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
 const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
   fCat:'',fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
-  pagPrev:{},temV12:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
+  pagPrev:{},temV12:false,patrIni:'',temPatr:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 
 /* ================= carregamento ================= */
@@ -168,6 +168,7 @@ async function carregarResto(){
   S.limites=(cf.data&&cf.data.limites)||{};
   S.mesadas=(cf.data&&cf.data.mesadas)||{};
   S.temV12=!!(cf.data&&'pag_previstos' in cf.data);S.pagPrev=(cf.data&&cf.data.pag_previstos)||{};
+  S.temPatr=!!(cf.data&&'patr_inicial' in cf.data);S.patrIni=(cf.data&&cf.data.patr_inicial)||'';
   S.saldoInicial=Number(cf.data&&cf.data.saldo_inicial)||0;
   S.movMetas=(mv.data||[]).map(x=>({meta_id:x.meta_id,tipo:x.tipo,valor:Number(x.valor),mes:(x.data||'').slice(0,7)}));
   S.movCaixa=(tot.data||[]).reduce((s,x)=>{const v=Number(x.valor);return s+(x.tipo==='entrada'||x.tipo==='resgate'?v:-v)},0);
@@ -1270,7 +1271,9 @@ function patrimonioEm(m){
   const caixa=S.saldoInicial+H.filter(x=>x.status==='pago'&&x.data_caixa&&x.data_caixa<=fim).reduce((s,x)=>s+sg(x),0);
   const metas=H.filter(x=>x.meta_id&&x.status==='pago'&&x.data<=fim).reduce((s,x)=>s+(x.tipo==='aporte'?x.valor:-x.valor),0);
   const invest=S.invest.reduce((s,x)=>{if(m>=MES_ATUAL)return s+x.valor;const depois=H.filter(l=>l.investimento_id===x.id&&l.status==='pago'&&l.data>fim).reduce((a,l)=>a+(l.tipo==='aporte'?l.valor:-l.valor),0);
-    const v=(x.data&&x.data>fim&&!H.some(l=>l.investimento_id===x.id&&l.data<=fim))?0:x.aplicado-depois;return s+Math.max(0,v)},0);
+    /* com "patrimônio inicial" definido, o que foi cadastrado sem movimentar o caixa já existia nessa data */
+    const de=(S.patrIni&&x.data&&S.patrIni<x.data)?S.patrIni:x.data;
+    const v=(de&&de>fim&&!H.some(l=>l.investimento_id===x.id&&l.data<=fim))?0:x.aplicado-depois;return s+Math.max(0,v)},0);
   const dividas=S.dividas.reduce((s,d)=>{const pagos=H.filter(l=>l.divida_id===d.id&&l.tipo==='divida'&&l.data<=fim).length;return s+saldoDevedor(d,Math.max(0,d.parcelas_total-d.pagas_inicial-pagos))},0);
   return {caixa,metas,invest,dividas,liquido:caixa+metas+invest};
 }
@@ -1293,6 +1296,8 @@ function vPatrimonio(){
     <div class="tbl-wrap" style="margin-top:14px"><table><thead><tr><th>Mês</th><th class="r">Caixa</th><th class="r">Metas</th><th class="r">Investimentos</th><th class="r">Dívidas</th><th class="r">Patrimônio</th></tr></thead><tbody>
     ${[...meses].reverse().map(x=>`<tr class="row"><td>${esc(nomeMes(x.m))}</td><td class="r vl ${cS(x.caixa)}">${R0(x.caixa)}</td><td class="r vl ${cS(x.metas)}">${R0(x.metas)}</td><td class="r vl ${cS(x.invest)}">${R0(x.invest)}</td><td class="r vl ${x.dividas>0?'neg':'zero'}">${R0(x.dividas)}</td><td class="r vl ${cS(x.liquido)}">${R0(x.liquido)}</td></tr>`).join('')}
     </tbody></table></div>
+    <div class="orc-acoes" style="margin-top:12px"><span class="mut">${S.patrIni?`Patrimônio inicial: os investimentos já cadastrados contam desde <b>${dataBR(S.patrIni)}/${S.patrIni.slice(0,4)}</b>.`:'Investimentos aparecem só a partir do dia em que foram cadastrados. Se já existiam antes, informe desde quando.'}</span>
+      <button class="btn sm ghost" data-act="patr-ini">${S.patrIni?'Alterar':'Definir patrimônio inicial'}</button></div>
     <p class="nota">Os investimentos dos meses anteriores usam o valor aplicado, porque o site não guarda o histórico de rendimento; o mês atual usa o valor atual. O caixa parte do saldo ajustado por vocês.</p></div>`;
 }
 function resumoFech(m){const r=resumo(m),p=S.hist?patrimonioEm(m):null;return {entradas:r.entradas,gastos:r.gastos,investimentos:r.investido,metas:r.guardado,resultado:r.resultado,saldo_final:p?p.caixa:null,patrimonio:p?p.liquido:null}}
@@ -1889,6 +1894,17 @@ function modalPagPrev(card,fm){
     const {error}=await sb.from('config').upsert({id:'casal',pag_previstos:novo,atualizado_em:new Date().toISOString()});if(error)throw error;
     S.pagPrev=novo;toast(d?'Pagamento previsto para '+dataBR(d):'Voltou para o vencimento');});
 }
+/* patrimônio inicial: desde quando os investimentos já cadastrados existiam (não é "ganho" do dia do cadastro) */
+function modalPatrIni(){
+  if(!S.temPatr){toast('Falta rodar o arquivo schema-v12.sql no Supabase.');return}
+  modal(`<h2>Patrimônio inicial</h2><p class="mut" style="margin:-6px 0 16px">Investimentos cadastrados sem movimentar o caixa passam a contar desde a data abaixo, e o gráfico deixa de mostrar um salto no mês do cadastro.</p>
+    <label>Esse patrimônio já existia desde<input class="field" id="mData" type="date" value="${S.patrIni||''}"></label>
+    <p class="mut" style="font-size:13px;margin:-6px 0 14px">Use o dia em que vocês começaram a usar o site (por exemplo 01/09/2026). Deixe em branco para voltar a contar só a partir do cadastro.</p>${btns('Salvar')}`,
+  async()=>{const d=val('mData');
+    if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||d>HOJE))return 'Escolha uma data que já passou.';
+    const {error}=await sb.from('config').upsert({id:'casal',patr_inicial:d||null,atualizado_em:new Date().toISOString()});if(error)throw error;
+    S.patrIni=d;toast(d?'Patrimônio inicial definido':'Patrimônio inicial removido');});
+}
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
   modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
@@ -2320,6 +2336,7 @@ document.addEventListener('click',async e=>{
     case 'fatura-add':if(cartao){const fm=a.dataset.fm,fech=fechamentoFatura(cartao,fm);modalCompraCartao({cartao:cartao.id,fm,data:HOJE<=fech?HOJE:fech})}break;
     case 'fatura-pagar':if(cartao)modalPagarFatura(cartao,a.dataset.fm);break;
     case 'fatura-prev':if(cartao)modalPagPrev(cartao,a.dataset.fm);break;
+    case 'patr-ini':modalPatrIni();break;
     case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
       if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');await recarregar();if(volta)abrirFaturas(volta.cartao,volta.fm)}}break;
     case 'sim-comprar':{const v=parseValor(S.sim.valor);if(!v)break;if(S.sim.forma==='parc')modalCompraCartao({valor:v,desc:S.sim.nome,n:parseInt(S.sim.n,10)||2});else modalLancamento('gasto',null,{valor:v,desc:S.sim.nome,cat:'compras'})}break;
