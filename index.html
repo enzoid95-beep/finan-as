@@ -1074,6 +1074,17 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .toast{max-width:min(560px,calc(100vw - 24px));text-align:center}
 @media (max-width:760px){.toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
 .cons{margin:0 0 14px;padding-left:20px;color:var(--muted);font-size:13.5px;line-height:1.55}
+/* números clicáveis e glossário */
+.kpi-click{cursor:pointer;border-radius:12px;padding:4px 8px;margin:-4px -8px;transition:background .15s}
+.kpi-click:hover,.kpi-click:focus-visible{background:rgba(255,255,255,.07);outline:none}
+.kpi-i{font-style:normal;opacity:.65;font-size:12px}
+.hv3-dica{margin-top:10px;opacity:.85}
+.kpi-det .sd-l.sub{padding-left:14px;font-size:13px;color:var(--muted)}
+.kpi-det .sd-l.sub span:last-child{color:#dfe4ec}
+.kpi-det .sd-l.tot{border-top:1px solid var(--line2);margin-top:6px;padding-top:8px;font-weight:700}
+.glos{display:grid;gap:10px}
+.gl{display:grid;gap:2px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.gl b{color:var(--g2);font-size:14.5px}.gl span{color:var(--muted);font-size:13.5px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -1152,6 +1163,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>
