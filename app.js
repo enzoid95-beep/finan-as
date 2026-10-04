@@ -114,7 +114,8 @@ function parseValor(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return
 function parseLivre(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;const neg=s.startsWith('-');s=normNum(s.replace('-',''));const n=Number(s);return isFinite(n)?Math.round((neg?-n:n)*100)/100:null}
 function fmtInput(v){return v||v===0?String(v).replace('.',','):''}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2600)}
-const soma=arr=>arr.reduce((s,i)=>s+i.valor,0);
+const cent=v=>Math.round((v+Number.EPSILON)*100)/100;
+const soma=arr=>cent(arr.reduce((s,i)=>s+Math.round(i.valor*100),0)/100);
 const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g,()=>(Math.random()*16|0).toString(16)));
 const plural=(n,s,p)=>n+' '+(n===1?s:p);
 
@@ -241,14 +242,14 @@ function resumo(m){
   const metasM=ef.filter(i=>i.meta_id),inv=ef.filter(i=>!i.meta_id&&(i.tipo==='aporte'||i.tipo==='resgate'));
   const sg=a=>soma(a.filter(i=>i.tipo==='aporte'))-soma(a.filter(i=>i.tipo==='resgate'));
   const ap=sg(metasM),iv=sg(inv),dv=soma(ef.filter(i=>i.tipo==='divida'));
-  return {it,ef,gastos:g,entradas:e,guardado:ap,investido:iv,amortizado:dv,resultado:e-g,saldo:e-g};
+  return {it,ef,gastos:g,entradas:e,guardado:ap,investido:iv,amortizado:dv,resultado:cent(e-g),saldo:cent(e-g)};
 }
 function emCaixa(){return S.saldoInicial+S.movCaixa}
 function guardadoMeta(id){return S.movMetas.filter(x=>x.meta_id===id).reduce((s,x)=>s+(x.tipo==='aporte'?x.valor:-x.valor),0)}
 function totalInvest(){return S.invest.reduce((s,x)=>s+x.valor,0)}
 function mixHex(a,b,t){const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));const x=p(a),y=p(b);return '#'+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,'0')).join('')}
 function totalMetas(){return S.metas.reduce((s,m)=>s+guardadoMeta(m.id),0)}
-function porCategoria(it,semPessoal){const o={};it.filter(i=>i.tipo==='gasto'&&efetivo(i)&&!(semPessoal&&ehLivre(i))).forEach(i=>{o[i.categoria]=(o[i.categoria]||0)+i.valor});return o}
+function porCategoria(it,semPessoal){const o={};it.filter(i=>i.tipo==='gasto'&&efetivo(i)&&!(semPessoal&&ehLivre(i))).forEach(i=>{o[i.categoria]=cent((o[i.categoria]||0)+i.valor)});return o}
 /* médias dos últimos 3 meses fechados (ou do mês atual, se ainda não houver histórico) */
 function media(){
   let per=[1,2,3].map(k=>addMes(MES_ATUAL,-k)).map(m=>S.base.filter(x=>x.mes===m)).filter(a=>a.length);
@@ -468,6 +469,7 @@ function alertas(){
   const res=S.metas.find(m=>m.reserva);
   if(res&&guardadoMeta(res.id)<res.alvo)al.push({k:'at',ic:'🛟',t:`Reserva abaixo do alvo: ${R0(guardadoMeta(res.id))} de ${R0(res.alvo)}`,go:'reserva'});
   const sm=situacaoMes();if(sm.previsao<0)al.push({k:'no',ic:'📉',t:`A projeção do mês termina negativa em ${R0(-sm.previsao)}`,go:'calendario'});
+  if(!CATS_G.some(c=>Number(pl[c.id])>0))al.push({k:'at',ic:'🎯',t:`Orçamento de ${esc(soMes(MES_ATUAL))} ainda não definido`,go:'orcamento'});
   return al.sort((a,b)=>(a.k==='no'?0:1)-(b.k==='no'?0:1));
 }
 /* linhas da projeção do mês: hoje → pendências → eventos futuros, com o saldo acumulado */
@@ -507,20 +509,20 @@ function vGeral(){
   const proxHTML=prox.length?`<div class="mini">${prox.map(e=>`<div class="mini-row"><div class="em">${e.ic||e.em}</div><div class="nm"><b>${esc(e.txt)}</b><small>${e.data===HOJE?'Hoje':diasEntre(HOJE,e.data)===1?'Amanhã':dataBR(e.data)} · ${esc(e.k)}</small>${acaoEvento(e,'btn xs ev-acao')}</div><div class="vl ${e.entra?'pos':'neg'}">${e.entra?'+ ':'− '}${R(e.pend!=null?e.pend:e.valor)}</div></div>`).join('')}</div>`
     :vazio('Nada pela frente','Nenhum vencimento, fatura ou entrada prevista.');
   const ult=[...r.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm).slice(0,5);
+  const aCartaoMes=soma(r0.ef.filter(i=>i.tipo==='gasto'&&i.cartao_id&&i.status==='comprometido'));
   const kpi=(k,v,cls,sub)=>`<div class="kpi"><small>${k}</small><b class="${cls}">${v}</b>${sub?`<span>${sub}</span>`:''}</div>`;
   return head('Visão geral','A situação de vocês e o que precisam saber agora.',BTN('novo-global','Novo'),true)+retro+`
   <div class="hero hero-v3">
     <div class="hv3-main">
       <div class="kpis-top">
         ${kpi(`Em caixa ${selo(sm.caixa,{inl:1})}`,R(sm.caixa),cS(sm.caixa)+' kpi-xl',`<button class="lnk" data-act="ajustar-caixa">Ajustar saldo</button>`)}
-        ${kpi('Compromissos futuros',R0(sm.compromissos),sm.compromissos>0?'ref':'zero','até o fim de '+esc(mc))}
-        ${kpi(`Patrimônio líquido ${selo(pat.liquido,{inl:1})}`,R0(pat.liquido),cS(pat.liquido),'caixa + metas + investimentos')}
+        ${kpi('Compromissos futuros',R0(sm.compromissos),sm.compromissos>0?'ref':'zero','tudo que ainda vai sair até o fim de '+esc(mc))}
+        ${kpi(`Patrimônio líquido ${selo(pat.liquido,{inl:1})}`,R0(pat.liquido),cS(pat.liquido),'caixa + metas + investimentos − dívidas')}
       </div>
       <div class="kpis-bot">
         ${kpi('Entradas',R0(r0.entradas),r0.entradas>0?'pos':'zero','recebidas em '+esc(mc))}
-        ${kpi('Gastos realizados',R0(r0.gastos),r0.gastos>0?'neg':'zero','em '+esc(mc))}
-        ${kpi('Ainda a pagar',R0(sm.aPagar),sm.aPagar>0?'neg':'zero','vencidos ou vencem hoje')}
-        ${kpi('Previsto gastar',R0(sm.previsto),sm.previsto>0?'ref':'zero','datas que ainda não chegaram')}
+        ${kpi('Gastos realizados',R0(r0.gastos),r0.gastos>0?'neg':'zero','em '+esc(mc)+(aCartaoMes>0?` · ${R0(aCartaoMes)} no cartão a pagar`:''))}
+        ${kpi('Vence hoje / em atraso',R0(sm.aPagar),sm.aPagar>0?'neg':'zero',sm.aPagar>0?'pede pagamento agora':'nada vencido')}
       </div>
       ${sm.sugestaoMetas>0?`<p class="hv3-nota">🎯 Sugestão para as metas neste mês: <b class="ref">${R0(sm.sugestaoMetas)}</b>. Só sai do caixa quando vocês registrarem "Guardar na meta".</p>`:''}
     </div>
@@ -746,7 +748,7 @@ function vCartoes(){
     <div class="tile"><div class="k">Fatura de ${esc(soMes(MES_ATUAL))}</div><div class="v ${atualAb>0?'neg':'zero'}">${R(atual)}</div><div class="d">${atualAb>0?`<span class="neg">${R0(atualAb)}</span> a pagar`:atual?'paga':'sem compras'}${vencDe(MES_ATUAL)?' · '+vencDe(MES_ATUAL):''}</div></div>
     <div class="tile"><div class="k">Fatura de ${esc(soMes(addMes(MES_ATUAL,1)))}</div><div class="v ${prox1>0?'neg':'zero'}">${R(prox1)}</div><div class="d">${prox1>0?(vencDe(addMes(MES_ATUAL,1))||'em aberto'):'sem compras'}</div></div>
     <div class="tile"><div class="k">Limite disponível</div><div class="v ${cS(totalLim-totalUsado)}">${R0(totalLim-totalUsado)}</div><div class="d">${totalLim?'de '+RF(R0(totalLim))+' no total':'cadastre os limites'}</div></div>
-    <div class="tile"><div class="k">Parcelado futuro</div><div class="v ${pf>0?'neg':'zero'}">${R0(pf)}</div><div class="d">depois da próxima fatura · <span class="${pctRenda>30?'neg':''}">${pctRenda}% da renda</span></div></div>
+    <div class="tile"><div class="k">Parcelado futuro</div><div class="v ${pf>0?'neg':'zero'}">${R0(pf)}</div><div class="d">depois da próxima fatura · <span class="${pctRenda>30?'neg':''}">${med.ent>0?pctRenda+'%':'—'} da renda</span></div></div>
   </div>
   <div class="ccards">${cards}<button class="ccard-add" data-act="cartao-novo">${svg('plus')}Novo cartão</button></div>
   ${histCartoes()}
@@ -811,7 +813,7 @@ function vOrcamento(){
     <div><small>${pl.entradas?'Entradas previstas':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês':'média dos últimos meses'}</small></div>
     <div><small>Planejado para gastar</small><b class="ref">${R0(totPl)}</b><small class="mut">${totPl&&entPl>0?pctF(totPl/entPl)+' das entradas':'defina abaixo'}</small></div>
     <div><small>Realizado + comprometido</small><b class="${r.gastos+totComp>0?'neg':'zero'}">${R0(r.gastos+totComp)}</b><small class="mut">${R0(r.gastos)} realizados · ${R0(totComp)} comprometidos</small></div>
-    <div><small>Disponível no planejado</small><b class="${cS(totPl-r.gastos-totComp)}">${R0(totPl-r.gastos-totComp)}</b><small class="mut">sobra planejada ${R0(entPl-totPl)}</small></div>
+    <div><small>Disponível no planejado</small>${totPl>0?`<b class="${cS(totPl-r.gastos-totComp)}">${R0(totPl-r.gastos-totComp)}</b><small class="mut">sobra planejada ${R0(entPl-totPl)}</small>`:`<b class="zero">—</b><small class="mut">defina o orçamento primeiro</small>`}</div>
   </div>
   <div class="orc-acoes"><span class="mut">${pl.proprio?'Orçamento próprio de '+esc(soMes(S.mes))+'.':'Usando o orçamento padrão.'}</span>
     <button class="btn sm ghost" data-act="orc-copiar">Copiar do mês anterior</button><button class="btn sm ghost" data-act="orc-padrao">Usar como padrão</button></div>
@@ -841,7 +843,9 @@ function vContas(){
   /* lançada no cartão, mas a fatura ainda não foi paga: virou despesa, o caixa não mudou */
   const noCartaoAberto=x=>x.k==='compra'?x.i.status==='comprometido':(x.k==='regra'&&!!x.s.oc&&x.s.oc.status==='comprometido');
   const pagas=sai.filter(pago),atras=sai.filter(x=>x.k==='regra'&&x.s.k==='late');
-  const tot=a=>a.reduce((s,x)=>s+valor(x),0);
+  const tot=a=>cent(a.reduce((s,x)=>s+Math.round(valor(x)*100),0)/100);
+  /* o que ainda vai sair do caixa: contas não pagas + faturas de cartão em aberto */
+  const faltaPagar=cent(tot(sai)-tot(pagas.filter(x=>!noCartaoAberto(x))));
   const card=x=>{
     const c=x.k==='compra'?catVis(x.i):(CAT[x.cat]||CAT.contas),cc=x.cartao&&S.cartoes.find(y=>y.id===x.cartao),entra=x.tipo==='entrada';
     if(x.k==='compra'){const i=x.i,paga=i.status==='pago',meu=!outroLivre(i),ref=refDoItem(i);
@@ -873,7 +877,7 @@ function vContas(){
   <div class="tiles">
     <div class="tile"><div class="k">Saídas do mês</div><div class="v ${tot(sai)?'neg':'zero'}">${R(tot(sai))}</div><div class="d">${plural(sai.length,'conta','contas')}</div></div>
     <div class="tile"><div class="k">Já realizado como despesa</div><div class="v ${pagas.length?'neg':'zero'}">${R(tot(pagas))}</div><div class="d">${pagas.length} de ${sai.length} · <b>${R0(tot(pagas)-tot(pagas.filter(noCartaoAberto)))}</b> já pago${tot(pagas.filter(noCartaoAberto))>0?` · <span class="neg">${R0(tot(pagas.filter(noCartaoAberto)))}</span> no cartão, ainda a pagar`:''}</div></div>
-    <div class="tile"><div class="k">Falta pagar</div><div class="v ${tot(sai)-tot(pagas)>0?'neg':'zero'}">${R(tot(sai)-tot(pagas))}</div><div class="d">${atras.length?`<span class="neg">${plural(atras.length,'atrasada','atrasadas')}</span>`:'nenhuma atrasada'}</div></div>
+    <div class="tile"><div class="k">Falta pagar</div><div class="v ${faltaPagar>0?'neg':'zero'}">${R(faltaPagar)}</div><div class="d">${tot(sai.filter(x=>!pago(x)))>0&&tot(pagas.filter(noCartaoAberto))>0?`${R0(tot(sai.filter(x=>!pago(x))))} em contas + ${R0(tot(pagas.filter(noCartaoAberto)))} no cartão · `:''}${atras.length?`<span class="neg">${plural(atras.length,'atrasada','atrasadas')}</span>`:'nenhuma atrasada'}</div></div>
     <div class="tile"><div class="k">Entradas previstas</div><div class="v ${ent.length?'pos':'zero'}">${R(tot(ent))}</div><div class="d">${ent.filter(pago).length} de ${ent.length} recebidas</div></div>
   </div>
   <div class="ct-cats">${cats.map(id=>{const c=CAT[id]||{em:'•',nome:id},xs=grupos[id],cont=xs.filter(conta1),tc=cont.reduce((s,x)=>s+valor(x),0),nc=cont.length;return `<button class="ct-cat" data-act="ct-cat" data-v="${id}" aria-pressed="${f.cat===id}"><span>${c.em} ${esc(c.nome)}</span><b class="${tc?(xs[0].tipo==='entrada'?'pos':'neg'):'zero'}">${R0(tc)}</b><small>${plural(nc,'conta','contas')} no mês${xs.length>nc?` · ${xs.length-nc} fora`:''}</small></button>`}).join('')}${f.cat?'<button class="ct-cat limpar" data-act="ct-cat" data-v="">✕ Ver todas</button>':''}</div>
@@ -1294,10 +1298,10 @@ function vPatrimonio(){
     <div class="tile"><div class="k">Investimentos</div><div class="v ${cS(at.invest)}">${R0(at.invest)}</div><div class="d">valor atual</div></div>
     <div class="tile"><div class="k">Dívidas</div><div class="v ${at.dividas>0?'neg':'zero'}">${R0(at.dividas)}</div><div class="d">saldo devedor</div></div>
   </div>
-  <div class="panel"><h2>Desde setembro de 2026</h2><p class="sub">Patrimônio líquido no fim de cada mês</p>
-    <div class="chart12">${meses.map(x=>`<div class="cg ${x.m===MES_ATUAL?'atual':''}" title="${esc(nomeMes(x.m))}: ${R(x.liquido)}"><div class="cpair"><div class="cb" style="max-width:26px;width:70%"><i class="${x.liquido>=0?'e':'g'}" style="height:${Math.abs(x.liquido)/mx*100}%"></i></div></div><small>${nomeMes(x.m,true).charAt(0)}</small></div>`).join('')}</div>
+  <div class="panel"><h2>Desde setembro de 2026</h2><p class="sub">Patrimônio registrado em cada mês · o mês atual mostra o valor de hoje</p>
+    <div class="chart-pat" style="--n:${meses.length}">${meses.map(x=>`<div class="cg ${x.m===MES_ATUAL?'atual':''}" title="${esc(nomeMes(x.m))}: ${R(x.liquido)}"><small class="cval ${cS(x.liquido)}">${R0(x.liquido)}</small><div class="cpair"><div class="cb"><i class="${x.liquido>=0?'e':'g'}" style="height:${Math.abs(x.liquido)/mx*100}%"></i></div></div><small>${nomeMes(x.m,true)}${x.m===MES_ATUAL?' (atual)':''}</small></div>`).join('')}</div>
     <div class="tbl-wrap" style="margin-top:14px"><table><thead><tr><th>Mês</th><th class="r">Caixa</th><th class="r">Metas</th><th class="r">Investimentos</th><th class="r">Dívidas</th><th class="r">Patrimônio</th></tr></thead><tbody>
-    ${[...meses].reverse().map(x=>`<tr class="row"><td>${esc(nomeMes(x.m))}</td><td class="r vl ${cS(x.caixa)}">${R0(x.caixa)}</td><td class="r vl ${cS(x.metas)}">${R0(x.metas)}</td><td class="r vl ${cS(x.invest)}">${R0(x.invest)}</td><td class="r vl ${x.dividas>0?'neg':'zero'}">${R0(x.dividas)}</td><td class="r vl ${cS(x.liquido)}">${R0(x.liquido)}</td></tr>`).join('')}
+    ${[...meses].reverse().map(x=>`<tr class="row"><td>${esc(nomeMes(x.m))}${x.m===MES_ATUAL?' (atual)':''}</td><td class="r vl ${cS(x.caixa)}">${R0(x.caixa)}</td><td class="r vl ${cS(x.metas)}">${R0(x.metas)}</td><td class="r vl ${cS(x.invest)}">${R0(x.invest)}</td><td class="r vl ${x.dividas>0?'neg':'zero'}">${R0(x.dividas)}</td><td class="r vl ${cS(x.liquido)}">${R0(x.liquido)}</td></tr>`).join('')}
     </tbody></table></div>
     <div class="orc-acoes" style="margin-top:12px"><span class="mut">${S.patrIni?`Patrimônio inicial: os investimentos já cadastrados contam desde <b>${dataBR(S.patrIni)}/${S.patrIni.slice(0,4)}</b>.`:'Investimentos aparecem só a partir do dia em que foram cadastrados. Se já existiam antes, informe desde quando.'}</span>
       <button class="btn sm ghost" data-act="patr-ini">${S.patrIni?'Alterar':'Definir patrimônio inicial'}</button></div>

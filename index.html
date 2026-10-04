@@ -583,7 +583,7 @@ dialog{position:fixed}
 .kpis-top{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;align-items:end}
 .kpis-top .kpi:first-child{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:baseline;column-gap:14px}
 .kpis-top .kpi:first-child small{flex-basis:100%}
-.kpis-bot{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding-top:16px;border-top:1px solid rgba(255,255,255,.16)}
+.kpis-bot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding-top:16px;border-top:1px solid rgba(255,255,255,.16)}
 .kpi{display:flex;flex-direction:column;gap:3px;min-width:0}
 .kpi small{font-size:13px;font-weight:600;color:rgba(255,255,255,.8)}
 .kpi b{font:800 30px/1.05 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -993,6 +993,11 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .orc-row .df{text-align:right;font:700 17px/1 "Barlow Condensed",sans-serif}
 
 /* retrospectiva */
+.chart-pat{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,120px));justify-content:center;gap:32px;align-items:end;height:200px;padding-top:6px}
+.chart-pat .cb{max-width:48px;width:100%}
+.chart-pat .cg small.cval{font-size:13.5px;font-weight:800;color:#fff;text-transform:none;white-space:nowrap}
+.chart-pat .cg small.cval.neg{color:var(--neg)}
+@media (max-width:600px){.chart-pat{gap:14px}.chart-pat .cg small.cval{font-size:12px}}
 .chart12{display:grid;grid-template-columns:repeat(12,1fr);gap:8px;align-items:end;height:210px;padding-top:22px}
 .chart12 .cb{max-width:16px}
 .rank{display:flex;flex-direction:column;gap:2px}
@@ -1110,6 +1115,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>
