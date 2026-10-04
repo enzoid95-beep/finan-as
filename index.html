@@ -1085,6 +1085,18 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .glos{display:grid;gap:10px}
 .gl{display:grid;gap:2px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
 .gl b{color:var(--g2);font-size:14.5px}.gl span{color:var(--muted);font-size:13.5px;line-height:1.45}
+/* busca global */
+.busca-side{width:100%;justify-content:center;padding:9px;margin:0 0 4px;gap:8px}
+.busca-side svg{width:16px;height:16px}
+.busca-res{max-height:min(52vh,420px);overflow-y:auto;margin:0 0 14px}
+.busca-res-t{font-size:12.5px;margin:6px 0}
+.busca-l{display:grid;gap:6px}
+.busca-i{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);color:inherit;cursor:pointer;font:inherit}
+.busca-i:hover,.busca-i:focus-visible{background:rgba(255,255,255,.09);outline:none}
+.bi-em{font-size:21px;text-align:center}
+.bi-t b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bi-t small{color:var(--muted);font-size:12px}
+.bi-v{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1135,6 +1147,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
   <aside class="side" aria-label="Navegação">
     <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="1000" height="219"></div>
     <button class="btn novo-side" data-act="novo-global"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Novo</button>
+    <button class="btn ghost busca-side" data-act="busca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Buscar</button>
     <nav id="sideNav"></nav>
     <div class="side-foot">
       <div class="who"><b id="whoName"></b><span id="whoMail"></span><span id="ver" class="ver"></span></div>
@@ -1151,6 +1164,7 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
     <div class="topbar">
       <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="1000" height="219"></div>
       <button class="ic ic-novo" data-act="novo-global" aria-label="Novo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="ic" data-act="busca" aria-label="Buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
       <button class="ic" id="privTop" data-act="priv" aria-label="Esconder ou mostrar valores"></button>
       <button class="ic" data-act="mais" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
@@ -1163,6 +1177,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>

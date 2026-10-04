@@ -512,10 +512,10 @@ function vGeral(){
     <div class="cpair"><div class="cb"><i class="e" style="height:${d.entradas/maxV*100}%"></i></div><div class="cb"><i class="g" style="height:${d.gastos/maxV*100}%"></i></div></div><small>${nomeMes(d.m,true)}</small></div>`).join('');
   const cats=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,6),maxC=Math.max(1,...cats.map(c=>c[1]));
   const catsHTML=cats.length?cats.map(([id,v])=>{const c=CAT[id]||{em:'•',nome:id};const lim=Number(pl[id])||0;const ratio=lim?v/lim:v/maxC;
-    return pbar(`${c.em} ${esc(c.nome)}`,R(v),lim?RF('de '+R0(lim)):'',ratio,lim?clsLim(ratio):'','neg')}).join(''):vazio('Nenhum gasto ainda','Lance o primeiro gasto do mês.');
+    return pbar(`${c.em} ${esc(c.nome)}`,R(v),lim?RF('de '+R0(lim)):'',ratio,lim?clsLim(ratio):'','neg')}).join(''):vazio('Nenhum gasto ainda','Lancem o primeiro gasto do mês para ver para onde o dinheiro está indo.',BTN('novo','Novo gasto','data-tipo="gasto"'));
   const prox=proximosEventos(45).slice(0,5);
   const proxHTML=prox.length?`<div class="mini">${prox.map(e=>`<div class="mini-row"><div class="em">${e.ic||e.em}</div><div class="nm"><b>${esc(e.txt)}</b><small>${e.data===HOJE?'Hoje':diasEntre(HOJE,e.data)===1?'Amanhã':dataBR(e.data)} · ${esc(e.k)}</small>${acaoEvento(e,'btn xs ev-acao')}</div><div class="vl ${e.entra?'pos':'neg'}">${e.entra?'+ ':'− '}${R(e.pend!=null?e.pend:e.valor)}</div></div>`).join('')}</div>`
-    :vazio('Nada pela frente','Nenhum vencimento, fatura ou entrada prevista.');
+    :vazio('Nada pela frente','Cadastrem as contas que se repetem (aluguel, internet, salário) para o site avisar antes de vencer.',BTN('cr-nova','Cadastrar conta'));
   const ult=[...r.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm).slice(0,5);
   const aCartaoMes=soma(r0.ef.filter(i=>i.tipo==='gasto'&&i.cartao_id&&i.status==='comprometido'));
   /* det = qual detalhe abre ao tocar no número (de onde ele vem) */
@@ -559,7 +559,7 @@ function vTransf(){
   const dest=i=>i.meta_id?((S.metas.find(m=>m.id===i.meta_id)||{}).reserva?'🛟 Reserva':'🎯 '+((S.metas.find(m=>m.id===i.meta_id)||{nome:'Meta'}).nome)):i.investimento_id?'📈 '+(()=>{const x=S.invest.find(v=>v.id===i.investimento_id);return x?(x.produto||x.nome||(INVT[x.tipo]||{nome:'Investimento'}).nome):'Investimento'})():i.divida_id?'🏦 Dívida':'📈 Investimento';
   const r=resumo(S.mes),am=soma(it.filter(i=>i.tipo==='divida'));
   const head0=head('Transferências','Dinheiro que muda de lugar: metas, reserva, investimentos e dívidas. Não é gasto nem entrada.',BTN('n-transf','Nova transferência'));
-  if(!it.length)return head0+`<div class="panel">${vazio('Nenhuma transferência em '+esc(soMes(S.mes)),'Guardar em meta, investir, resgatar e pagar dívida aparecem aqui.')}</div>`;
+  if(!it.length)return head0+`<div class="panel">${vazio('Nenhuma transferência em '+esc(soMes(S.mes)),'Quando vocês guardarem em uma meta, investirem, resgatarem ou pagarem uma dívida, aparece aqui. Isso não conta como gasto.',BTN('n-transf','Nova transferência'))}</div>`;
   return head0+`
   <div class="tiles">
     <div class="tile"><div class="k">Para metas e reserva</div><div class="v ${cS(r.guardado)}">${R(r.guardado)}</div><div class="d">guardado menos resgatado</div></div>
@@ -645,13 +645,13 @@ function vCalendario(){
 
 /* ================= gastos e entradas ================= */
 function tabela(itens,tipo){
-  if(!itens.length)return vazio('Nada por aqui',`${tipo==='gasto'?'Nenhum gasto':'Nenhuma entrada'} ${S.fCat||S.fBusca?'com esse filtro':'neste mês'}.`);
+  if(!itens.length)return vazio('Nada por aqui',`${tipo==='gasto'?'Nenhum gasto':'Nenhuma entrada'} ${S.fCat||S.fBusca?'com esse filtro. Limpem a busca ou a categoria para ver tudo.':'neste mês. Lancem agora para o resumo do mês começar a ser montado.'}`,S.fCat||S.fBusca?'':BTN('novo',tipo==='gasto'?'Novo gasto':'Nova entrada',`data-tipo="${tipo}"`));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="hide-sm hide-md">Quem lançou</th><th class="r">Valor</th><th class="r"></th></tr></thead><tbody>
   ${itens.map(i=>{const c=catVis(i);const cc=i.cartao_id&&S.cartoes.find(x=>x.id===i.cartao_id);
     const tags=(cc?`<span class="badge-s cc" style="--cc:${esc(cc.cor)}">💳 ${esc(cc.nome)}${i.parcelas>1?' '+i.parcela+'/'+i.parcelas:''}${i.fatura_mes?' · fatura de '+nomeMes(refDoItem(i),true).toLowerCase():''}</span>${i.status==='pago'?'<span class="badge-s">paga</span>':'<span class="badge-s ref">a pagar</span>'}`:'')+(i.recorrente_id?`<span class="badge-s">${(S.recorrentes.find(r=>r.id===i.recorrente_id)||{}).auto?'🔁 automática':'🏠 conta'}${i.editado?' · valor ajustado':''}</span>`:'')+(i.divida_id?'<span class="badge-s">🏦 dívida</span>':'')+(ehLivre(i)&&!outroLivre(i)?'<span class="badge-s">💸 pessoal</span>':'')+(i.tags||[]).map(t=>`<span class="badge-s tg">#${esc(t)}</span>`).join('')+(i.nota?`<span class="badge-s" title="${esc(i.nota)}">📝</span>`:'')+(i.anexo?`<button class="badge-s lnk" data-act="ver-anexo" data-path="${esc(i.anexo)}" title="Ver anexo">📎</button>`:'');
     const meuOuNaoLivre=!outroLivre(i);
     return `<tr class="row"><td class="mut">${dataBR(i.data)}</td><td class="desc">${esc(descVis(i))}${tags}</td><td class="wrap"><span class="cat">${c.em} ${esc(c.nome)}</span></td><td class="hide-sm hide-md mut">${esc(nomeDe(i.autor)||'Automático')}</td><td class="r vl ${tipo==='entrada'?'pos':'neg'}">${R(i.valor)}</td>
-    <td class="r"><span class="acts">${meuOuNaoLivre?`<button class="ic" data-act="editar" data-id="${i.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${i.id}" aria-label="Apagar">${svg('del')}</button>`:''}</span></td></tr>`}).join('')}
+    <td class="r"><span class="acts">${meuOuNaoLivre?`${(i.tipo==='gasto'||i.tipo==='entrada')&&!i.recorrente_id&&!(i.parcelas>1)?`<button class="ic" data-act="duplicar" data-id="${i.id}" aria-label="Duplicar para hoje" title="Duplicar para hoje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>`:''}<button class="ic" data-act="editar" data-id="${i.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="apagar" data-id="${i.id}" aria-label="Apagar">${svg('del')}</button>`:''}</span></td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 function filtrar(tipo){
@@ -817,7 +817,7 @@ function vOrcamento(){
   const ref503020=entPl>0?pbar('Essenciais (até 50%)',pctF(ess/entPl),RF(R0(ess)),ess/entPl/.5,clsLim(ess/entPl/.5))
       +pbar('Estilo de vida (até 30%)',pctF(des/entPl),RF(R0(des)),des/entPl/.3,clsLim(des/entPl/.3))
       +pbar('Metas e reserva (20% ou mais)',pctF(Math.max(0,fut)/entPl),RF(R0(fut)),Math.max(0,fut)/entPl/.2)
-    :vazio('Sem entradas previstas','Definam as entradas previstas no topo da tela para calcular a divisão 50/30/20.');
+    :vazio('Sem entradas previstas','Definam a renda média mensal para calcular a divisão 50/30/20.',`<button class="btn" data-act="renda-media">Definir renda média</button>`);
   return head('Orçamento','Quanto vocês planejam gastar em cada categoria. Clique no valor para editar.')+`
   <div class="orc-resumo panel" data-ak="orc-resumo">
     <div><small>${pl.entradas?'Entradas previstas':med.definida?'Renda média mensal':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês para este mês':med.definida?'definida por vocês':'média dos últimos meses'}</small></div>
@@ -1982,6 +1982,51 @@ function modalGlossario(){
     ${d('Patrimônio líquido','Caixa + metas + investimentos − dívidas cadastradas.')}
   </div><div class="btns" style="margin-top:14px"><button class="btn" data-m="cancelar">Entendi</button></div>`);
 }
+/* busca em todo o histórico: descrição, categoria, valor, mês e ano */
+const MESES_BUSCA=['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const semAcento=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function modalBusca(){
+  modal(`<h2>Buscar</h2><label>O que procura?<input class="field" id="bQ" autocomplete="off" placeholder="Ex.: netflix, aluguel, 200, outubro 2026"></label>
+    <div id="bRes" class="busca-res"><p class="mut">Busca em todos os lançamentos, contas, metas, dívidas e desejos. Dá para combinar: <b>mercado outubro</b>, <b>200</b>, <b>academia 2026</b>.</p></div>
+    <div class="btns"><button class="btn ghost" data-m="cancelar">Fechar</button></div>`);
+  const q=$('mdl').querySelector('#bQ');let t=null,seq=0;
+  setTimeout(()=>q.focus(),60);
+  q.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>buscar(q.value,++seq,()=>seq),260)});
+}
+async function buscar(txt,meu,atual){
+  const box=$('bRes');if(!box)return;
+  const bruto=txt.trim();if(bruto.length<2){box.innerHTML='<p class="mut">Digite pelo menos 2 letras ou um valor.</p>';return}
+  let nq=semAcento(bruto).replace(/r\$/g,' ');
+  let mes=null,ano=null;
+  const my=nq.match(/\b(20\d\d)\b/);if(my){ano=Number(my[1]);nq=nq.replace(my[0],' ')}
+  MESES_BUSCA.forEach((n,i)=>{if(mes===null&&new RegExp('\\b'+n+'\\b').test(nq)){mes=i+1;nq=nq.replace(n,' ')}});
+  nq=nq.replace(/\s+/g,' ').trim();
+  const limpo=nq.replace(/[,()%*]/g,' ').replace(/\s+/g,' ').trim();
+  const numTxt=/^[\d.,]+$/.test(nq)?normNum(nq):null,num=numTxt&&isFinite(Number(numTxt))&&Number(numTxt)>0?Number(numTxt):null;
+  const cats=Object.entries(CAT).filter(([id,c])=>limpo&&(semAcento(c.nome).includes(limpo)||id===limpo)).map(([id])=>id);
+  let qr=sb.from('lancamentos').select('*').neq('status','cancelado').order('data',{ascending:false}).limit(80);
+  if(mes!==null||ano!==null){const y=ano||ANO_ATUAL;
+    if(mes!==null){const a=`${y}-${pad(mes)}-01`,b=mes===12?`${y+1}-01-01`:`${y}-${pad(mes+1)}-01`;qr=qr.gte('data',a).lt('data',b)}else qr=qr.gte('data',`${y}-01-01`).lt('data',`${y+1}-01-01`)}
+  if(limpo){const f=[`descricao.ilike.%${limpo}%`];if(cats.length)f.push(`categoria.in.(${cats.join(',')})`);if(num!==null)f.push(`valor.eq.${num}`);qr=qr.or(f.join(','))}
+  const {data,error}=await qr;
+  if(meu!==undefined&&atual&&meu!==atual())return;
+  if(error){box.innerHTML='<p class="mut">Não deu para buscar agora. Tentem de novo.</p>';return}
+  const itens=(data||[]).map(deLinha);
+  const extras=[];
+  if(limpo){
+    S.recorrentes.filter(r=>semAcento(r.descricao).includes(limpo)).forEach(r=>extras.push({em:(CAT[r.categoria]||{em:'🔁'}).em,t:r.descricao,s:`Conta fixa · todo dia ${r.dia} · ${R0(r.valor)}`,go:'contas'}));
+    S.metas.filter(m=>semAcento(m.nome).includes(limpo)).forEach(m=>extras.push({em:m.emoji||'🎯',t:m.nome,s:`Meta · ${R0(guardadoMeta(m.id))} de ${R0(m.alvo)}`,go:m.reserva?'reserva':'metas'}));
+    S.dividas.filter(d=>semAcento(d.nome).includes(limpo)).forEach(d=>extras.push({em:'🏦',t:d.nome,s:`Dívida · parcela ${R0(d.parcela)}`,go:'dividas'}));
+    S.desejos.filter(d=>semAcento(d.nome).includes(limpo)).forEach(d=>extras.push({em:d.emoji||'⭐',t:d.nome,s:`Desejo · ${R0(d.valor)}`,go:'desejos'}));
+  }
+  const gastos=itens.filter(i=>i.tipo==='gasto'),totG=soma(gastos);
+  const st=i=>i.status==='previsto'?'previsto':i.status==='comprometido'?'no cartão, a pagar':'';
+  const linhas=itens.map(i=>{const c=catVis(i),ent=i.tipo==='entrada'||i.tipo==='resgate',v=ent?'entradas':'gastos';
+    return `<button type="button" class="busca-i" data-act="busca-ir" data-mes="${i.mes}" data-v="${i.tipo==='entrada'?'entradas':(i.tipo==='aporte'||i.tipo==='resgate'||i.tipo==='divida')?'transf':v}"><span class="bi-em">${c.em}</span><span class="bi-t"><b>${esc(descVis(i))}</b><small>${dataBR(i.data)}/${i.data.slice(0,4)} · ${esc(c.nome)}${st(i)?' · '+st(i):''}</small></span><span class="bi-v ${ent?'pos':'neg'}">${ent?'+ ':''}${R(i.valor)}</span></button>`}).join('');
+  const ex=extras.map(e=>`<button type="button" class="busca-i" data-go="${e.go}"><span class="bi-em">${e.em}</span><span class="bi-t"><b>${esc(e.t)}</b><small>${esc(e.s)}</small></span><span class="bi-v mut">›</span></button>`).join('');
+  box.innerHTML=(itens.length||extras.length)?`${itens.length?`<p class="mut busca-res-t">${plural(itens.length,'lançamento','lançamentos')}${itens.length>=80?' (mostrando os 80 mais recentes)':''}${gastos.length?` · gastos somam <b class="neg">${R(totG)}</b>`:''}</p><div class="busca-l">${linhas}</div>`:''}${extras.length?`<p class="mut busca-res-t">Também encontrado em</p><div class="busca-l">${ex}</div>`:''}`:'<p class="mut">Nada encontrado. Tentem outra palavra, um valor (200) ou um mês (outubro).</p>';
+  marcarValores(box);
+}
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
   if(f.aberto<=0){toast('Esta fatura já está paga.');return}
@@ -2348,6 +2393,16 @@ document.addEventListener('click',async e=>{
         if(orig&&orig.length)toastDesfazer('Compra apagada',async()=>{const r=await sb.from('lancamentos').insert(orig);if(r.error)throw r.error});else toast('Compra apagada')});
       else confirmar('Apagar lançamento?',`${esc(descVis(item))} de ${R(item.valor)} sai de todo o site para vocês dois.`,'Apagar',async()=>{const {data:orig}=await sb.from('lancamentos').select('*').eq('id',id);const {error}=await sb.from('lancamentos').delete().eq('id',id);if(error)throw error;
         if(orig&&orig.length)toastDesfazer('Lançamento apagado',async()=>{const r=await sb.from('lancamentos').insert(orig);if(r.error)throw r.error});else toast('Lançamento apagado')});break;
+    case 'duplicar':{if(!item||!(item.tipo==='gasto'||item.tipo==='entrada')||item.recorrente_id||item.parcelas>1){toast('Só gastos e entradas avulsos podem ser duplicados.');break}
+      a.disabled=true;const cd=item.cartao_id&&S.cartoes.find(c=>c.id===item.cartao_id);
+      const nova={tipo:item.tipo,valor:item.valor,descricao:item.descricao,categoria:item.categoria,data:HOJE,meio:item.meio||'',...(item.livre?{livre:true}:{}),...(item.dono?{dono:item.dono}:{}),...(item.tags&&item.tags.length?{tags:item.tags}:{}),
+        ...(cd?{cartao_id:cd.id,fatura_mes:mesFatura(cd,HOJE),status:'comprometido',meio:'credito',compra_id:uuid(),parcela:1,parcelas:1}:{status:'pago'})};
+      const {data:ins,error}=await sb.from('lancamentos').insert(nova).select('id');a.disabled=false;
+      if(error){toast('Não deu para duplicar agora.');break}
+      if(HOJE.slice(0,7)!==S.mes){S.mes=HOJE.slice(0,7)}
+      toastDesfazer(`Duplicado para hoje · ${R(item.valor)}`,async()=>{const r=await sb.from('lancamentos').delete().in('id',(ins||[]).map(x=>x.id));if(r.error)throw r.error});break}
+    case 'busca':modalBusca();break;
+    case 'busca-ir':{const m=a.dataset.mes,v=a.dataset.v;fechar();S.mes=m;await carregarItens();ir(v);break}
     case 'cal-dia':S.calDia=a.dataset.d;render();break;
     case 'meta-nova':modalMeta();break;
     case 'meta-editar':if(meta)modalMeta(meta);break;
