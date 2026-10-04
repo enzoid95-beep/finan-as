@@ -1057,6 +1057,23 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .aviso-i.no{background:rgba(255,69,96,.12)!important;border:1px solid rgba(255,69,96,.55)!important}
 .aviso-i.at{background:rgba(250,204,21,.09)!important;border:1px solid rgba(250,204,21,.45)!important}
 .aviso-i.no b{color:#ff8a9a}.aviso-i.at b{color:#fde047}
+/* lançamento: o essencial primeiro, o resto em "Mais detalhes" */
+.mais-det{margin:2px 0 14px;border-top:1px solid var(--line);padding-top:4px}
+.mais-det>summary{cursor:pointer;list-style:none;color:var(--g2);font-weight:700;font-size:14.5px;padding:10px 0;display:flex;align-items:baseline;gap:8px}
+.mais-det>summary::-webkit-details-marker{display:none}
+.mais-det>summary::before{content:'+';font-weight:800}
+.mais-det[open]>summary::before{content:'−'}
+.mais-det>summary small{color:var(--muted);font-weight:500;font-size:12.5px}
+/* celular: os botões do pop-up ficam sempre visíveis */
+@media (max-width:760px){
+  .mdl .btns{position:sticky;bottom:0;margin:0 -22px calc(-22px - env(safe-area-inset-bottom,0px));padding:12px 22px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,rgba(8,10,15,0),#0a0d13 28%);z-index:3}
+  .mdl .erro{position:relative;z-index:3}
+}
+.toast-undo{display:flex;align-items:center;gap:14px;max-width:min(560px,calc(100vw - 24px))}
+.toast-undo button{flex:none;border:1px solid rgba(245,179,1,.6);background:rgba(245,179,1,.14);color:var(--g2);font-weight:800;border-radius:9px;padding:6px 12px;cursor:pointer}
+.toast{max-width:min(560px,calc(100vw - 24px));text-align:center}
+@media (max-width:760px){.toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
+.cons{margin:0 0 14px;padding-left:20px;color:var(--muted);font-size:13.5px;line-height:1.55}
 </style>
 </head>
 <body>
@@ -1135,6 +1152,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=32"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

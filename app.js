@@ -113,7 +113,16 @@ function normNum(s){if(s.includes(','))return s.replace(/\./g,'').replace(',','.
 function parseValor(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;s=normNum(s);const n=Number(s);return isFinite(n)&&n>0?Math.round(n*100)/100:null}
 function parseLivre(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;const neg=s.startsWith('-');s=normNum(s.replace('-',''));const n=Number(s);return isFinite(n)?Math.round((neg?-n:n)*100)/100:null}
 function fmtInput(v){return v||v===0?String(v).replace('.',','):''}
-function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2600)}
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),t.length>60?4200:2600)}
+/* aviso com botão "Desfazer" por alguns segundos */
+function toastDesfazer(t,desfazer){
+  document.querySelectorAll('.toast-undo').forEach(x=>x.remove());
+  const d=document.createElement('div');d.className='toast toast-undo';
+  const sp=document.createElement('span');sp.textContent=t;
+  const b=document.createElement('button');b.type='button';b.textContent='Desfazer';
+  b.addEventListener('click',async()=>{b.disabled=true;try{await desfazer();d.remove();toast('Desfeito')}catch(e){b.disabled=false;toast('Não deu para desfazer agora.')}});
+  d.append(sp,b);document.body.append(d);setTimeout(()=>d.remove(),9000);
+}
 const cent=v=>Math.round((v+Number.EPSILON)*100)/100;
 const soma=arr=>cent(arr.reduce((s,i)=>s+Math.round(i.valor*100),0)/100);
 const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g,()=>(Math.random()*16|0).toString(16)));
@@ -1572,7 +1581,6 @@ function modalLancamento(tipo,item,o={}){
   modal(`<h2>${tipo==='entrada'?'Nova entrada':'Novo gasto'}</h2>
     <div class="seg" data-g="tipo" data-onchange="__trocaTipo"><button type="button" data-v="gasto" aria-pressed="${tipo==='gasto'}">Gasto</button><button type="button" data-v="entrada" aria-pressed="${tipo==='entrada'}">Entrada</button></div>
     <label>Valor (R$)<input class="field big" id="mValor" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${o.valor?fmtInput(o.valor):''}"></label>
-    <label>Descrição<input class="field" id="mDesc" maxlength="80" autocomplete="off" placeholder="${tipo==='entrada'?'Ex.: salário':'Ex.: feira do sábado'}" value="${esc(o.desc||'')}"></label>
     <label style="margin-bottom:0">Categoria</label><div class="chips" data-g="cat">${chipsCat(lista,cat)}</div>
     <div id="meioWrap" ${tipo==='gasto'?'':'hidden'}><label style="margin-bottom:0">Forma de pagamento</label><div class="chips" data-g="meio" data-onchange="__trocaMeio">${meioChips(meio0)}</div></div>
     <div id="credWrap" ${tipo==='gasto'&&meio0==='credito'?'':'hidden'}>${S.cartoes.length?`<label style="margin-bottom:0">Cartão</label><div class="chips" data-g="cartao">${cartaoChips()}</div>
@@ -1580,24 +1588,28 @@ function modalLancamento(tipo,item,o={}){
       <label class="chk"><input type="checkbox" id="mRec"> 🔁 Repetir todo mês neste cartão (assinatura, academia…)</label>
       <p class="mut" style="font-size:13px;margin:4px 0 14px">No crédito, o gasto conta na data da compra e a fatura do cartão aumenta. O caixa só muda quando a fatura for paga.</p>`
       :`<p class="mut">Nenhum cartão cadastrado. <button type="button" class="lnk" data-act="cartao-novo">Cadastrar cartão</button></p>`}</div>
-    <div id="situWrap" ${tipo==='gasto'&&meio0==='credito'?'hidden':''}><label style="margin-bottom:0">Situação</label><div class="seg" data-g="situ"><button type="button" data-v="pago" aria-pressed="true">${tipo==='gasto'?'Já paguei':'Já recebi'}</button><button type="button" data-v="previsto" aria-pressed="false">${tipo==='gasto'?'Vou pagar (agendar)':'Vou receber (prevista)'}</button></div></div>
+    ${donoBox(o.dono)}
     <label id="lblDataL">${meio0==='credito'?'Data da compra':'Data'}<input class="field" id="mData" type="date" value="${data}"></label>
-    ${tipo==='gasto'?livreBox(o.livre):livreBox(false).replace('<div id="livreWrap">','<div id="livreWrap" hidden>')}
-    ${extrasBox()}
+    <details class="mais-det"><summary>Mais detalhes <small>descrição, situação, tags, anexo</small></summary>
+      <label>Descrição (opcional)<input class="field" id="mDesc" maxlength="80" autocomplete="off" placeholder="${tipo==='entrada'?'Ex.: salário':'Ex.: feira do sábado'}" value="${esc(o.desc||'')}"></label>
+      <div id="situWrap" ${tipo==='gasto'&&meio0==='credito'?'hidden':''}><label style="margin-bottom:0">Situação</label><div class="seg" data-g="situ"><button type="button" data-v="pago" aria-pressed="true">${tipo==='gasto'?'Já paguei':'Já recebi'}</button><button type="button" data-v="previsto" aria-pressed="false">${tipo==='gasto'?'Vou pagar (agendar)':'Vou receber (prevista)'}</button></div><p class="mut" style="font-size:13px;margin:6px 0 14px">Com data futura, o lançamento é agendado automaticamente.</p></div>
+      ${tipo==='gasto'?livreBox(o.livre):livreBox(false).replace('<div id="livreWrap">','<div id="livreWrap" hidden>')}
+      ${extrasBox()}
+    </details>
     ${btns('Salvar')}`,
   async()=>{
     const valor=parseValor(val('mValor')),d=val('mData'),desc=val('mDesc').trim().slice(0,80),categoria=sel('cat'),t=sel('tipo');
-    const meio=t==='gasto'?(sel('meio')||'pix'):'',credito=meio==='credito',status=credito?'comprometido':(sel('situ')||'pago');
+    const meio=t==='gasto'?(sel('meio')||'pix'):'',credito=meio==='credito',status=credito?'comprometido':(d>HOJE?'previsto':(sel('situ')||'pago'));
+    const dono=S.temV11&&sel('dono')?{dono:sel('dono')}:{};
     if(!valor)return 'Digite um valor maior que zero, por exemplo 45,90.';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
     const livre=t==='gasto'&&!!$('mdl').querySelector('#mLivre')?.checked;
-    if(credito)return salvarCompraCredito({cardId:sel('cartao'),valor,n:parseInt(val('mParc'),10)||1,d,desc,categoria,livre,dono:S.me,rec:!!$('mdl').querySelector('#mRec')?.checked,extras:await lerExtras(),after:o.after});
-    if(status==='pago'&&d>HOJE)return 'Para uma data futura, escolham "'+(t==='gasto'?'Vou pagar':'Vou receber')+'".';
+    if(credito)return salvarCompraCredito({cardId:sel('cartao'),valor,n:parseInt(val('mParc'),10)||1,d,desc,categoria,livre,dono:sel('dono')||S.me,rec:!!$('mdl').querySelector('#mRec')?.checked,extras:await lerExtras(),after:o.after});
     const ex=await lerExtras();
-    const {error}=await sb.from('lancamentos').insert({tipo:t,valor,descricao:desc,categoria,data:d,status,meio,...(livre?{livre:true}:{}),...ex});
+    const {error}=await sb.from('lancamentos').insert({tipo:t,valor,descricao:desc,categoria,data:d,status,meio,...(livre?{livre:true}:{}),...dono,...ex});
     if(error)throw error;
     if(d.slice(0,7)!==S.mes)S.mes=d.slice(0,7);
-    toast(status==='previsto'?'Agendado para '+dataBR(d):'Lançamento salvo');
+    toast(status==='previsto'?'Agendado para '+dataBR(d)+` · ${R0(valor)} ainda não saiu do caixa`:t==='gasto'?`Gasto adicionado · caixa reduzido em ${R(valor)} (agora ${R(emCaixa()-valor)})`:`Entrada registrada · caixa aumentou ${R(valor)} (agora ${R(emCaixa()+valor)})`);
     if(o.after)await o.after();
   });
 }
@@ -1617,7 +1629,7 @@ async function salvarCompraCredito(c){
     const linhas=parcelasCompra(card,c.valor,n,c.d,c.fm).map(p=>({tipo:'gasto',valor:p.valor,descricao:(c.desc||CAT[c.categoria].nome)+(n>1?` (${p.k}/${n})`:''),categoria:c.categoria,data:p.data,
       cartao_id:card.id,compra_id:p.compra,parcela:p.k,parcelas:n,fatura_mes:p.fm,status:'comprometido',meio:'credito',...(c.livre?{livre:true}:{}),...(c.extras||{}),...dono}));
     const {error}=await sb.from('lancamentos').insert(linhas);if(error){if(/dono/.test(error.message||''))return 'Falta rodar o arquivo schema-v11.sql no Supabase.';throw error}
-    toast(n>1?`Compra lançada em ${n}x de ${R(linhas[n>1?1:0].valor)}`:`Compra lançada na fatura de ${soMes(refDe(card,linhas[0].fatura_mes))} (vence ${dataBR(vencFatura(card,linhas[0].fatura_mes))})`);
+    toast(n>1?`Compra lançada em ${n}x de ${R(linhas[n>1?1:0].valor)}`:`Compra lançada · fatura de ${soMes(refDe(card,linhas[0].fatura_mes))} agora ${R(infoFatura(card,linhas[0].fatura_mes).total+soma(linhas))} (vence ${dataBR(vencFatura(card,linhas[0].fatura_mes))})`);
   }
   if(['contas','gastos','orcamento','calendario'].includes(S.view)&&c.d.slice(0,7)!==S.mes)S.mes=c.d.slice(0,7);
   if(c.after)await c.after();
@@ -1883,7 +1895,7 @@ function modalConfirmarOc(item){
   async()=>{
     const v=parseValor(val('mValor')),d=val('mData');if(!v)return 'Digite o valor.';if(d>HOJE)return 'A data não pode ser no futuro.';
     const up=item.cartao_id?{status:'comprometido',valor:v}:{status:'pago',valor:v,data_caixa:d};if(v!==item.valor&&item.recorrente_id)up.editado=true;if(!item.recorrente_id&&!item.cartao_id)up.data=d;
-    const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast(ent?'Recebimento confirmado':'Pagamento registrado');
+    const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast(ent?`Recebimento confirmado · caixa aumentou ${R(v)}`:item.cartao_id?`Lançado na fatura do cartão · o caixa só muda ao pagar a fatura`:`Pagamento registrado · caixa reduzido em ${R(v)}`);
   });
 }
 /* data prevista de pagamento: só muda onde a fatura aparece no Calendário e na Projeção; o caixa muda ao pagar */
@@ -1924,11 +1936,16 @@ function modalRendaMedia(){
 }
 function modalPagarFatura(card,fm){
   const f=infoFatura(card,fm);
-  modal(`<h2>Pagar fatura ${esc(card.nome)}</h2><p class="mut" style="margin:-6px 0 16px">Fatura de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
-    <div class="sim-depois" style="margin-bottom:14px"><div class="sd-l"><span>Valor a pagar</span><span><b class="ref">${R(f.aberto)}</b></span></div><div class="sd-l"><span>Caixa</span><span>${R0(emCaixa())} → <b class="${cS(emCaixa()-f.aberto)}">${R0(emCaixa()-f.aberto)}</b></span></div><div class="sd-l"><span>Gastos do mês</span><span><b class="pos">não mudam</b> · já foram contados nas compras</span></div></div>
-    <label>Data do pagamento<input class="field" id="mData" type="date" value="${HOJE}"></label>${btns('Pagar fatura')}`,
+  if(f.aberto<=0){toast('Esta fatura já está paga.');return}
+  const depois=emCaixa()-f.aberto;
+  modal(`<h2>Pagar ${R(f.aberto)}?</h2><p class="mut" style="margin:-6px 0 16px">Fatura ${esc(card.nome)} de ${esc(soMes(refDe(card,fm)))} · fecha ${dataBR(f.fech)} · vence ${dataBR(f.venc)} · ${plural(f.it.length,'compra','compras')}</p>
+    <div class="sim-depois" style="margin-bottom:14px"><div class="sd-l"><span>Caixa hoje</span><span>${R(emCaixa())}</span></div><div class="sd-l"><span>Caixa após o pagamento</span><span><b class="${cS(depois)}">${R(depois)}</b></span></div></div>
+    <ul class="cons"><li>A fatura será marcada como paga.</li><li>Nenhuma nova despesa será criada: os gastos do mês não mudam.</li>${depois<0?'<li class="neg">O caixa ficará negativo.</li>':''}</ul>
+    <label>Data do pagamento<input class="field" id="mData" type="date" value="${HOJE}" max="${HOJE}"></label>${btns('Pagar fatura')}`,
   async()=>{const d=val('mData');if(d>HOJE)return 'A data não pode ser no futuro.';
-    const {error}=await sb.from('lancamentos').update({status:'pago',data_caixa:d}).eq('cartao_id',card.id).eq('fatura_mes',fm).eq('status','comprometido');if(error)throw error;toast('Fatura paga');});
+    const {data,error}=await sb.from('lancamentos').update({status:'pago',data_caixa:d}).eq('cartao_id',card.id).eq('fatura_mes',fm).eq('status','comprometido').select('id');if(error)throw error;
+    if(!data||!data.length)return 'Esta fatura já foi paga. Atualize a tela para ver.';
+    toastDesfazer(`Fatura paga · caixa reduzido em ${R(f.aberto)} (agora ${R(depois)})`,async()=>{const r=await sb.from('lancamentos').update({status:'comprometido',data_caixa:null}).in('id',data.map(x=>x.id));if(r.error)throw r.error});});
 }
 function modalPagarDivida(dv){
   const inf=infoDivida(dv),juros=Math.round(inf.jurosProx*100)/100,principal=Math.round((dv.parcela-juros)*100)/100;
@@ -2278,9 +2295,11 @@ document.addEventListener('click',async e=>{
     case 'novo':modalLancamento(a.dataset.tipo||'gasto',null,{cat:a.dataset.cat,data:a.dataset.data,livre:a.dataset.livre==='1'});break;
     case 'editar':if(item)modalLancamento(null,item);break;
     case 'apagar':if(!item)break;
-      if(item.recorrente_id)confirmar('Pular este mês?',`${esc(descVis(item))} deixa de acontecer em ${esc(soMes(item.ref_mes||item.mes))}. A conta continua nos próximos meses.`,'Pular este mês',async()=>{const {error}=await sb.from('lancamentos').update({status:'cancelado'}).eq('id',id);if(error)throw error;toast('Mês pulado')});
-      else if(item.compra_id&&item.parcelas>1)confirmar('Apagar compra parcelada?',`${esc(item.descricao.replace(/\s\(\d+\/\d+\)$/,''))} tem ${item.parcelas} parcelas. Todas saem dos gastos, das faturas e das projeções.`,'Apagar compra inteira',async()=>{const {error}=await sb.from('lancamentos').delete().eq('compra_id',item.compra_id);if(error)throw error;toast('Compra apagada')});
-      else confirmar('Apagar lançamento?',`${esc(descVis(item))} de ${R(item.valor)} sai de todo o site para vocês dois.`,'Apagar',async()=>{const {error}=await sb.from('lancamentos').delete().eq('id',id);if(error)throw error;toast('Lançamento apagado')});break;
+      if(item.recorrente_id)confirmar('Pular este mês?',`${esc(descVis(item))} deixa de acontecer em ${esc(soMes(item.ref_mes||item.mes))}. A conta continua nos próximos meses.`,'Pular este mês',async()=>{const antes=item.status;const {error}=await sb.from('lancamentos').update({status:'cancelado'}).eq('id',id);if(error)throw error;toastDesfazer('Mês pulado',async()=>{const r=await sb.from('lancamentos').update({status:antes}).eq('id',id);if(r.error)throw r.error})});
+      else if(item.compra_id&&item.parcelas>1)confirmar('Apagar compra parcelada?',`${esc(item.descricao.replace(/\s\(\d+\/\d+\)$/,''))} tem ${item.parcelas} parcelas. Todas saem dos gastos, das faturas e das projeções.`,'Apagar compra inteira',async()=>{const {data:orig}=await sb.from('lancamentos').select('*').eq('compra_id',item.compra_id);const {error}=await sb.from('lancamentos').delete().eq('compra_id',item.compra_id);if(error)throw error;
+        if(orig&&orig.length)toastDesfazer('Compra apagada',async()=>{const r=await sb.from('lancamentos').insert(orig);if(r.error)throw r.error});else toast('Compra apagada')});
+      else confirmar('Apagar lançamento?',`${esc(descVis(item))} de ${R(item.valor)} sai de todo o site para vocês dois.`,'Apagar',async()=>{const {data:orig}=await sb.from('lancamentos').select('*').eq('id',id);const {error}=await sb.from('lancamentos').delete().eq('id',id);if(error)throw error;
+        if(orig&&orig.length)toastDesfazer('Lançamento apagado',async()=>{const r=await sb.from('lancamentos').insert(orig);if(r.error)throw r.error});else toast('Lançamento apagado')});break;
     case 'cal-dia':S.calDia=a.dataset.d;render();break;
     case 'meta-nova':modalMeta();break;
     case 'meta-editar':if(meta)modalMeta(meta);break;
