@@ -1030,8 +1030,8 @@ function vDesejos(){
     </div>
     <div id="simRes">${simHTML()}</div>
   </div>
-  ${temV?`${S.desejos.length?`<div class="tiles">
-    <div class="tile"><div class="k">Desejos na lista</div><div class="v">${abertos.length}</div><div class="d">${RF(R0(soma(abertos)))} no total</div></div>
+  ${temV?`${S.desejos.length?`<div class="tiles tiles-des">
+    <div class="tile tile-total"><div class="k">Valor total dos desejos</div><div class="v ref">${R(soma(abertos))}</div><div class="d">${plural(abertos.length,'desejo','desejos')} na lista${abertos.filter(d=>d.prioridade===1).length?` · <b>${R0(soma(abertos.filter(d=>d.prioridade===1)))}</b> em prioridade alta`:''}</div></div>
     <div class="tile"><div class="k">Prioridade alta</div><div class="v">${abertos.filter(d=>d.prioridade===1).length}</div><div class="d">${RF(R0(soma(abertos.filter(d=>d.prioridade===1))))}</div></div>
     <div class="tile"><div class="k">Viraram meta</div><div class="v">${feitos.filter(d=>d.status==='meta').length}</div><div class="d">em construção</div></div>
     <div class="tile"><div class="k">Conquistados</div><div class="v pos">${feitos.filter(d=>d.status==='comprado').length}</div><div class="d">desejos realizados</div></div>
