@@ -1037,7 +1037,7 @@ function vDesejos(){
     <div class="tile"><div class="k">Conquistados</div><div class="v pos">${feitos.filter(d=>d.status==='comprado').length}</div><div class="d">desejos realizados</div></div>
   </div>`:''}
   ${S.desejos.length?`<div class="seg-inline"><button data-act="des-aba" data-v="aberto" aria-pressed="${S.abaDesejos==='aberto'}">Na lista (${abertos.length})</button><button data-act="des-aba" data-v="feito" aria-pressed="${S.abaDesejos!=='aberto'}">Realizados e em meta (${feitos.length})</button></div>`:''}
-  ${lst.length?`<div class="cards">${lst.map(d=>{const p=PR[d.prioridade]||PR[2];const meses=med.sobra>0?Math.ceil(d.valor/(med.sobra/2)):null;return `<div class="meta-card">
+  ${lst.length?`<div class="cards">${lst.map(d=>{const p=PR[d.prioridade]||PR[2];const meses=med.sobra>0?Math.ceil(d.valor/(med.sobra/2)):null;return `<div class="meta-card des-card pr-${p[0]}">
     <div class="meta-top"><div class="em">${esc(d.emoji)}</div><div style="min-width:0"><b>${esc(d.nome)}</b><small><span class="prio ${p[0]}">${p[1]}</span>${d.status==='meta'?' · virou meta':d.status==='comprado'?' · conquistado 🎉':''}</small></div>
       <span class="acts"><button class="ic" data-act="des-editar" data-id="${d.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="des-apagar" data-id="${d.id}" aria-label="Excluir">${svg('del')}</button></span></div>
     <div class="meta-val"><b class="ref">${R(d.valor)}</b>${d.link&&/^https?:\/\//.test(d.link)?`<a class="lnk" href="${esc(d.link)}" target="_blank" rel="noopener">Ver produto</a>`:''}</div>

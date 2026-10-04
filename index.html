@@ -1046,6 +1046,13 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .tile-total .d b{color:var(--g2)}
 @media (max-width:1200px){.tiles-des{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-total{grid-column:1/-1}}
 @media (max-width:760px){.tile-total .v{font-size:clamp(30px,10vw,42px)}}
+/* Desejos: cor da prioridade (alta = vermelho, média = amarelo, baixa = azul) no ícone e na etiqueta */
+.des-card.pr-p1 .meta-top .em{background:linear-gradient(135deg,rgba(255,69,96,.38),rgba(255,69,96,.12));border-color:rgba(255,69,96,.75);box-shadow:0 0 14px rgba(255,69,96,.25)}
+.des-card.pr-p2 .meta-top .em{background:linear-gradient(135deg,rgba(250,204,21,.38),rgba(250,204,21,.12));border-color:rgba(250,204,21,.75);box-shadow:0 0 14px rgba(250,204,21,.22)}
+.des-card.pr-p3 .meta-top .em{background:linear-gradient(135deg,rgba(59,130,246,.40),rgba(59,130,246,.12));border-color:rgba(96,165,250,.8);box-shadow:0 0 14px rgba(59,130,246,.28)}
+.des-card .prio.p1{background:rgba(255,69,96,.2)!important;color:#ff8a9a!important}
+.des-card .prio.p2{background:rgba(250,204,21,.18)!important;color:#fde047!important}
+.des-card .prio.p3{background:rgba(59,130,246,.2)!important;color:#93c5fd!important}
 </style>
 </head>
 <body>
@@ -1124,6 +1131,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>
