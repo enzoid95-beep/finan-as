@@ -1123,6 +1123,19 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .fact-click:hover,.fact-click:focus-visible{background:rgba(255,255,255,.09)!important;outline:none}
 .det-click:hover,.det-click:focus-visible{background:rgba(255,255,255,.06);outline:none;border-radius:8px}
 .fluxo-det{max-height:52vh;overflow-y:auto}
+/* ===== v45: subtítulos e rótulos em branco, maiores; títulos de card com relevo texturizado ===== */
+.panel .sub,.view-head p,.hv3-nota,.hv3-dica{color:#fff!important;font-size:15px!important;opacity:1!important}
+.tile .k{color:#fff!important;font-size:14.5px!important;font-weight:600!important}
+.tile .d{color:#fff!important;font-size:14px!important;opacity:1!important}
+.kpi small{color:#fff!important;font-size:14.5px!important;font-weight:600!important}
+.kpi>span{color:#fff!important;font-size:14px!important;opacity:1!important}
+.fact small{color:#fff!important;font-size:13.5px!important}
+.hero-meta span,.hero-sub span{color:#fff!important}
+.panel h2{font-size:26px!important;letter-spacing:.3px;text-shadow:none!important;
+  background:repeating-linear-gradient(118deg,rgba(255,255,255,0) 0 2px,rgba(0,0,0,.13) 2px 3px),linear-gradient(180deg,#ffffff 0%,#eef1f7 42%,#aeb7c8 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.95)) drop-shadow(0 -1px 0 rgba(255,255,255,.18)) drop-shadow(0 3px 5px rgba(0,0,0,.55))}
+.panel h2::before{height:.95em;width:4px}
 </style>
 </head>
 <body>
@@ -1203,6 +1216,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=44"></script>
+<script src="app.js?v=45"></script>
 </body>
 </html>
