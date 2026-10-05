@@ -1460,7 +1460,7 @@ function melhorarArquivos(root){
 function soNumeros(root){
   root.querySelectorAll('input[type=number]').forEach(i=>{i.type='text';i.inputMode='numeric';i.dataset.num='int';i.autocomplete='off'});
 }
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.kpi-click')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.kpi-click,.fact-click,.det-click')){e.preventDefault();e.target.click()}});
 document.addEventListener('input',e=>{const i=e.target;if(!(i instanceof HTMLInputElement))return;
   const dec=i.inputMode==='decimal',int=i.dataset.num==='int';if(!dec&&!int)return;
   const antes=i.value,pos=i.selectionStart;
@@ -1716,14 +1716,14 @@ function modalProjecao(){
   const sm=situacaoMes(),r0=resumo(MES_ATUAL),lp=linhasProjecao(sm),mc=soMes(MES_ATUAL),fim=MES_ATUAL+'-'+pad(ultimoDia(MES_ATUAL));
   const feitos=[...r0.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm);
   const aCartaoMes=soma(r0.ef.filter(i=>i.tipo==='gasto'&&i.cartao_id&&i.status==='comprometido')),saiuCaixa=cent(r0.gastos-aCartaoMes);
-  const fato=(t,v,c,s)=>`<div class="fact"><small>${t}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
+  const fato=(t,v,c,s,det)=>`<div class="fact${det?' fact-click':''}"${det?` data-act="det-fluxo" data-k="${det}" role="button" tabindex="0" title="Ver tudo detalhado"`:''}><small>${t}${det?' <i class="kpi-i" aria-hidden="true">ⓘ</i>':''}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
   modal(`<h2>Projeção de ${esc(mc)}</h2>
     <div class="pj-facts">
       ${fato('Em caixa hoje',R(sm.caixa),cS(sm.caixa))}
-      ${fato('Já entrou no mês',R(r0.entradas),r0.entradas?'pos':'zero')}
-      ${fato('Já saiu do caixa',R(saiuCaixa),saiuCaixa?'neg':'zero',aCartaoMes>0.004?`+ ${R0(aCartaoMes)} no cartão, a pagar na fatura`:'')}
-      ${fato('Ainda entra',R(sm.entra),sm.entra?'pos':'zero','salários e entradas previstas')}
-      ${fato('Ainda sai',R(sm.sai),sm.sai?'neg':'zero',`${R0(sm.aPagar)} vencidos ou de hoje · ${R0(sm.previsto)} até o fim do mês`)}
+      ${fato('Já entrou no mês',R(r0.entradas),r0.entradas?'pos':'zero','','jaEntrou')}
+      ${fato('Já saiu do caixa',R(saiuCaixa),saiuCaixa?'neg':'zero',aCartaoMes>0.004?`+ ${R0(aCartaoMes)} no cartão, a pagar na fatura`:'','jaSaiu')}
+      ${fato('Ainda entra',R(sm.entra),sm.entra?'pos':'zero','salários e entradas previstas','aEntrar')}
+      ${fato('Ainda sai',R(sm.sai),sm.sai?'neg':'zero',`${R0(sm.aPagar)} vencidos ou de hoje · ${R0(sm.previsto)} até o fim do mês`,'aSair')}
       ${fato('Previsão para '+dataBR(fim),R(sm.previsao),cS(sm.previsao),'caixa + o que entra − o que sai')}
     </div>
     ${sm.sugestaoMetas>0.5?`<p class="mut" style="margin:0 0 12px">🎯 Sugestão para as metas neste mês: <b class="ref">${R0(sm.sugestaoMetas)}</b>. Não está incluída na previsão: só sai do caixa quando vocês guardarem.</p>`:''}
@@ -1945,6 +1945,38 @@ function modalRendaMedia(){
     if(t&&!v)return 'Digite um valor válido.';
     const {error}=await sb.from('config').upsert({id:'casal',renda_media:v||null,atualizado_em:new Date().toISOString()});if(error)throw error;
     S.rendaMedia=v||0;toast(v?'Renda média definida':'Voltou a usar a média dos últimos meses');});
+}
+/* detalhe completo de entradas e gastos (passado e futuro) */
+function modalFluxo(k,volta){
+  const sm=situacaoMes(),r0=resumo(MES_ATUAL),mc=soMes(MES_ATUAL);
+  const porDataDesc=(a,b)=>b.data.localeCompare(a.data)||(b.criadoEm||0)-(a.criadoEm||0),porData=(a,b)=>a.data.localeCompare(b.data);
+  const row=(dt,em,txt,tag,v,cls,id)=>`<div class="sd-l sub${id?' det-click':''}"${id?` data-act="det-edit" data-id="${id}" role="button" tabindex="0" title="Abrir para editar"`:''}><span>${em||''} ${esc(txt)} <small class="mut">${dt?dataBR(dt):''}${tag?' · '+tag:''}</small></span><span><b class="${cls||''}">${R(v)}</b></span></div>`;
+  const tot=(t,v,cls)=>`<div class="sd-l tot"><span>${t}</span><span><b class="${cls}">${R(v)}</b></span></div>`;
+  const sec=(t,v,cls,linhas,vazio)=>`<div class="side-title" style="padding:10px 0 4px">${t}</div>${linhas||`<p class="mut" style="margin:4px 0">${vazio}</p>`}${tot('Total',v,cls)}`;
+  const entP=r0.ef.filter(i=>i.tipo==='entrada').sort(porDataDesc);
+  const gaP=r0.ef.filter(i=>i.tipo==='gasto').sort(porDataDesc);
+  const tagG=i=>i.cartao_id?(i.status==='comprometido'?'💳 no cartão, a pagar':'💳 fatura paga'):(NOME_MEIO[i.meio]||'saiu do caixa');
+  const lEnt=entP.map(i=>row(i.data,catVis(i).em,descVis(i),'recebido',i.valor,'pos',i.id)).join('');
+  const entF=sm.itens.filter(e=>e.entra).sort(porData);
+  const lEntF=entF.map(e=>row(e.data,e.em,e.txt,e.k||'previsto',e.valor,'pos',e.id&&!e.cartao?e.id:'')).join('');
+  const caixaP=gaP.filter(i=>!(i.cartao_id&&i.status==='comprometido')),cartP=gaP.filter(i=>i.cartao_id&&i.status==='comprometido');
+  const lCx=caixaP.map(i=>row(i.data,catVis(i).em,descVis(i),tagG(i),i.valor,'neg',i.id)).join('');
+  const lCt=cartP.map(i=>row(i.data,catVis(i).em,descVis(i),tagG(i),i.valor,'ref',i.id)).join('');
+  const saiF=sm.itens.filter(e=>e.sai).sort(porData);
+  const lSaiF=saiF.map(e=>row(e.data,e.em,e.txt,e.k||'',e.valor,'ref',e.id&&!e.cartao?e.id:'')).join('');
+  const atras=cent(sm.atrCartao+sm.atrContas);
+  const lAtr=atras>0.004?`<div class="sd-l"><span>Atrasado de meses anteriores</span><span><b class="neg">${R(atras)}</b></span></div>`:'';
+  const caixaTot=soma(caixaP),cartTot=soma(cartP);
+  let t,def,corpo,go='';
+  if(k==='jaEntrou'){t='Já entrou em '+mc;def='Tudo que vocês já receberam neste mês.';corpo=sec('Entradas recebidas',r0.entradas,r0.entradas>0?'pos':'zero',lEnt,'Nenhuma entrada recebida ainda.');go='entradas'}
+  else if(k==='aEntrar'){t='Ainda entra em '+mc;def='Salários e entradas previstos até o fim do mês, ainda não recebidos.';corpo=sec('Entradas previstas',sm.entra,sm.entra>0?'pos':'zero',lEntF,'Nada mais previsto para entrar.');go='calendario'}
+  else if(k==='jaSaiu'){t='Já saiu do caixa em '+mc;def='Gastos que realmente tiraram dinheiro da conta. Compras no cartão só saem quando a fatura é paga.';corpo=sec('Saíram do caixa',caixaTot,caixaTot>0?'neg':'zero',lCx,'Nada saiu do caixa ainda.');go='gastos'}
+  else if(k==='aSair'){t='Ainda sai em '+mc;def='Tudo que já é obrigação e ainda vai sair do caixa até o fim do mês: contas, faturas e parcelas.';corpo=sec('A pagar até o fim do mês',sm.sai,sm.sai>0?'ref':'zero',lSaiF+lAtr,'Nada mais a pagar.');go='calendario'}
+  else if(k==='entradas'){t='Entradas de '+mc;def='O que já entrou e o que ainda está previsto, lançamento por lançamento.';
+    corpo=sec('Já recebido',r0.entradas,r0.entradas>0?'pos':'zero',lEnt,'Nenhuma entrada recebida ainda.')+sec('Ainda a receber',sm.entra,sm.entra>0?'pos':'zero',lEntF,'Nada mais previsto.')+(S.rendaMedia>0?`<div class="sd-l"><span>Renda média definida</span><span><b class="ref">${R(S.rendaMedia)}</b></span></div>`:'');go='entradas'}
+  else {t='Gastos de '+mc;def='Tudo que vocês gastaram, independentemente da forma de pagamento, lançamento por lançamento.';
+    corpo=sec('Já saíram do caixa',caixaTot,caixaTot>0?'neg':'zero',lCx,'Nada saiu do caixa ainda.')+sec('No cartão, ainda a pagar',cartTot,cartTot>0?'ref':'zero',lCt,'Nenhuma compra no cartão pendente.')+tot('Total gasto',r0.gastos,'neg');go='gastos'}
+  modal(`<h2>${t}</h2><p class="mut" style="margin:-6px 0 10px">${def}</p><div class="sim-depois kpi-det fluxo-det">${corpo}</div><p class="mut" style="font-size:12.5px;margin:8px 0 0">Toque em um lançamento para editar.</p><div class="btns" style="margin-top:12px">${volta?`<button class="btn ghost" data-act="det-proj">← Projeção</button>`:`<button class="btn ghost" data-m="cancelar">Fechar</button>`}<button class="btn" data-go="${go}">Abrir</button></div>`);
 }
 /* de onde vem cada número da Visão geral */
 function modalKpi(k){
@@ -2484,7 +2516,10 @@ document.addEventListener('click',async e=>{
     case 'fatura-prev':if(cartao)modalPagPrev(cartao,a.dataset.fm);break;
     case 'patr-ini':modalPatrIni();break;
     case 'renda-media':modalRendaMedia();break;
-    case 'kpi-det':modalKpi(a.dataset.k);break;
+    case 'kpi-det':(a.dataset.k==='entradas'||a.dataset.k==='gastos')?modalFluxo(a.dataset.k):modalKpi(a.dataset.k);break;
+    case 'det-fluxo':modalFluxo(a.dataset.k,true);break;
+    case 'det-proj':modalProjecao();break;
+    case 'det-edit':{const it=S.itens.find(x=>x.id===a.dataset.id);if(it)modalLancamento(null,it)}break;
     case 'glossario':modalGlossario();break;
     case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
       if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');await recarregar();if(volta)abrirFaturas(volta.cartao,volta.fm)}}break;

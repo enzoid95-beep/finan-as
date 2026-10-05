@@ -1119,6 +1119,10 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .side-foot .tool-i svg{width:18px!important;height:18px!important}
 }
 @media (max-width:760px){.side{display:none!important}}
+.fact-click,.det-click{cursor:pointer;transition:background .15s}
+.fact-click:hover,.fact-click:focus-visible{background:rgba(255,255,255,.09)!important;outline:none}
+.det-click:hover,.det-click:focus-visible{background:rgba(255,255,255,.06);outline:none;border-radius:8px}
+.fluxo-det{max-height:52vh;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -1199,6 +1203,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>
