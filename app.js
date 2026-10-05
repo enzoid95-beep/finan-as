@@ -3,11 +3,12 @@ if(window.top!==window.self){try{window.top.location=window.self.location}catch(
 /* ================= dados fixos ================= */
 const CATS_G=[
   {id:'moradia',nome:'Moradia',em:'🏠'},{id:'contas',nome:'Contas da casa',em:'💡'},{id:'mercado',nome:'Mercado',em:'🛒'},
-  {id:'transporte',nome:'Transporte',em:'🚗'},{id:'saude',nome:'Saúde',em:'🩺'},{id:'educacao',nome:'Educação',em:'🎓'},
-  {id:'dividas',nome:'Dívidas e empréstimos',em:'🏦'},{id:'assinaturas',nome:'Assinaturas',em:'📺'},{id:'restaurantes',nome:'Restaurantes e delivery',em:'🍝'},
-  {id:'lazer',nome:'Lazer',em:'🎬'},{id:'compras',nome:'Compras pessoais',em:'🛍️'},{id:'viagens',nome:'Viagens',em:'✈️'},
+  {id:'restaurantes',nome:'Alimentação fora de casa',em:'🍽️'},{id:'transporte',nome:'Transporte',em:'🚗'},{id:'farmacia',nome:'Farmácia',em:'💊'},
+  {id:'saude',nome:'Saúde',em:'🩺'},{id:'educacao',nome:'Educação',em:'🎓'},{id:'dividas',nome:'Dívidas e empréstimos',em:'🏦'},
+  {id:'assinaturas',nome:'Assinaturas',em:'📺'},{id:'lazer',nome:'Lazer',em:'🎬'},{id:'compras',nome:'Compras pessoais',em:'🛍️'},
+  {id:'roupas',nome:'Roupas e acessórios',em:'👕'},{id:'beleza',nome:'Beleza',em:'💈'},{id:'viagens',nome:'Viagens',em:'✈️'},
   {id:'presentes',nome:'Presentes',em:'🎁'},{id:'impostos',nome:'Impostos e taxas',em:'🧾'},{id:'pets',nome:'Pets',em:'🐶'},
-  {id:'outros',nome:'Outros',em:'📦'}];
+  {id:'manutencao',nome:'Casa e manutenção',em:'🔧'},{id:'outros',nome:'Outros',em:'📦'}];
 const CATS_E=[{id:'salario',nome:'Salário',em:'💼'},{id:'extra',nome:'Renda extra',em:'✨'},{id:'outros-in',nome:'Outras entradas',em:'➕'}];
 const CAT=Object.fromEntries([...CATS_G,...CATS_E,{id:'meta',nome:'Metas',em:'🎯'},{id:'livre',nome:'Dinheiro pessoal',em:'💸'},{id:'investimentos',nome:'Investimentos',em:'📈'}].map(c=>[c.id,c]));
 const EMOJIS_META=['💍','🏡','🛟','✈️','🚗','🎓','👶','🐶','🛋️','🎯'];
@@ -132,7 +133,7 @@ const plural=(n,s,p)=>n+' '+(n===1?s:p);
 const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
 const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
-  fCat:'',fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
+  fCat:'',fOrd:(()=>{try{return localStorage.getItem('pf-ord')||'recente'}catch(e){return 'recente'}})(),fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
   pagPrev:{},temV12:false,patrIni:'',temPatr:false,rendaMedia:0,temRenda:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 
@@ -657,11 +658,16 @@ function tabela(itens,tipo){
 function filtrar(tipo){
   const b=S.fBusca.trim().toLowerCase();
   return doMes(S.mes).filter(i=>i.tipo===tipo&&efetivo(i)&&(!S.fCat||i.categoria===S.fCat)&&(!S.fTag||(i.tags||[]).includes(S.fTag))&&(!b||descVis(i).toLowerCase().includes(b)))
-    .sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm);
+    .sort(S.fOrd==='maior'?(a,b)=>b.valor-a.valor||b.data.localeCompare(a.data)
+      :S.fOrd==='menor'?(a,b)=>a.valor-b.valor||b.data.localeCompare(a.data)
+      :S.fOrd==='antigo'?(a,b)=>a.data.localeCompare(b.data)||a.criadoEm-b.criadoEm
+      :(a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm);
 }
+const ORDENS=[['recente','Mais recente → mais antigo'],['antigo','Mais antigo → mais recente'],['maior','Maior valor → menor valor'],['menor','Menor valor → maior valor']];
 function toolbar(cats){
   return `<div class="toolbar"><input class="field grow" id="fBusca" placeholder="Buscar pela descrição" value="${esc(S.fBusca)}">
-    <select class="field" id="fCat"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${c.id}" ${S.fCat===c.id?'selected':''}>${c.em} ${esc(c.nome)}</option>`).join('')}</select>${(()=>{const ts=[...new Set(doMes(S.mes).flatMap(i=>i.tags||[]))].sort();return ts.length?`<select class="field" id="fTag"><option value="">Todas as tags</option>${ts.map(t=>`<option value="${esc(t)}" ${S.fTag===t?'selected':''}>#${esc(t)}</option>`).join('')}</select>`:''})()}</div>`;
+    <select class="field" id="fCat"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${c.id}" ${S.fCat===c.id?'selected':''}>${c.em} ${esc(c.nome)}</option>`).join('')}</select>
+    <select class="field" id="fOrd" aria-label="Ordenar">${ORDENS.map(([v,t])=>`<option value="${v}" ${S.fOrd===v?'selected':''}>${t}</option>`).join('')}</select>${(()=>{const ts=[...new Set(doMes(S.mes).flatMap(i=>i.tags||[]))].sort();return ts.length?`<select class="field" id="fTag"><option value="">Todas as tags</option>${ts.map(t=>`<option value="${esc(t)}" ${S.fTag===t?'selected':''}>#${esc(t)}</option>`).join('')}</select>`:''})()}</div>`;
 }
 function vGastos(){
   const r=resumo(S.mes),ant=resumo(addMes(S.mes,-1)),lista=filtrar('gasto'),pc=porCategoria(r.it);
@@ -813,7 +819,7 @@ function vOrcamento(){
       <div class="oc-rcd"><span>Realizado <b class="${u.realizado>0?'neg':'zero'}">${R0(u.realizado)}</b></span><span>Comprometido <b class="${u.comprometido>0?'ref':'zero'}">${R0(u.comprometido)}</b></span><span>Disponível <b class="${lim?cS(disp):'zero'}">${lim?R0(disp):'—'}</b></span></div>
     </div>`}).join('');
   // 50/30/20 sobre as entradas previstas; sem entradas, não há base para percentual
-  const ess=['moradia','mercado','contas','transporte','saude','dividas','impostos'].reduce((s,k)=>s+(Number(pl.gastos[k])||0),0),des=totPl-ess,fut=entPl-totPl;
+  const ess=['moradia','mercado','contas','transporte','saude','farmacia','dividas','impostos'].reduce((s,k)=>s+(Number(pl.gastos[k])||0),0),des=totPl-ess,fut=entPl-totPl;
   const ref503020=entPl>0?pbar('Essenciais (até 50%)',pctF(ess/entPl),RF(R0(ess)),ess/entPl/.5,clsLim(ess/entPl/.5))
       +pbar('Estilo de vida (até 30%)',pctF(des/entPl),RF(R0(des)),des/entPl/.3,clsLim(des/entPl/.3))
       +pbar('Metas e reserva (20% ou mais)',pctF(Math.max(0,fut)/entPl),RF(R0(fut)),Math.max(0,fut)/entPl/.2)
@@ -1482,6 +1488,7 @@ function render(){
   const b=$('fBusca'),c=$('fCat');
   if(b)b.addEventListener('input',()=>{S.fBusca=b.value;clearTimeout(b._t);b._t=setTimeout(()=>{const pos=b.selectionStart;render();const nb=$('fBusca');nb.focus();nb.setSelectionRange(pos,pos)},250)});
   if(c)c.addEventListener('change',()=>{S.fCat=c.value;render()});
+  const fo=$('fOrd');if(fo)fo.addEventListener('change',()=>{S.fOrd=fo.value;try{localStorage.setItem('pf-ord',fo.value)}catch(e){}render()});
   const ft=$('fTag');if(ft)ft.addEventListener('change',()=>{S.fTag=ft.value;render()});
   const cc1=$('ccCartao'),cc2=$('ccPeriodo');
   if(cc1)cc1.addEventListener('change',()=>{S.ccF.cartao=cc1.value;render()});
