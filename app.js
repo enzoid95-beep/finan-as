@@ -86,7 +86,7 @@ const $=id=>document.getElementById(id);
 const brl=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const brl0=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
 const R=v=>brl.format(v||0);
-const R0=v=>Math.abs(v)>=10000?brl0.format(v):brl.format(v||0);
+const R0=v=>brl.format(v||0);
 const K=v=>{const a=Math.abs(v);return a>=1000?(a/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':Math.round(a).toLocaleString('pt-BR')};
 const KS=v=>{const a=Math.abs(v);return a>=1000?(a/1000).toLocaleString('pt-BR',{maximumFractionDigits:a>=10000?0:1})+'k':Math.round(a)};
 /* regra de cores: entrada verde, saída vermelha, saldo pelo sinal, referência dourada */
@@ -133,7 +133,7 @@ const plural=(n,s,p)=>n+' '+(n===1?s:p);
 const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
 const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
-  fCat:'',fOrd:(()=>{try{return localStorage.getItem('pf-ord')||'recente'}catch(e){return 'recente'}})(),fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
+  ordDes:(()=>{try{return localStorage.getItem('pf-ord-des')||'prioridade'}catch(e){return 'prioridade'}})(),fCat:'',fOrd:(()=>{try{return localStorage.getItem('pf-ord')||'recente'}catch(e){return 'recente'}})(),fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
   pagPrev:{},temV12:false,patrIni:'',temPatr:false,rendaMedia:0,temRenda:false,fut:[],card:[],fech:{},ccF:{cartao:'',periodo:6},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 
@@ -630,9 +630,9 @@ function vCalendario(){
   return head('Calendário','Tudo que entra e sai, dia a dia.',BTN('novo','Novo lançamento','data-tipo="gasto"'))+`
   <div class="tiles">
     <div class="tile"><div class="k">Entradas previstas no mês</div><div class="v pos">${R(entM)}</div><div class="d">${R0(entRec)} recebido + ${R0(entM-entRec)} previsto</div></div>
-    <div class="tile"><div class="k">Saídas no mês</div><div class="v neg">${R(saiM)}</div><div class="d">gastos, faturas e contas</div></div>
+    <div class="tile"><div class="k">${S.mes<MES_ATUAL?'Saídas no mês':'Saídas previstas no mês'}</div><div class="v neg">${R(saiM)}</div><div class="d">${S.mes<MES_ATUAL?'gastos, faturas e contas':'já pagas + ainda por pagar'}</div></div>
     <div class="tile"><div class="k">Ainda a pagar</div><div class="v ref">${R(pendM)}</div><div class="d">contas, faturas e parcelas</div></div>
-    <div class="tile">${selo(entM-saiM)}<div class="k">Resultado do mês</div><div class="v ${cS(entM-saiM)}">${R(entM-saiM)}</div><div class="d">entradas menos saídas do mês (não é o caixa)</div></div>
+    <div class="tile">${selo(entM-saiM)}<div class="k">${S.mes<MES_ATUAL?'Resultado do mês':'Resultado projetado do mês'}</div><div class="v ${cS(entM-saiM)}">${R(entM-saiM)}</div><div class="d">entradas menos saídas ${S.mes<MES_ATUAL?'do mês':'previstas'} (não é o caixa)</div></div>
   </div>
   <div class="cal-wrap">
     <div class="panel"><div class="cal">${cells}</div>
@@ -738,7 +738,7 @@ function vCartoes(){
   const maxP=Math.max(1,...prox.map(p=>p.v));
   const totalUsado=S.cartoes.reduce((s,c)=>s+usadoCartao(c.id),0),totalLim=S.cartoes.reduce((s,c)=>s+c.limite,0);
   const prox1=totalRef(addMes(MES_ATUAL,1)),atual=totalRef(MES_ATUAL),atualAb=totalRef(MES_ATUAL,true);
-  const vencDe=ref=>{const v=[...new Set(S.cartoes.map(c=>faturaRef(c,ref)).filter(f=>f.it.length).map(f=>dataBR(f.venc)))];return v.length?'vence '+v.join(' e '):''};
+  const vencDe=ref=>{const v=[...new Set(S.cartoes.map(c=>faturaRef(c,ref)).filter(f=>f.it.length).map(f=>f.venc))].sort().map(dataBR);return v.length>1?'vencimentos: '+v.join(' e '):v.length?'vence '+v[0]:''};
   const pctRenda=med.ent>0?Math.round(totalRef(addMes(MES_ATUAL,1),true)/med.ent*100):0;
   const pf=S.card.filter(x=>x.status==='comprometido'&&refDoItem(x)>addMes(MES_ATUAL,1)).reduce((s,x)=>s+x.valor,0);
   const grupos={};S.card.filter(x=>x.compra_id&&x.parcelas>1).forEach(x=>{(grupos[x.compra_id]=grupos[x.compra_id]||[]).push(x)});
@@ -892,7 +892,7 @@ function vContas(){
     ${nFora?`<button type="button" class="ct-tog" data-act="ct-fora" aria-pressed="${!!f.fora}">${f.fora?'🙈 Ocultar contas fora do mês':`👁 Mostrar contas fora do mês (${nFora})`}</button>`:''}
   </div>
   <div class="tiles">
-    <div class="tile"><div class="k">Saídas do mês</div><div class="v ${tot(sai)?'neg':'zero'}">${R(tot(sai))}</div><div class="d">${plural(sai.length,'conta','contas')}</div></div>
+    <div class="tile"><div class="k">Total previsto no mês</div><div class="v ${tot(sai)?'neg':'zero'}">${R(tot(sai))}</div><div class="d">${plural(sai.length,'conta','contas')} · pagas e a pagar</div></div>
     <div class="tile"><div class="k">Já realizado como despesa</div><div class="v ${pagas.length?'neg':'zero'}">${R(tot(pagas))}</div><div class="d">${pagas.length} de ${sai.length} · <b>${R0(tot(pagas)-tot(pagas.filter(noCartaoAberto)))}</b> já pago${tot(pagas.filter(noCartaoAberto))>0?` · <span class="ref">${R0(tot(pagas.filter(noCartaoAberto)))}</span> no cartão, ainda a pagar`:''}</div></div>
     <div class="tile"><div class="k">Ainda a pagar</div><div class="v ${faltaPagar>0?'ref':'zero'}">${R(faltaPagar)}</div><div class="d">${tot(sai.filter(x=>!pago(x)))>0&&tot(pagas.filter(noCartaoAberto))>0?`${R0(tot(sai.filter(x=>!pago(x))))} em contas + ${R0(tot(pagas.filter(noCartaoAberto)))} no cartão · `:''}${atras.length?`<span class="neg">${plural(atras.length,'atrasada','atrasadas')}</span>`:'nenhuma atrasada'}</div></div>
     <div class="tile"><div class="k">Entradas previstas</div><div class="v ${ent.length?'pos':'zero'}">${R(tot(ent))}</div><div class="d">${ent.filter(pago).length} de ${ent.length} recebidas</div></div>
@@ -1029,8 +1029,10 @@ function simHTML(){
 }
 function vDesejos(){
   const temV=S.temV4;
-  const abertos=S.desejos.filter(d=>d.status==='aberto').sort((a,b)=>a.prioridade-b.prioridade||a.valor-b.valor);
-  const feitos=S.desejos.filter(d=>d.status!=='aberto');
+  const ORD_D={prioridade:(a,b)=>a.prioridade-b.prioridade||a.valor-b.valor,menor:(a,b)=>a.valor-b.valor,maior:(a,b)=>b.valor-a.valor,nome:(a,b)=>a.nome.localeCompare(b.nome,'pt-BR')};
+  if(!ORD_D[S.ordDes])S.ordDes='prioridade';
+  const abertos=S.desejos.filter(d=>d.status==='aberto').sort(ORD_D[S.ordDes]);
+  const feitos=S.desejos.filter(d=>d.status!=='aberto').sort(ORD_D[S.ordDes]);
   const lst=S.abaDesejos==='aberto'?abertos:feitos,med=media();
   const PR={1:['p1','Alta'],2:['p2','Média'],3:['p3','Baixa']};
   return head('Desejos','Tudo que vocês querem conquistar, sem dívida.',temV&&!(S.abaDesejos==='aberto'&&!abertos.length)?BTN('des-novo','Novo desejo'):'',true)+`
@@ -1049,7 +1051,8 @@ function vDesejos(){
     <div class="tile"><div class="k">Viraram meta</div><div class="v">${feitos.filter(d=>d.status==='meta').length}</div><div class="d">em construção</div></div>
     <div class="tile"><div class="k">Conquistados</div><div class="v pos">${feitos.filter(d=>d.status==='comprado').length}</div><div class="d">desejos realizados</div></div>
   </div>`:''}
-  ${S.desejos.length?`<div class="seg-inline"><button data-act="des-aba" data-v="aberto" aria-pressed="${S.abaDesejos==='aberto'}">Na lista (${abertos.length})</button><button data-act="des-aba" data-v="feito" aria-pressed="${S.abaDesejos!=='aberto'}">Realizados e em meta (${feitos.length})</button></div>`:''}
+  ${S.desejos.length?`<div class="seg-inline"><button data-act="des-aba" data-v="aberto" aria-pressed="${S.abaDesejos==='aberto'}">Na lista (${abertos.length})</button><button data-act="des-aba" data-v="feito" aria-pressed="${S.abaDesejos!=='aberto'}">Realizados e em meta (${feitos.length})</button></div>
+  <div class="toolbar" style="margin:10px 0 0"><select class="field" id="dOrd" aria-label="Ordenar desejos">${[['prioridade','Prioridade'],['menor','Menor valor'],['maior','Maior valor'],['nome','Nome (A–Z)']].map(([v,t])=>`<option value="${v}" ${S.ordDes===v?'selected':''}>Ordenar: ${t}</option>`).join('')}</select></div>`:''}
   ${lst.length?`<div class="cards">${lst.map(d=>{const p=PR[d.prioridade]||PR[2];const meses=med.sobra>0?Math.ceil(d.valor/(med.sobra/2)):null;return `<div class="meta-card des-card pr-${p[0]}">
     <div class="meta-top"><div class="em">${esc(d.emoji)}</div><div style="min-width:0"><b>${esc(d.nome)}</b><small><span class="prio ${p[0]}">${p[1]}</span>${d.status==='meta'?' · virou meta':d.status==='comprado'?' · conquistado 🎉':''}</small></div>
       <span class="acts"><button class="ic" data-act="des-editar" data-id="${d.id}" aria-label="Editar">${svg('edit')}</button><button class="ic del" data-act="des-apagar" data-id="${d.id}" aria-label="Excluir">${svg('del')}</button></span></div>
@@ -1097,7 +1100,7 @@ function vRetro(){
   const h=`<div class="view-head"><div><h1>Relatório anual</h1><p>O ano de vocês em números.</p></div><div class="head-ctl">${nav}</div></div>`;
   let d=S.retro[ano];
   if(!d){carregarRetro(ano);return h+`<div class="panel">${vazio('Carregando o ano…','Juntando todos os lançamentos de '+ano+'.')}</div>`}
-  const d0=d;d=d.filter(x=>x.data<=HOJE);
+  const d0=d;d=d.filter(x=>x.data<=HOJE);const futG=cent(d0.filter(x=>x.data>HOJE&&x.tipo==='gasto').reduce((q,x)=>q+x.valor,0));
   if(!d.length)return h+`<div class="panel">${vazio('Nenhum lançamento em '+ano,'Quando houver lançamentos neste ano, a retrospectiva aparece aqui.')}</div>`;
   const f=(arr,t)=>arr.filter(x=>x.tipo===t).reduce((s,x)=>s+x.valor,0);
   const ent=f(d,'entrada'),gas=f(d,'gasto'),guard=f(d,'aporte')-f(d,'resgate');
@@ -1112,8 +1115,8 @@ function vRetro(){
   const taxa=ent>0?Math.round((ent-gas)/ent*100):0;
   return h+`
   <div class="hero"><div><div class="hero-kick"><span class="live"></span>${ano} em números</div><h1 class="${cS(ent-gas)}">${R(ent-gas)}${selo(ent-gas,{inl:1})}</h1>
-    <div class="hero-sub"><span>foi o que sobrou no ano, depois de todos os gastos</span></div>
-    <div class="hero-meta"><div><b class="pos">${R0(ent)}</b><span>Entrou</span></div><div><b class="neg">${R0(gas)}</b><span>Saiu em gastos</span></div><div><b class="${cS(guard)}">${R0(guard)}</b><span>Guardado em metas</span></div><div><b>${d.length}</b><span>Lançamentos</span></div></div></div>
+    <div class="hero-sub"><span>foi o que sobrou no ano até hoje (${dataBR(HOJE)}), depois de todos os gastos, cartão incluído</span>${futG>0.004?`<span>Fora desta conta: ${R0(futG)} em gastos com data futura (parcelas e pagamentos antecipados). O Resumo mensal conta esses valores no mês deles.</span>`:''}</div>
+    <div class="hero-meta"><div><b class="pos">${R0(ent)}</b><span>Entradas até hoje</span></div><div><b class="neg">${R0(gas)}</b><span>Gastos realizados até hoje</span></div><div><b class="${cS(guard)}">${R0(guard)}</b><span>Guardado em metas</span></div><div><b>${d.length}</b><span>Lançamentos</span></div></div></div>
     <div class="hero-side"><div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle cx="60" cy="60" r="54" fill="none" stroke="url(#gr2)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${2*Math.PI*54}" stroke-dashoffset="${2*Math.PI*54*(1-Math.max(0,Math.min(100,taxa))/100)}"/><defs><linearGradient id="gr2"><stop offset="0" stop-color="#e8a90c"/><stop offset="1" stop-color="#fff1b8"/></linearGradient></defs></svg><div class="rv">${taxa}%</div></div><div><b class="cond" style="font-size:19px">Taxa de economia</b><small>da renda do ano ficou com vocês</small></div></div>
   </div>
   <div class="tiles">
@@ -1344,6 +1347,10 @@ function vRelMes(){
   const linhaCmp=(k,a,b,inv)=>`<div class="sd-l"><span>${k}</span><span><b class="${inv?'neg':'pos'}">${R0(a)}</b> <span class="mut">vs ${R0(b)}</span> ${delta(a,b,inv)}</span></div>`;
   const orcRows=CATS_G.filter(c=>Number(pl[c.id])||pc[c.id]).map(c=>{const lim=Number(pl[c.id])||0,v=pc[c.id]||0;return `<tr class="row"><td>${c.em} ${esc(c.nome)}</td><td class="r vl ref">${lim?R0(lim):'—'}</td><td class="r vl ${v?'neg':'zero'}">${R0(v)}</td><td class="r vl ${lim?cS(lim-v):'zero'}">${lim?R0(lim-v):'—'}</td></tr>`}).join('');
   const emAndamento=m===MES_ATUAL&&!f;
+  const diaCmp=Math.min(Number(HOJE.slice(8,10)),ultimoDia(ant)),limAnt=ant+'-'+pad(diaCmp);
+  const somaT=(arr,t,lim)=>cent(arr.filter(i=>i.tipo===t&&(!lim||i.data<=lim)).reduce((q,i)=>q+i.valor,0));
+  const cmpE=emAndamento?somaT(r.ef,'entrada',HOJE):r.entradas,cmpEa=emAndamento?somaT(ra.ef,'entrada',limAnt):ra.entradas;
+  const cmpG=emAndamento?somaT(r.ef,'gasto',HOJE):r.gastos,cmpGa=emAndamento?somaT(ra.ef,'gasto',limAnt):ra.gastos;
   return head('Resumo mensal',`${esc(nomeMes(m))}${f?' · mês fechado em '+dataBR((f.criado_em||HOJE).slice(0,10)):emAndamento?' · <b class="ref">mês em andamento</b>':''}`,fechavel?(f?`<button class="btn ghost" data-act="reabrir-mes">Reabrir mês</button>`:`<button class="btn novo" data-act="fechar-mes">Fechar mês</button>`):'')+`
   ${f?`<div class="panel fech-p"><h2>🔒 Resumo salvo no fechamento</h2><p class="sub">Valores preservados como estavam em ${dataBR((f.criado_em||HOJE).slice(0,10))}</p><div class="facts" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
     ${[['Entradas',f.resumo.entradas,'pos'],['Gastos',f.resumo.gastos,'neg'],['Investimentos',f.resumo.investimentos,'ref'],['Metas',f.resumo.metas,'ref'],['Saldo final',f.resumo.saldo_final,null]].map(x=>`<div class="fact"><small>${x[0]}</small><b class="${x[2]||cS(x[1]||0)}">${x[1]==null?'—':R0(x[1])}</b></div>`).join('')}</div></div>`:''}
@@ -1354,8 +1361,8 @@ function vRelMes(){
     <div class="tile">${p?selo(p.caixa):''}<div class="k">${emAndamento?'Caixa atual':'Saldo final do mês'}</div><div class="v ${p?cS(p.caixa):'zero'}">${p?R(p.caixa):'…'}</div><div class="d">${emAndamento?'o mês ainda não terminou':'caixa no último dia'}</div></div>
   </div>
   <div class="grid g2">
-    <div class="panel"><h2>Comparativo</h2><p class="sub">${emAndamento?`${esc(nomeMes(m,true))} até ${dataBR(HOJE)} contra ${esc(nomeMes(ant,true))} completo`:`${esc(nomeMes(m,true))} contra ${esc(nomeMes(ant,true))}`}</p>
-      <div class="sim-depois">${linhaCmp('Entradas',r.entradas,ra.entradas)}${linhaCmp('Gastos',r.gastos,ra.gastos,true)}
+    <div class="panel"><h2>Comparativo</h2><p class="sub">${emAndamento?`${esc(nomeMes(m,true))} até ${dataBR(HOJE)} × ${esc(nomeMes(ant,true))} até ${dataBR(limAnt)}`:`${esc(nomeMes(m,true))} contra ${esc(nomeMes(ant,true))}`}</p>
+      <div class="sim-depois">${linhaCmp('Entradas',cmpE,cmpEa)}${linhaCmp('Gastos',cmpG,cmpGa,true)}
         <div class="sd-l"><span>Gastos vs média de 3 meses</span><span><b class="neg">${R0(r.gastos)}</b> <span class="mut">vs ${R0(mg)}</span> ${delta(r.gastos,mg,true)}</span></div>
         <div class="sd-l"><span>Categoria que mais cresceu</span><span>${cresceu?`${cresceu.c.em} ${esc(cresceu.c.nome)} <b class="neg">+${R0(cresceu.d)}</b>`:'<span class="mut">nenhuma</span>'}</span></div>
         <div class="sd-l"><span>Maior redução</span><span>${caiu?`${caiu.c.em} ${esc(caiu.c.nome)} <b class="pos">−${R0(-caiu.d)}</b>`:'<span class="mut">nenhuma</span>'}</span></div>
@@ -1488,6 +1495,7 @@ function render(){
   const b=$('fBusca'),c=$('fCat');
   if(b)b.addEventListener('input',()=>{S.fBusca=b.value;clearTimeout(b._t);b._t=setTimeout(()=>{const pos=b.selectionStart;render();const nb=$('fBusca');nb.focus();nb.setSelectionRange(pos,pos)},250)});
   if(c)c.addEventListener('change',()=>{S.fCat=c.value;render()});
+  const dO=$('dOrd');if(dO)dO.addEventListener('change',()=>{S.ordDes=dO.value;try{localStorage.setItem('pf-ord-des',dO.value)}catch(e){}render()});
   const fo=$('fOrd');if(fo)fo.addEventListener('change',()=>{S.fOrd=fo.value;try{localStorage.setItem('pf-ord',fo.value)}catch(e){}render()});
   const ft=$('fTag');if(ft)ft.addEventListener('change',()=>{S.fTag=ft.value;render()});
   const cc1=$('ccCartao'),cc2=$('ccPeriodo');
@@ -2024,7 +2032,7 @@ function modalGlossario(){
     ${d('Ainda a pagar','Tudo que já é obrigação e ainda não saiu do caixa: faturas, contas, parcelas e agendados.')}
     ${d('Vence hoje / em atraso','A parte do "ainda a pagar" que já venceu ou vence hoje.')}
     ${d('Em caixa','O dinheiro que está na conta agora.')}
-    ${d('Resultado do mês','Entradas menos saídas do mês. Não é o saldo da conta.')}
+    ${d('Resultado do mês','Entradas menos saídas do mês. No mês atual, o calendário mostra o “resultado projetado”, que inclui o que ainda vai entrar e sair. Não é o saldo da conta.')}
     ${d('Patrimônio líquido','Caixa + metas + investimentos − dívidas cadastradas.')}
   </div><div class="btns" style="margin-top:14px"><button class="btn" data-m="cancelar">Entendi</button></div>`);
 }
