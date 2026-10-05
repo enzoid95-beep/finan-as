@@ -1715,12 +1715,13 @@ function modalEditarLanc(item){
 function modalProjecao(){
   const sm=situacaoMes(),r0=resumo(MES_ATUAL),lp=linhasProjecao(sm),mc=soMes(MES_ATUAL),fim=MES_ATUAL+'-'+pad(ultimoDia(MES_ATUAL));
   const feitos=[...r0.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm);
+  const aCartaoMes=soma(r0.ef.filter(i=>i.tipo==='gasto'&&i.cartao_id&&i.status==='comprometido')),saiuCaixa=cent(r0.gastos-aCartaoMes);
   const fato=(t,v,c,s)=>`<div class="fact"><small>${t}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
   modal(`<h2>Projeção de ${esc(mc)}</h2>
     <div class="pj-facts">
       ${fato('Em caixa hoje',R(sm.caixa),cS(sm.caixa))}
       ${fato('Já entrou no mês',R(r0.entradas),r0.entradas?'pos':'zero')}
-      ${fato('Já gasto no mês',R(r0.gastos),r0.gastos?'neg':'zero','inclui compras no cartão')}
+      ${fato('Já saiu do caixa',R(saiuCaixa),saiuCaixa?'neg':'zero',aCartaoMes>0.004?`+ ${R0(aCartaoMes)} no cartão, a pagar na fatura`:'')}
       ${fato('Ainda entra',R(sm.entra),sm.entra?'pos':'zero','salários e entradas previstas')}
       ${fato('Ainda sai',R(sm.sai),sm.sai?'neg':'zero',`${R0(sm.aPagar)} vencidos ou de hoje · ${R0(sm.previsto)} até o fim do mês`)}
       ${fato('Previsão para '+dataBR(fim),R(sm.previsao),cS(sm.previsao),'caixa + o que entra − o que sai')}
@@ -1732,7 +1733,7 @@ function modalProjecao(){
         ${lp.map(l=>`<div class="tl-l"><span>${l.d?dataBR(l.d):'—'}</span><span class="tl-t" title="${esc(l.k||'')}">${l.ic?l.ic+' ':''}${esc(l.t)} <i class="${l.v>0?'pos':'neg'}">${l.v>0?'+':'−'}${R0(Math.abs(l.v))}</i></span><b class="${cS(l.s)}">${R0(l.s)}</b></div>`).join('')||'<p class="mut">Nada mais previsto.</p>'}
         <div class="tl-l tl-h"><span>${dataBR(fim)}</span><span>Final do mês</span><b class="${cS(sm.previsao)}">${R0(sm.previsao)}</b></div></div></div>
       <div><div class="side-title" style="padding:0 0 6px">Já aconteceu em ${esc(mc)}</div><div class="pj-lista">
-        ${feitos.length?feitos.map(i=>{const entra=i.tipo==='entrada'||i.tipo==='resgate',tr=i.tipo==='aporte';return `<div class="tl-l"><span>${dataBR(i.data)}</span><span class="tl-t">${catVis(i).em} ${esc(descVis(i))}${i.cartao_id?' · 💳':''}</span><b class="${entra?'pos':tr?'ref':'neg'}">${entra?'+':'−'}${R0(i.valor)}</b></div>`}).join(''):'<p class="mut">Nenhum lançamento ainda.</p>'}</div></div>
+        ${feitos.length?feitos.map(i=>{const entra=i.tipo==='entrada'||i.tipo==='resgate',tr=i.tipo==='aporte';return `<div class="tl-l"><span>${dataBR(i.data)}</span><span class="tl-t">${catVis(i).em} ${esc(descVis(i))}${i.cartao_id?(i.status==='comprometido'?' · 💳 no cartão, ainda não saiu do caixa':' · 💳'):''}</span><b class="${entra?'pos':tr?'ref':(i.cartao_id&&i.status==='comprometido'?'ref':'neg')}">${entra?'+':'−'}${R0(i.valor)}</b></div>`}).join(''):'<p class="mut">Nenhum lançamento ainda.</p>'}</div></div>
     </div>
     <div class="btns" style="margin-top:14px"><button class="btn ghost" data-go="calendario">Abrir calendário</button><button class="btn" data-m="cancelar">Fechar</button></div>`);
 }
