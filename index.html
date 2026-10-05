@@ -1097,7 +1097,8 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .bi-t b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bi-t small{color:var(--muted);font-size:12px}
 .bi-v{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
-/* ===== v38: barra lateral — sem sobreposição, maior e mais legível ===== */
+/* ===== v38: barra lateral (só tablet/desktop) ===== */
+@media (min-width:761px){
 :root{--side:276px}
 @media (max-width:1000px){:root{--side:248px}}
 .side{height:100vh!important;height:100dvh!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;gap:12px!important;padding:max(18px,env(safe-area-inset-top,0px)) 14px max(14px,env(safe-area-inset-bottom,0px))!important}
@@ -1119,6 +1120,8 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .side-foot .who span{font-size:12.5px!important}
 .side-foot .tool-i{width:36px!important;height:36px!important}
 .side-foot .tool-i svg{width:19px!important;height:19px!important}
+}
+@media (max-width:760px){.side{display:none!important}}
 </style>
 </head>
 <body>
@@ -1199,6 +1202,6 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>
