@@ -1309,6 +1309,29 @@ body *{text-shadow:none!important}
 @media(max-width:760px){.hero-v3 .kpis-bot{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-v3 .kpis-bot .kpi:last-child{grid-column:1/-1}}
 @media(max-width:420px){.hero-v3 .kpis-top{grid-template-columns:1fr}.hero-v3 .kpis-bot{grid-template-columns:1fr}.hero-v3 .kpis-bot .kpi:last-child{grid-column:auto}}
 body.priv .rs{filter:blur(8px)!important}
+/* v55: títulos dos cards maiores, com o restante reescalado em proporção */
+.kpi small{font-size:18px!important;font-weight:700!important;letter-spacing:.1px}
+.kpis-top .kpi b{font-size:36px}.kpis-bot .kpi b{font-size:28px}
+.kpi>span{font-size:15px!important}.kpi .lnk{font-size:13.5px}
+.tile .k{font-size:17px!important;font-weight:700!important}
+.tile .v{font-size:clamp(26px,2.6vw,34px)}
+.tile .d{font-size:14px}
+.ct-catl{font-size:17px!important;font-weight:700;letter-spacing:.1px}
+.ct-dia{font-size:15px}
+.ct-top .tag{font-size:12.5px}
+.ct-nome{font-size:18px}
+.ct-v{font-size:28px}
+.ct-meta .badge-s{font-size:12.5px}
+.ct-acts .lnk{font-size:14px}
+.oc-top b,.orc-page .oc-top b{font-size:17px!important}
+.oc-em,.orc-page .oc-em{font-size:21px!important}
+.orc-page .oc-val{font-size:26px}
+.meta-top b{font-size:25px}
+@media (max-width:760px){
+  .kpi small{font-size:15.5px!important}.kpis-top .kpi b{font-size:26px}.kpis-bot .kpi b{font-size:22px}.kpi>span{font-size:13.5px!important}
+  .tile .k{font-size:15px!important}.ct-catl{font-size:15px!important}.ct-nome{font-size:16px}.ct-v{font-size:23px}
+  .oc-top b,.orc-page .oc-top b{font-size:15px!important}.oc-em,.orc-page .oc-em{font-size:18px!important}
+}
 </style>
 </head>
 <body>
@@ -1389,6 +1412,6 @@ body.priv .rs{filter:blur(8px)!important}
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=53"></script>
+<script src="app.js?v=55"></script>
 </body>
 </html>
