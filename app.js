@@ -94,10 +94,13 @@ const cS=v=>v>0.004?'pos':v<-0.004?'neg':'zero';
 const RF=t=>`<span class="ref">${t}</span>`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
-const hojeD=new Date();
-const HOJE=`${hojeD.getFullYear()}-${pad(hojeD.getMonth()+1)}-${pad(hojeD.getDate())}`;
-const MES_ATUAL=HOJE.slice(0,7);
-const ANO_ATUAL=hojeD.getFullYear();
+let hojeD=new Date();
+let HOJE=`${hojeD.getFullYear()}-${pad(hojeD.getMonth()+1)}-${pad(hojeD.getDate())}`;
+let MES_ATUAL=HOJE.slice(0,7);
+let ANO_ATUAL=hojeD.getFullYear();
+function atualizarHoje(){hojeD=new Date();HOJE=`${hojeD.getFullYear()}-${pad(hojeD.getMonth()+1)}-${pad(hojeD.getDate())}`;MES_ATUAL=HOJE.slice(0,7);ANO_ATUAL=hojeD.getFullYear()}
+function dataValida(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const [y,m,d]=s.split('-').map(Number);return y>=1900&&y<=9999&&m>=1&&m<=12&&d>=1&&d<=ultimoDia(s.slice(0,7))}
+function mesValido(s){return /^\d{4}-(0[1-9]|1[0-2])$/.test(s)}
 function addMes(m,d){const [y,mm]=m.split('-').map(Number);const x=new Date(y,mm-1+d,1);return `${x.getFullYear()}-${pad(x.getMonth()+1)}`}
 function difMes(a,b){const [y1,m1]=a.split('-').map(Number),[y2,m2]=b.split('-').map(Number);return (y2-y1)*12+(m2-m1)}
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
@@ -111,8 +114,14 @@ function dataLonga(iso){const [y,m,d]=iso.split('-').map(Number);return new Date
 function diaSemana(iso){const [y,m,d]=iso.split('-').map(Number);return cap(new Date(y,m-1,d).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}))}
 function diasEntre(a,b){const p=s=>{const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)}
 function normNum(s){if(s.includes(','))return s.replace(/\./g,'').replace(',','.');if(/^\d{1,3}(\.\d{3})+$/.test(s))return s.replace(/\./g,'');return s}
-function parseValor(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;s=normNum(s);const n=Number(s);return isFinite(n)&&n>0?Math.round(n*100)/100:null}
-function parseLivre(s){s=String(s||'').trim().replace(/\s|R\$/g,'');if(!s)return null;const neg=s.startsWith('-');s=normNum(s.replace('-',''));const n=Number(s);return isFinite(n)?Math.round((neg?-n:n)*100)/100:null}
+function parseLivre(s){
+  s=String(s??'').trim().replace(/\s|R\$/g,'');if(!s)return null;
+  if(!/^-?(?:\d+(?:[.,]\d+)?|\d{1,3}(?:\.\d{3})+(?:,\d+)?)$/.test(s))return null;
+  const neg=s.startsWith('-'),n=Number(normNum(neg?s.slice(1):s));
+  const v=Math.round((n+Number.EPSILON)*100)/100;
+  return Number.isFinite(v)&&v<=9999999999.99?(neg?-v:v):null;
+}
+function parseValor(s){const v=parseLivre(s);return v!==null&&v>0?v:null}
 function fmtInput(v){return v||v===0?String(v).replace('.',','):''}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),t.length>60?4200:2600)}
 /* aviso com botão "Desfazer" por alguns segundos */
@@ -121,12 +130,12 @@ function toastDesfazer(t,desfazer){
   const d=document.createElement('div');d.className='toast toast-undo';
   const sp=document.createElement('span');sp.textContent=t;
   const b=document.createElement('button');b.type='button';b.textContent='Desfazer';
-  b.addEventListener('click',async()=>{b.disabled=true;try{await desfazer();d.remove();toast('Desfeito')}catch(e){b.disabled=false;toast('Não deu para desfazer agora.')}});
+  b.addEventListener('click',async()=>{b.disabled=true;try{await desfazer();await recarregar();d.remove();toast('Desfeito')}catch(e){b.disabled=false;toast('Não deu para desfazer agora.')}});
   d.append(sp,b);document.body.append(d);setTimeout(()=>d.remove(),9000);
 }
 const cent=v=>Math.round((v+Number.EPSILON)*100)/100;
 const soma=arr=>cent(arr.reduce((s,i)=>s+Math.round(i.valor*100),0)/100);
-const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g,()=>(Math.random()*16|0).toString(16)));
+const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3)|8).toString(16)}));
 const plural=(n,s,p)=>n+' '+(n===1?s:p);
 
 /* ================= estado ================= */
@@ -141,77 +150,129 @@ try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 function deLinha(r){return {id:r.id,tipo:r.tipo,valor:Number(r.valor),descricao:r.descricao||'',categoria:r.categoria,data:r.data,mes:r.data.slice(0,7),autor:r.autor_email,
   criadoEm:Date.parse(r.criado_em)||0,meta_id:r.meta_id||null,conta_id:r.conta_id||null,cartao_id:r.cartao_id||null,compra_id:r.compra_id||null,
   parcela:r.parcela||null,parcelas:r.parcelas||null,recorrente_id:r.recorrente_id||null,divida_id:r.divida_id||null,livre:!!r.livre||r.categoria==='livre',
-  status:r.status||'pago',data_caixa:r.data_caixa||null,fatura_mes:r.fatura_mes||null,meio:r.meio||'',ref_mes:r.ref_mes||null,investimento_id:r.investimento_id||null,editado:!!r.editado,tags:Array.isArray(r.tags)?r.tags:[],nota:r.nota||'',anexo:r.anexo||null,dono:r.dono||null}}
-async function carregarItens(){
-  const alvo=S.mes,menor=S.mes<MES_ATUAL?S.mes:MES_ATUAL,maior=S.mes>MES_ATUAL?S.mes:addMes(MES_ATUAL,1);
-  const ini=addMes(menor,-5)+'-01',fim=addMes(maior,1)+'-01';
-  const {data,error}=await sb.from('lancamentos').select('*').gte('data',ini).lt('data',fim);
-  if(alvo!==S.mes)return;
-  if(error){toast('Não deu para carregar os lançamentos.');return}
-  S.itens=(data||[]).map(deLinha);
+  status:r.status||'pago',data_caixa:r.data_caixa||null,fatura_mes:r.fatura_mes||null,meio:r.meio||'',ref_mes:r.ref_mes||null,investimento_id:r.investimento_id||null,principal_investido:r.principal_investido==null?null:Number(r.principal_investido),editado:!!r.editado,tags:Array.isArray(r.tags)?r.tags:[],nota:r.nota||'',anexo:r.anexo||null,dono:r.dono||null}}
+// Um pedido mantém o mesmo identificador nas tentativas após falha de rede.
+const pedidosPendentes=new Map();
+function op(tabela,acao,valores={},onde={},esperado){return {tabela,acao,valores,onde,...(esperado!==undefined?{esperado}:{})}}
+function chavePedido(operacoes){
+  const ids=new Map();operacoes.filter(o=>o.acao==='insert'&&o.valores?.id).forEach((o,i)=>ids.set(o.valores.id,'novo-'+i));operacoes.forEach((o,i)=>{const id=o.acao==='insert'&&o.valores?.compra_id;if(id&&!ids.has(id))ids.set(id,'compra-'+i)});
+  const limpar=(v,k='')=>{if(['atualizado_em','criado_em'].includes(k))return undefined;if(Array.isArray(v))return v.map(x=>limpar(x));if(v&&typeof v==='object')return Object.fromEntries(Object.keys(v).sort().map(k=>[k,limpar(v[k],k)]).filter(([,x])=>x!==undefined));return ids.get(v)||v};
+  return JSON.stringify(limpar(operacoes));
 }
-async function carregarResto(){
+async function transacao(operacoes){
+  const assinatura=chavePedido(operacoes);let pendente=pedidosPendentes.get(assinatura);if(!pendente){pendente={pedido:uuid(),operacoes};pedidosPendentes.set(assinatura,pendente)}
+  const {data,error}=await sb.rpc('controle360_transacao',{p_pedido:pendente.pedido,p_operacoes:pendente.operacoes});
+  if(error){if(['PGRST202','42883'].includes(error.code))throw new Error('Execute schema-v13-checkup.sql no SQL Editor do Supabase antes de usar esta operação.');throw error}
+  if(!Array.isArray(data))throw new Error('O servidor não confirmou a operação.');pedidosPendentes.delete(assinatura);return data;
+}
+async function inserirSeguro(tabela,reg){try{const resultado=await transacao((Array.isArray(reg)?reg:[reg]).map(x=>op(tabela,'insert',x,{},1)));return {data:resultado.flat(),error:null}}catch(error){return {data:null,error}}}
+function movimentoInvest(item,valor,excluir=false){
+  const x=S.invest.find(x=>x.id===item.investimento_id);if(!x)throw new Error('Atualize os dados para localizar o investimento.');
+  if(item.tipo==='resgate'&&item.principal_investido==null)throw new Error('Este resgate antigo não registra o principal. Para evitar inconsistências, corrija no banco o histórico e a posição do investimento juntos.');
+  const sinal=item.tipo==='aporte'?1:-1,ant=item.principal_investido??item.valor;
+  const principal=excluir?0:item.tipo==='aporte'?valor:cent(ant*valor/item.valor);
+  const novo=cent(x.valor+sinal*((excluir?0:valor)-item.valor)),aplicado=cent(x.aplicado+sinal*(principal-ant));
+  if(novo<0||aplicado<0)throw new Error('A alteração deixaria o investimento negativo. Confira os aportes e resgates.');
+  return {principal,operacao:op('investimentos','update',{valor:novo,aplicado},{id:x.id,valor:x.valor,aplicado:x.aplicado},1)};
+}
+async function lerTodos(criar,chave='id'){
+  const data=[];let inicio=0;
+  for(;;){
+    const r=await criar().order(chave,{ascending:true}).range(inicio,inicio+499);
+    if(r.error)return {data:null,error:r.error};
+    if(!Array.isArray(r.data))return {data:null,error:new Error('Resposta de dados inválida.')};
+    if(!r.data.length)return {data,error:null};
+    data.push(...r.data);inicio+=r.data.length;
+  }
+}
+function erroSchema(e){return !!e&&['42P01','42703','PGRST204','PGRST205'].includes(e.code)}
+function conferirLeitura(r,opcional=false){if(r.error&&!(opcional&&erroSchema(r.error)))throw r.error;return r}
+async function carregarItens(aplicar=true){
+  const usuario=S.me,alvo=S.mes,menor=S.mes<MES_ATUAL?S.mes:MES_ATUAL,maior=S.mes>MES_ATUAL?S.mes:addMes(MES_ATUAL,1);
+  const ini=addMes(menor,-5)+'-01',fim=addMes(maior,1)+'-01';
+  const {data,error}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').or(`and(data.gte.${ini},data.lt.${fim}),and(data_caixa.gte.${ini},data_caixa.lt.${fim}),and(status.eq.previsto,cartao_id.is.null,data.lt.${ini})`)));
+  if(alvo!==S.mes||usuario!==S.me)return;
+  const itens=data.map(deLinha);if(aplicar)S.itens=itens;return {mes:alvo,itens};
+}
+async function carregarResto(aplicar=true){
+  const destino=S,estado={};
   const q=t=>sb.from(t);
   const ini3=addMes(MES_ATUAL,-3)+'-01',fimAt=addMes(MES_ATUAL,1)+'-01';
   const r=await Promise.all([
-    q('metas').select('*').order('criado_em'),
+    lerTodos(()=>q('metas').select('*').order('criado_em')),
     q('config').select('*').eq('id','casal').maybeSingle(),
-    q('lancamentos').select('meta_id,tipo,valor,data').in('tipo',['aporte','resgate']).not('meta_id','is',null).eq('status','pago'),
-    q('lancamentos').select('id,tipo,valor,data_caixa').eq('status','pago').lte('data_caixa',HOJE),
-    q('lancamentos').select('tipo,valor,data,categoria,livre,status').in('status',['pago','comprometido']).gte('data',ini3).lt('data',fimAt),
-    q('cartoes').select('*').order('criado_em'),
-    q('recorrentes').select('*').order('dia'),
-    q('dividas').select('*').order('criado_em'),
-    q('desejos').select('*').order('criado_em'),
-    q('orcamentos').select('*'),
-    q('lancamentos').select('*').not('cartao_id','is',null),
-    q('lancamentos').select('divida_id,data,tipo').eq('tipo','divida').not('divida_id','is',null),
-    q('investimentos').select('*').order('data',{ascending:false}),
+    lerTodos(()=>q('lancamentos').select('meta_id,tipo,valor,data').in('tipo',['aporte','resgate']).not('meta_id','is',null).eq('status','pago').lte('data',HOJE)),
+    lerTodos(()=>q('lancamentos').select('id,tipo,valor,data_caixa').eq('status','pago').lte('data_caixa',HOJE)),
+    lerTodos(()=>q('lancamentos').select('tipo,valor,data,categoria,livre,status').in('status',['pago','comprometido']).gte('data',ini3).lt('data',fimAt)),
+    lerTodos(()=>q('cartoes').select('*').order('criado_em')),
+    lerTodos(()=>q('recorrentes').select('*').order('dia')),
+    lerTodos(()=>q('dividas').select('*').order('criado_em')),
+    lerTodos(()=>q('desejos').select('*').order('criado_em')),
+    lerTodos(()=>q('orcamentos').select('*'),'mes'),
+    lerTodos(()=>q('lancamentos').select('*').not('cartao_id','is',null)),
+    lerTodos(()=>q('lancamentos').select('divida_id,data,tipo').eq('tipo','divida').not('divida_id','is',null).eq('status','pago').lte('data',HOJE)),
+    lerTodos(()=>q('investimentos').select('*').order('data',{ascending:false})),
     q('lancamentos').select('status,fatura_mes').limit(1),
-    q('fechamentos').select('*'),
+    lerTodos(()=>q('fechamentos').select('*'),'mes'),
     q('lancamentos').select('tags').limit(1),
     q('recorrentes').select('dono,fim').limit(1)
   ]);
   const [mt,cf,mv,tot,base,cc,rc,dv,ds,orc,card,pd,inv,v9,fc,v10,v11]=r;
-  S.temV10=!v10.error;S.temV11=!v11.error;S.fech=Object.fromEntries((fc.data||[]).map(f=>[f.mes,f]));
-  S.temV9=!v9.error;S.temV2=!mt.error;S.temV4=!cc.error;S.temV5=!inv.error;S.temV6=true;S.temV8=true;
-  S.metas=(mt.data||[]).filter(m=>!m.arquivada).map(m=>({...m,alvo:Number(m.alvo)}));
-  S.limites=(cf.data&&cf.data.limites)||{};
-  S.mesadas=(cf.data&&cf.data.mesadas)||{};
-  S.temV12=!!(cf.data&&'pag_previstos' in cf.data);S.pagPrev=(cf.data&&cf.data.pag_previstos)||{};
-  S.temRenda=!!(cf.data&&'renda_media' in cf.data);S.rendaMedia=Number(cf.data&&cf.data.renda_media)||0;
-  S.temPatr=!!(cf.data&&'patr_inicial' in cf.data);S.patrIni=(cf.data&&cf.data.patr_inicial)||'';
-  S.saldoInicial=Number(cf.data&&cf.data.saldo_inicial)||0;
-  S.movMetas=(mv.data||[]).map(x=>({meta_id:x.meta_id,tipo:x.tipo,valor:Number(x.valor),mes:(x.data||'').slice(0,7)}));
-  S.movCaixa=(tot.data||[]).reduce((s,x)=>{const v=Number(x.valor);return s+(x.tipo==='entrada'||x.tipo==='resgate'?v:-v)},0);
-  S.base=(base.data||[]).map(x=>({tipo:x.tipo,valor:Number(x.valor),mes:x.data.slice(0,7),categoria:x.categoria,livre:!!x.livre}));
-  S.cartoes=(cc.data||[]).map(c=>({...c,limite:Number(c.limite)}));
-  S.recorrentes=(rc.data||[]).map(x=>({...x,valor:Number(x.valor),auto:x.auto!==false}));
-  S.contas=[];
-  S.dividas=(dv.data||[]).map(x=>({...x,parcela:Number(x.parcela),juros:Number(x.juros)||0}));
-  S.desejos=(ds.data||[]).map(x=>({...x,valor:Number(x.valor)}));
-  {const novo=Object.fromEntries((orc.data||[]).map(o=>[o.mes,{gastos:o.gastos||{},entradas:Number(o.entradas)||0}]));if((S._orcPend||0)>0&&S.orc[S.mes])novo[S.mes]=S.orc[S.mes];S.orc=novo;}
-  S.card=(card.data||[]).map(deLinha).filter(x=>x.status!=='cancelado');
-  S.pagDiv=(pd.data||[]).map(x=>({divida_id:x.divida_id,mes:x.data.slice(0,7)}));
-  if(!tot.error&&!card.error)S.assMov=JSON.stringify([...(tot.data||[]).filter(x=>['gasto','entrada'].includes(x.tipo)).map(x=>[x.id,x.tipo,Number(x.valor),x.data_caixa]),...(card.data||[]).filter(x=>x.tipo==='gasto'&&x.status==='comprometido'&&x.data<=HOJE).map(x=>[x.id,x.tipo,Number(x.valor),x.data,x.status])].sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
-  S.invest=(inv.data||[]).map(x=>{const v={...x,valor:Number(x.valor),aplicado:x.aplicado==null?Number(x.valor):Number(x.aplicado),produto:x.produto||''};if(INV_ANTIGO[v.tipo]){v.produto=v.produto||INV_ANTIGO[v.tipo];v.tipo='renda_fixa'}return v});
+  r.forEach((x,i)=>conferirLeitura(x,![1,2,3,4,10,11].includes(i)));
+  estado.temV10=!v10.error;estado.temV11=!v11.error;estado.fech=Object.fromEntries((fc.data||[]).map(f=>[f.mes,f]));
+  estado.temV9=!v9.error;estado.temV2=!mt.error;estado.temV4=!cc.error;estado.temV5=!inv.error;estado.temV6=true;estado.temV8=true;
+  estado.metas=(mt.data||[]).filter(m=>!m.arquivada).map(m=>({...m,alvo:Number(m.alvo)}));
+  estado.limites=(cf.data&&cf.data.limites)||{};
+  estado.mesadas=(cf.data&&cf.data.mesadas)||{};
+  estado.temV12=!!(cf.data&&'pag_previstos' in cf.data);estado.pagPrev=(cf.data&&cf.data.pag_previstos)||{};
+  estado.temRenda=!!(cf.data&&'renda_media' in cf.data);estado.rendaMedia=Number(cf.data&&cf.data.renda_media)||0;
+  estado.temPatr=!!(cf.data&&'patr_inicial' in cf.data);estado.patrIni=(cf.data&&cf.data.patr_inicial)||'';
+  estado.saldoInicial=Number(cf.data&&cf.data.saldo_inicial)||0;
+  estado.movMetas=(mv.data||[]).map(x=>({meta_id:x.meta_id,tipo:x.tipo,valor:Number(x.valor),mes:(x.data||'').slice(0,7)}));
+  estado.movCaixa=cent((tot.data||[]).reduce((s,x)=>{const v=Math.round(Number(x.valor)*100);return s+(x.tipo==='entrada'||x.tipo==='resgate'?v:-v)},0)/100);
+  estado.base=(base.data||[]).map(x=>({tipo:x.tipo,valor:Number(x.valor),mes:x.data.slice(0,7),categoria:x.categoria,livre:!!x.livre}));
+  estado.cartoes=(cc.data||[]).map(c=>({...c,limite:Number(c.limite)}));
+  estado.recorrentes=(rc.data||[]).map(x=>({...x,valor:Number(x.valor),auto:x.auto!==false}));
+  estado.contas=[];
+  estado.dividas=(dv.data||[]).map(x=>({...x,parcela:Number(x.parcela),juros:Number(x.juros)||0}));
+  estado.desejos=(ds.data||[]).map(x=>({...x,valor:Number(x.valor)}));
+  {const novo=Object.fromEntries((orc.data||[]).map(o=>[o.mes,{gastos:o.gastos||{},entradas:Number(o.entradas)||0}]));Object.keys(destino._orcPorMes||{}).filter(m=>destino._orcPorMes[m]>0).forEach(m=>{if(destino.orc[m])novo[m]=destino.orc[m]});estado._orcSalvo=Object.fromEntries((orc.data||[]).map(o=>[o.mes,{gastos:o.gastos||{},entradas:Number(o.entradas)||0}]));estado.orc=novo;}
+  estado.cardTodos=(card.data||[]).map(deLinha);estado.card=estado.cardTodos.filter(x=>x.status!=='cancelado');
+  estado.pagDiv=(pd.data||[]).map(x=>({divida_id:x.divida_id,mes:x.data.slice(0,7)}));
+  if(!tot.error&&!card.error)estado.assMov=JSON.stringify([...(tot.data||[]).filter(x=>['gasto','entrada'].includes(x.tipo)).map(x=>[x.id,x.tipo,Number(x.valor),x.data_caixa]),...(card.data||[]).filter(x=>x.tipo==='gasto'&&x.status==='comprometido'&&x.data<=HOJE).map(x=>[x.id,x.tipo,Number(x.valor),x.data,x.status])].sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+  estado.invest=(inv.data||[]).map(x=>{const v={...x,valor:Number(x.valor),aplicado:x.aplicado==null?Number(x.valor):Number(x.aplicado),produto:x.produto||''};if(INV_ANTIGO[v.tipo]){v.produto=v.produto||INV_ANTIGO[v.tipo];v.tipo='renda_fixa'}return v});  if(aplicar)Object.assign(destino,estado);return estado;
 }
+
+let cargaAtual=null,repetirCarga=false;
 async function recarregar(){
-  const permitirMovimento=!!S._movCarregado;
-  S.hist=null;S._histV=(S._histV||0)+1;S._histC=false;
-  await Promise.all([carregarItens(),carregarResto()]);
-  const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;
-  if(S.assMov!==undefined){S._movCarregado=true;S._ultimaAssMov=S.assMov}
-  render(mudou);
-  if(!gerando&&S.temV9){gerando=true;try{if(await gerarOcorrencias()>0){await Promise.all([carregarItens(),carregarResto()]);const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;S._ultimaAssMov=S.assMov;render(mudou)}}finally{gerando=false}}
+  repetirCarga=true;if(cargaAtual)return cargaAtual;
+  cargaAtual=(async()=>{
+    try{do{
+      repetirCarga=false;atualizarHoje();const alvo=S.mes,usuario=S.me;
+      const permitirMovimento=!!S._movCarregado;
+      const carregar=async()=>{
+        const [it,resto]=await Promise.all([carregarItens(false),carregarResto(false)]);
+        if(usuario!==S.me){repetirCarga=false;return false}if(alvo!==S.mes){repetirCarga=true;return false}
+        if(resto)Object.assign(S,resto);if(it)S.itens=it.itens;return true;
+      };
+      if(!await carregar())continue;
+      S.hist=null;S._histV=(S._histV||0)+1;S._histC=false;S.retro={};S._retroC={};S._retroV=(S._retroV||0)+1;
+      const pintar=()=>{const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;if(S.assMov!==undefined){S._movCarregado=true;S._ultimaAssMov=S.assMov}render(mudou)};
+      pintar();
+      if(!gerando&&S.temV9){gerando=true;try{if(await gerarOcorrencias()>0&&await carregar())pintar()}finally{gerando=false}}
+    }while(repetirCarga)}catch(e){toast('Não deu para atualizar os dados. Tente novamente; os valores anteriores foram preservados.');return false}
+    return true;
+  })().finally(()=>{cargaAtual=null});
+  return cargaAtual;
 }
 function agendar(){clearTimeout(timer);timer=setTimeout(()=>{if((S._orcEditando||0)>0||(S._orcPend||0)>0)return agendar();recarregar()},350)}
+setInterval(()=>{if(S.me&&!document.hidden){const d=new Date(),hoje=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;if(hoje!==HOJE)agendar()}},60000);
 function assinar(){
   if(canal)return;
   canal=sb.channel('caixa');
   ['lancamentos','config','metas','contas_fixas','cartoes','recorrentes','dividas','desejos','orcamentos','investimentos','fechamentos'].forEach(t=>canal.on('postgres_changes',{event:'*',schema:'public',table:t},agendar));
   canal.subscribe();
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)agendar()});
+  if(!S._visAssinada){S._visAssinada=true;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.me)agendar()})}
 }
 /* lança sozinho as recorrências que chegaram no dia (sem duplicar entre os dois celulares) */
 /* regras de contas e recorrências geram uma ocorrência por mês (mês atual e o próximo).
@@ -235,15 +296,18 @@ async function gerarOcorrencias(){
       novos.push(o);
     }
   }
-  if(novos.length){const {data,error}=await sb.from('lancamentos').upsert(novos,{onConflict:'recorrente_id,ref_mes',ignoreDuplicates:true}).select('id');if(!error&&data)n+=data.length}
+  if(novos.length){const {data,error}=await sb.from('lancamentos').upsert(novos,{onConflict:'recorrente_id,ref_mes',ignoreDuplicates:true}).select('id');if(error)throw error;if(data)n+=data.length}
   const autos=S.recorrentes.filter(r=>r.ativa&&r.auto);
-  const caixa=autos.filter(r=>!r.cartao_id).map(r=>r.id),cred=autos.filter(r=>r.cartao_id).map(r=>r.id);
-  if(caixa.length){const {data,error}=await sb.from('lancamentos').update({status:'pago'}).eq('status','previsto').in('recorrente_id',caixa).lte('data',HOJE).select('id');if(!error&&data)n+=data.length}
-  if(cred.length){const {data,error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('status','previsto').in('recorrente_id',cred).lte('data',HOJE).select('id');if(!error&&data)n+=data.length}
+  if(autos.length){
+    const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').eq('status','previsto').in('recorrente_id',autos.map(r=>r.id)).lte('data',HOJE)));
+    const atualizar=data.filter(x=>{const r=autos.find(r=>r.id===x.recorrente_id),mes=x.ref_mes||x.data.slice(0,7);return r&&mes>=r.inicio&&(!r.fim||mes<=r.fim)}).map(x=>op('lancamentos','update',x.cartao_id?{status:'comprometido',data_caixa:null}:{status:'pago',data_caixa:x.data},{id:x.id,status:'previsto'}));
+    // Blocos independentes: cada ocorrência é confirmada inteira e não duplica em outro aparelho.
+    for(let k=0;k<atualizar.length;k+=500){const resultado=await transacao(atualizar.slice(k,k+500));n+=resultado.reduce((s,a)=>s+a.length,0)}
+  }
   /* cobranças recorrentes no cartão sempre seguem a regra do fechamento: corrige as que ficaram com datas antigas do cartão */
-  for(const x of S.card.filter(x=>x.recorrente_id&&x.cartao_id&&x.status!=='pago')){
+  for(const x of S.card.filter(x=>x.recorrente_id&&x.cartao_id&&x.status!=='pago'&&!x.editado)){
     const card=S.cartoes.find(c=>c.id===x.cartao_id);if(!card)continue;const certo=mesFatura(card,x.data);
-    if(x.fatura_mes!==certo){const {error}=await sb.from('lancamentos').update({fatura_mes:certo}).eq('id',x.id);if(!error)n++}
+    if(x.fatura_mes!==certo){const {error}=await sb.from('lancamentos').update({fatura_mes:certo}).eq('id',x.id).eq('status',x.status).eq('editado',false);if(!error)n++}
   }
   return n;
 }
@@ -316,7 +380,7 @@ function outroLivre(i){return ehLivre(i)&&!!i.autor&&i.autor!==S.me}
 function catVis(i){return outroLivre(i)?CAT.livre:(CAT[i.categoria]||{em:'•',nome:i.categoria||''})}
 function descVis(i){const c=CAT[i.categoria]||{nome:''};if(outroLivre(i))return 'Dinheiro pessoal de '+nomeDe(i.autor);return i.descricao||c.nome}
 /* cartões */
-function mesFatura(card,dataISO){let fm=dataISO.slice(0,7);if(Number(dataISO.slice(8,10))>=card.fechamento)fm=addMes(fm,1);if(card.vencimento<=card.fechamento)fm=addMes(fm,1);return fm}
+function mesFatura(card,dataISO){let fm=dataISO.slice(0,7);if(dataISO>=diaNoMes(fm,card.fechamento))fm=addMes(fm,1);if(card.vencimento<=card.fechamento)fm=addMes(fm,1);return fm}
 function fechamentoFatura(card,fm){return diaNoMes(card.vencimento>card.fechamento?fm:addMes(fm,-1),card.fechamento)}
 function vencFatura(card,fm){return diaNoMes(fm,card.vencimento)}
 /* dia em que vocês pretendem pagar a fatura (só vale no mês do vencimento, enquanto não passou e não foi paga) */
@@ -345,7 +409,7 @@ function previstasFatura(card,fm){
     for(const m of [addMes(fm,-2),addMes(fm,-1),fm]){
       if(m<MES_ATUAL||r.inicio>m||(r.fim&&m>r.fim))continue;
       const d=diaNoMes(m,r.dia);if(mesFatura(card,d)!==fm)continue;
-      if(S.card.some(x=>x.recorrente_id===r.id&&x.ref_mes===m)||S.itens.some(x=>x.recorrente_id===r.id&&x.ref_mes===m))continue;
+      if((S.cardTodos||S.card).some(x=>x.recorrente_id===r.id&&x.ref_mes===m)||S.itens.some(x=>x.recorrente_id===r.id&&x.ref_mes===m))continue;
       out.push({id:'prev-'+r.id+'-'+m,descricao:r.descricao,valor:r.valor,data:d,categoria:r.categoria,dono:r.dono||null,prevista:true,recorrente_id:r.id,ref_mes:m,status:'previsto',autor:null,livre:false,cartao_id:card.id});
     }
   });
@@ -362,7 +426,7 @@ function faturaTotal(m){return S.card.filter(x=>x.fatura_mes===m).reduce((s,x)=>
 function saldoDevedor(d,rest){const i=(d.juros||0)/100;return rest<=0?0:i>0?d.parcela*(1-Math.pow(1+i,-rest))/i:d.parcela*rest}
 function infoDivida(d){
   const pagos=S.pagDiv.filter(p=>p.divida_id===d.id);
-  const pagas=Math.min(d.parcelas_total,d.pagas_inicial+pagos.length),rest=d.parcelas_total-pagas;
+  const pagas=Math.min(Number(d.parcelas_total),Number(d.pagas_inicial||0)+pagos.length),rest=d.parcelas_total-pagas;
   const pagaMes=pagos.some(p=>p.mes===S.mes),pagaAtual=pagos.some(p=>p.mes===MES_ATUAL);
   const sd=saldoDevedor(d,rest),i=(d.juros||0)/100,jurosProx=i>0?Math.min(d.parcela,sd*i):0;
   return {pagas,rest,saldo:sd,pagaMes,jurosProx,fim:rest>0?addMes(MES_ATUAL,pagaAtual?rest:rest-1):null};
@@ -593,22 +657,29 @@ function acaoEvento(e,cls='btn sm'){
 function eventosMes(m){
   const ev={};const add=(d,e)=>{(ev[d]=ev[d]||[]).push(e)};
   // lançamentos fora do cartão: realizados e previstos
-  S.itens.filter(i=>i.mes===m&&!i.cartao_id&&i.status!=='cancelado').forEach(i=>{
+  S.itens.filter(i=>(i.status==='pago'?(i.data_caixa||i.data).slice(0,7):i.mes)===m&&!i.cartao_id&&i.status!=='cancelado').forEach(i=>{
     const c=catVis(i),feito=i.status==='pago',entra=i.tipo==='entrada'||i.tipo==='resgate',sai=!entra;
     const reg=i.recorrente_id&&S.recorrentes.find(r=>r.id===i.recorrente_id);
     const tipoTxt={gasto:'Gasto'+(i.meio?' · '+(NOME_MEIO[i.meio]||i.meio):''),entrada:'Entrada',aporte:i.meta_id?'Transferência · guardar na meta':'Investimento · aporte',resgate:i.meta_id?'Transferência · resgate da meta':'Investimento · resgate',divida:'Pagamento de dívida'}[i.tipo]||'';
-    add(i.data,{em:c.em,txt:descVis(i),valor:i.valor,entra,sai,feito,id:i.id,transf:i.tipo==='aporte'||i.tipo==='resgate',
+    add(feito?(i.data_caixa||i.data):i.data,{em:c.em,txt:descVis(i),valor:i.valor,entra,sai,feito,id:i.id,transf:i.tipo==='aporte'||i.tipo==='resgate',
       k:tipoTxt+(feito?'':entra?' · previsto':' · a pagar'),ic:reg?(reg.auto?'🔁':'🏠'):(!feito?'📌':'')});
   });
-  // faturas no vencimento
-  S.cartoes.forEach(c=>{const f=infoFatura(c,m);if(!f.it.length)return;const pp=f.k==='paga'?null:pagPrevisto(c,m);
-    add(pp||f.venc,{em:'💳',txt:'Fatura '+c.nome+' ('+soMes(f.fech.slice(0,7))+')',valor:f.total,pend:f.aberto+f.prev,sai:true,feito:f.k==='paga',ic:'💳',cartao:c.id,fm:m,
-      k:'Pagamento de fatura · '+(f.k==='paga'?'paga':f.k==='atrasada'?'atrasada':f.k==='fechada'?'fechada, a pagar':'aberta, fecha '+dataBR(f.fech))+(pp?' · pagamento previsto, vence '+dataBR(f.venc):'')})});
+  // Compras no crédito saem do caixa na data do pagamento, incluindo pagamentos parciais.
+  S.cartoes.forEach(c=>{
+    const pagos={};S.card.filter(x=>x.cartao_id===c.id&&x.status==='pago').forEach(x=>{
+      const d=x.data_caixa||(x.fatura_mes?vencFatura(c,x.fatura_mes):x.data);if(d.slice(0,7)===m)(pagos[d]=pagos[d]||[]).push(x);
+    });
+    Object.entries(pagos).forEach(([d,it])=>add(d,{em:'💳',txt:'Fatura '+c.nome,valor:soma(it),sai:true,feito:true,ic:'💳',cartao:c.id,fm:it[0].fatura_mes,k:'Pagamento de fatura · paga'}));
+    const f=dadosFatura(c,m),pend=cent(f.aberto+infoFatura(c,m).prev+f.totalPrev);
+    if(pend<=0)return;const pp=pagPrevisto(c,m);
+    add(pp||f.venc,{em:'💳',txt:'Fatura '+c.nome+' ('+soMes(f.fech.slice(0,7))+')',valor:pend,pend,sai:true,feito:false,ic:'💳',cartao:c.id,fm:m,
+      k:'Pagamento de fatura · '+(f.k==='atrasada'?'atrasada':f.k==='fechada'?'fechada, a pagar':'aberta, fecha '+dataBR(f.fech))+(pp?' · pagamento previsto, vence '+dataBR(f.venc):'')});
+  });
   // parcela de dívida ainda não paga
   S.dividas.forEach(d=>{const inf=infoDivida(d);if(inf.rest<=0||S.pagDiv.some(p=>p.divida_id===d.id&&p.mes===m)||m<MES_ATUAL)return;if(difMes(MES_ATUAL,m)>=inf.rest)return;
     add(diaNoMes(m,d.dia),{em:'🏦',txt:'Parcela '+d.nome,valor:d.parcela,sai:true,divida:d.id,k:'Pagamento de dívida · a pagar',ic:'🏦'})});
   // regras que ainda não geraram ocorrência neste mês (meses mais distantes)
-  if(m>=MES_ATUAL)S.recorrentes.filter(r=>r.ativa&&r.inicio<=m&&!(r.fim&&m>r.fim)&&!ocorrencia(r,m)).forEach(r=>{const c=CAT[r.categoria]||{em:'🔁'};
+  if(m>=MES_ATUAL)S.recorrentes.filter(r=>r.ativa&&!r.cartao_id&&r.inicio<=m&&!(r.fim&&m>r.fim)&&!ocorrencia(r,m)).forEach(r=>{const c=CAT[r.categoria]||{em:'🔁'};
     add(diaNoMes(m,r.dia),{em:c.em,txt:r.descricao,valor:r.valor,entra:r.tipo==='entrada',sai:r.tipo==='gasto',k:r.tipo==='entrada'?'Entrada prevista':(r.cartao_id?'Compra recorrente no cartão · prevista':'Conta prevista'),ic:r.auto?'🔁':'🏠'})});
   return ev;
 }
@@ -1161,9 +1232,13 @@ function vLivre(){
 
 /* ================= retrospectiva ================= */
 async function carregarRetro(ano){
-  const {data,error}=await sb.from('lancamentos').select('*').gte('data',ano+'-01-01').lt('data',(ano+1)+'-01-01');
-  S.retro[ano]=error?[]:(data||[]).filter(x=>x.status!=='previsto'&&x.status!=='cancelado').map(x=>({...x,valor:Number(x.valor),mes:x.data.slice(0,7),autor:x.autor_email,livre:!!x.livre}));
-  if(S.view==='retro')render();
+  const versao=S._retroV||0;S._retroC=S._retroC||{};if(S._retroC[ano])return S._retroC[ano];
+  const promessa=(async()=>{try{
+    const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').gte('data',ano+'-01-01').lt('data',(Number(ano)+1)+'-01-01')));
+    if(versao!==(S._retroV||0))return false;
+    S.retro[ano]=data.filter(x=>x.status!=='previsto'&&x.status!=='cancelado').map(deLinha);if(S.view==='retro')render();return true;
+  }catch(e){toast('Não deu para carregar o ano. Tente atualizar novamente.');return false}
+  finally{if(versao===(S._retroV||0)&&S._retroC[ano]===promessa)delete S._retroC[ano]}})();S._retroC[ano]=promessa;return promessa;
 }
 function vRetro(){
   const ano=S.ano,nav=`<div class="mesnav"><button data-act="ano-1" aria-label="Ano anterior">‹</button><span>${ano}</span><button data-act="ano+1" aria-label="Próximo ano">›</button></div>`;
@@ -1381,9 +1456,18 @@ function animar(permitir=false){
 
 /* orçamento: clique no valor para editar; salva sozinho */
 let filaOrc=Promise.resolve();
-function salvarOrc(){S._orcPend=(S._orcPend||0)+1;const mes=S.mes,snap=JSON.parse(JSON.stringify(S.orc[mes]));
-  filaOrc=filaOrc.then(async()=>{const {error}=await sb.from('orcamentos').upsert({mes,gastos:snap.gastos,entradas:snap.entradas||0,atualizado_em:new Date().toISOString()});
-    if(error)toast(/orcamentos/.test(error.message||'')?'Falta rodar o schema-v4.sql no Supabase.':'Não deu para salvar agora.')}).finally(()=>{S._orcPend--});return filaOrc}
+function salvarOrc(mes=S.mes){
+  S._orcPend=(S._orcPend||0)+1;S._orcPorMes=S._orcPorMes||{};S._orcPorMes[mes]=(S._orcPorMes[mes]||0)+1;
+  S._orcVersao=S._orcVersao||{};const versao=S._orcVersao[mes]=(S._orcVersao[mes]||0)+1;
+  const snap=JSON.parse(JSON.stringify(S.orc[mes]));
+  filaOrc=filaOrc.catch(()=>{}).then(async()=>{try{
+    const {error}=await sb.from('orcamentos').upsert({mes,gastos:snap.gastos,entradas:snap.entradas||0,atualizado_em:new Date().toISOString()});
+    if(error)throw error;S._orcSalvo=S._orcSalvo||{};S._orcSalvo[mes]=snap;return true;
+  }catch(e){
+    if(S._orcVersao[mes]===versao){if(S._orcSalvo?.[mes])S.orc[mes]=JSON.parse(JSON.stringify(S._orcSalvo[mes]));else delete S.orc[mes];if(S.view==='orcamento')render()}
+    toast('Não deu para salvar o orçamento. A alteração não foi gravada.');return false;
+  }finally{S._orcPend--;S._orcPorMes[mes]--}});return filaOrc;
+}
 function ligarOrcamento(){
   const root=$('view');
   root.querySelectorAll('[data-orc-filter]').forEach(b=>b.addEventListener('click',()=>{
@@ -1399,27 +1483,29 @@ function ligarOrcamento(){
     card.addEventListener('click',e=>{if(e.target!==card){const control=e.target.closest('button,a,input,select');if(control&&control!==card)return;}e.stopPropagation();open()});
   });
   document.querySelectorAll('[data-orc-edit]').forEach(b=>b.addEventListener('click',()=>{
-    const k=b.dataset.orcEdit,pl0=planejado(S.mes),atual=k==='__ent'?(pl0.entradas||''):(pl0.gastos[k]||'');
+    const mes=S.mes,k=b.dataset.orcEdit,pl0=planejado(mes),atual=k==='__ent'?(pl0.entradas||''):(pl0.gastos[k]||'');
     const inp=document.createElement('input');inp.className='field oc-inp';inp.inputMode='decimal';inp.value=fmtInput(atual);inp.placeholder='0,00';
     b.replaceWith(inp);inp.focus();inp.select();S._orcEditando=(S._orcEditando||0)+1;
     let feito=false;
     const salvar=()=>{if(feito)return;feito=true;S._orcEditando--;
       const raw=inp.value.trim(),v=raw?parseValor(raw):null;
       if(raw&&!v){toast('Valor inválido. Use números como 800 ou 1.200,50.');render();return}
-      const pl=planejado(S.mes),g={...pl.gastos};let ent=pl.entradas||0;   // estado atual, não o do momento do clique
+      const pl=planejado(mes),g={...pl.gastos};let ent=pl.entradas||0;
       if(k==='__ent')ent=v||0;else if(v)g[k]=v;else delete g[k];
-      S.orc[S.mes]={gastos:g,entradas:ent};render();salvarOrc();};
+      S.orc[mes]={gastos:g,entradas:ent};render();salvarOrc(mes);};
     inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){feito=true;S._orcEditando--;render()}});
     inp.addEventListener('blur',salvar);
   }));
 }
 /* ================= relatórios ================= */
 async function carregarHist(){
-  if(S._histC)return;S._histC=true;const v0=S._histV=(S._histV||0)+1;
-  const {data,error}=await sb.from('lancamentos').select('tipo,valor,data,data_caixa,status,meta_id,investimento_id,divida_id,categoria,tags,livre').limit(20000);
-  S._histC=false;
-  if(v0!==S._histV)return; /* chegou uma resposta mais nova */
-  S.hist=error?[]:(data||[]).map(x=>({...x,valor:Number(x.valor)}));if(['relmes','patrimonio'].includes(S.view))render();
+  if(S._histC)return S._histProm;S._histC=true;const v0=S._histV=(S._histV||0)+1;
+  S._histProm=(async()=>{try{
+    const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*')));
+    if(v0!==S._histV)return false;
+    S.hist=data.map(x=>({...x,valor:Number(x.valor)}));if(['relmes','patrimonio'].includes(S.view))render();return true;
+  }catch(e){toast('Não deu para carregar o histórico. Tente atualizar novamente.');return false}
+  finally{if(v0===S._histV)S._histC=false}})();return S._histProm;
 }
 function fimMes(m){return m+'-'+pad(ultimoDia(m))}
 /* patrimônio no fim de um mês = caixa + metas + investimentos − dívidas */
@@ -1428,11 +1514,11 @@ function patrimonioEm(m){
   /* o mês atual usa o mesmo caixa da Visão geral: um conceito, um valor */
   const caixa=m===MES_ATUAL?cent(emCaixa()):cent(S.saldoInicial+H.filter(x=>x.status==='pago'&&x.data_caixa&&x.data_caixa<=fim).reduce((s,x)=>s+Math.round(sg(x)*100),0)/100);
   const metas=H.filter(x=>x.meta_id&&x.status==='pago'&&x.data<=fim).reduce((s,x)=>s+(x.tipo==='aporte'?x.valor:-x.valor),0);
-  const invest=S.invest.reduce((s,x)=>{if(m>=MES_ATUAL)return s+x.valor;const depois=H.filter(l=>l.investimento_id===x.id&&l.status==='pago'&&l.data>fim).reduce((a,l)=>a+(l.tipo==='aporte'?l.valor:-l.valor),0);
+  const invest=S.invest.reduce((s,x)=>{if(m>=MES_ATUAL)return s+x.valor;const depois=H.filter(l=>l.investimento_id===x.id&&l.status==='pago'&&l.data>fim).reduce((a,l)=>a+(l.tipo==='aporte'?(l.principal_investido??l.valor):-(l.principal_investido??l.valor)),0);
     /* com "patrimônio inicial" definido, o que foi cadastrado sem movimentar o caixa já existia nessa data */
     const de=(S.patrIni&&x.data&&S.patrIni<x.data)?S.patrIni:x.data;
     const v=(de&&de>fim&&!H.some(l=>l.investimento_id===x.id&&l.data<=fim))?0:x.aplicado-depois;return s+Math.max(0,v)},0);
-  const dividas=S.dividas.reduce((s,d)=>{const pagos=H.filter(l=>l.divida_id===d.id&&l.tipo==='divida'&&l.data<=fim).length;return s+saldoDevedor(d,Math.max(0,d.parcelas_total-d.pagas_inicial-pagos))},0);
+  const dividas=S.dividas.reduce((s,d)=>{const pagos=H.filter(l=>l.divida_id===d.id&&l.tipo==='divida'&&l.status==='pago'&&l.data<=fim&&l.data<=HOJE).length;return s+saldoDevedor(d,Math.max(0,d.parcelas_total-d.pagas_inicial-pagos))},0);
   return {caixa,metas,invest,dividas,liquido:cent(caixa+metas+invest-dividas)};
 }
 function vPatrimonio(){
@@ -1806,15 +1892,17 @@ $('mdl').addEventListener('click',async e=>{
   const b=e.target.closest('[data-m]');if(!b)return;
   if(b.dataset.m==='cancelar')return voltarOuFechar();
   if((b.dataset.m==='res-devolver'||b.dataset.m==='res-apagar')&&S._resExcluir){const {m,g}=S._resExcluir;b.disabled=true;let error;
-    if(b.dataset.m==='res-devolver'){({error}=await sb.from('lancamentos').insert({tipo:'resgate',valor:g,descricao:'Resgate: '+m.nome,categoria:'meta',data:HOJE,meta_id:m.id,status:'pago'}));
-      if(!error)({error}=await sb.from('metas').update(S.temV10?{arquivada:true,reserva:false}:{reserva:false}).eq('id',m.id))}
-    else({error}=await sb.from('metas').delete().eq('id',m.id));
+    try{if(b.dataset.m==='res-devolver')await transacao([
+      op('lancamentos','insert',{tipo:'resgate',valor:g,descricao:'Resgate: '+m.nome,categoria:'meta',data:HOJE,meta_id:m.id,status:'pago'}, {},1),
+      op('metas','update',S.temV10?{arquivada:true,reserva:false}:{reserva:false},{id:m.id},1)
+    ]);else{const r=await sb.from('metas').delete().eq('id',m.id);if(r.error)throw r.error}}catch(e){error=e}
     b.disabled=false;if(error){$('mdl').querySelector('.erro').textContent='Não deu para remover: '+error.message;return}
     S._resExcluir=null;fechar();toast(b.dataset.m==='res-devolver'?'Valor devolvido ao caixa e reserva removida':'Reserva e histórico apagados');recarregar();return}
   if(b.dataset.m==='ir-cartao'){const o={valor:parseValor(val('mValor')),desc:val('mDesc'),cat:sel('cat'),data:val('mData'),livre:!!$('mdl').querySelector('#mLivre')?.checked};return modalCompraCartao(o)}
   if(b.dataset.m==='salvar'&&onSave){
+    if(b.disabled)return;const salvar=onSave;
     const err=$('mdl').querySelector('.erro');err.textContent='';b.disabled=true;
-    try{const msg=await onSave();if(msg){err.textContent=msg}else{const v=S.fatVoltar;fechar();feedbackSalvo();await recarregar();if(v)abrirFaturas(v.cartao,v.fm)}}
+    try{const msg=await salvar();if(onSave!==salvar)return;if(msg){err.textContent=msg}else{const v=S.fatVoltar;fechar();feedbackSalvo();await recarregar();if(v)abrirFaturas(v.cartao,v.fm)}}
     catch(x){err.textContent='Não deu para salvar: '+(x&&x.message||'tente de novo.')}
     finally{b.disabled=false}
   }
@@ -1846,14 +1934,15 @@ function parseTags(s){return [...new Set(String(s||'').split(/[,;]+/).map(t=>t.t
 const extrasBox=(x)=>S.temV10?`<div class="fg extras"><label>Tags (opcional)<input class="field" id="mTags" maxlength="120" placeholder="Ex.: viagem, casamento" value="${esc((x&&x.tags||[]).join(', '))}"></label>
   <label>Observação (opcional)<input class="field" id="mNota" maxlength="200" placeholder="Algum detalhe para lembrar depois" value="${esc(x&&x.nota||'')}"></label>
   <label>Comprovante (opcional)<input class="field" id="mAnexo" type="file" accept="image/*,application/pdf">${x&&x.anexo?'<small class="mut">Já tem um arquivo anexado. Escolha outro para substituir.</small>':''}</label></div>`:'';
+const anexosEnviados=new WeakMap();
 async function lerExtras(){
   if(!S.temV10)return {};
   const o={tags:parseTags(val('mTags')),nota:val('mNota').trim().slice(0,200)};
   const f=$('mdl').querySelector('#mAnexo')?.files?.[0];
-  if(f){if(f.size>10*1024*1024)throw new Error('O comprovante pode ter no máximo 10 MB.');
+  if(f){if(anexosEnviados.has(f)){o.anexo=anexosEnviados.get(f);return o}if(f.size>10*1024*1024)throw new Error('O comprovante pode ter no máximo 10 MB.');
     const nome=f.name.normalize('NFD').replace(/[^\w.\-]+/g,'_').slice(-60),path=`${uuid()}/${nome}`;
     const {error}=await sb.storage.from('anexos').upload(path,f,{upsert:false,contentType:f.type||undefined});
-    if(error)throw new Error('Não deu para enviar o comprovante: '+error.message);o.anexo=path}
+    if(error)throw new Error('Não deu para enviar o comprovante: '+error.message);o.anexo=path;anexosEnviados.set(f,path)}
   return o;
 }
 const livreBox=(on)=>S.temV6?`<div id="livreWrap"><label class="chk"><input type="checkbox" id="mLivre" ${on?'checked':''}> 💸 Pago com meu dinheiro pessoal</label></div>`:'';
@@ -1885,12 +1974,13 @@ function modalLancamento(tipo,item,o={}){
     const meio=t==='gasto'?(sel('meio')||'pix'):'',credito=meio==='credito',status=credito?'comprometido':(d>HOJE?'previsto':(sel('situ')||'pago'));
     const dono=S.temV11&&sel('dono')?{dono:sel('dono')}:{};
     if(!valor)return 'Digite um valor maior que zero, por exemplo 45,90.';
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
+    if(!dataValida(d))return 'Escolha a data.';
     const livre=t==='gasto'&&!!$('mdl').querySelector('#mLivre')?.checked;
-    if(credito)return salvarCompraCredito({cardId:sel('cartao'),valor,n:parseInt(val('mParc'),10)||1,d,desc,categoria,livre,dono:sel('dono')||S.me,rec:!!$('mdl').querySelector('#mRec')?.checked,extras:await lerExtras(),after:o.after});
+    if(credito)return salvarCompraCredito({cardId:sel('cartao'),valor,n:Number(val('mParc')||1),d,desc,categoria,livre,dono:sel('dono')||S.me,rec:!!$('mdl').querySelector('#mRec')?.checked,extras:await lerExtras(),after:o.after,operacoesDepois:o.operacoesDepois});
     const ex=await lerExtras();
-    const {error}=await sb.from('lancamentos').insert({tipo:t,valor,descricao:desc,categoria,data:d,status,meio,...(livre?{livre:true}:{}),...dono,...ex});
-    if(error)throw error;
+    const reg={tipo:t,valor,descricao:desc,categoria,data:d,status,meio,...(livre?{livre:true}:{}),...dono,...ex};
+    if(o.operacoesDepois?.length)await transacao([op('lancamentos','insert',reg,{},1),...o.operacoesDepois]);
+    else await transacao([op('lancamentos','insert',reg,{},1)]);
     if(d.slice(0,7)!==S.mes)S.mes=d.slice(0,7);
     toast(status==='previsto'?'Agendado para '+dataBR(d)+` · ${R0(valor)} ainda não saiu do caixa`:t==='gasto'?`Gasto adicionado · caixa reduzido em ${R(valor)} (agora ${R(emCaixa()-valor)})`:`Entrada registrada · caixa aumentou ${R(valor)} (agora ${R(emCaixa()+valor)})`);
     if(o.after)await o.after();
@@ -1900,18 +1990,19 @@ function modalLancamento(tipo,item,o={}){
 async function salvarCompraCredito(c){
   const card=S.cartoes.find(x=>x.id===c.cardId);
   if(!card)return 'Escolham o cartão.';
-  const n=Math.max(1,Math.min(48,c.n||1)),dono=S.temV11&&c.dono?{dono:c.dono}:{};
+  const n=Number(c.n||1);if(!Number.isInteger(n)||n<1||n>48)return 'Informe de 1 a 48 parcelas.';if(Math.round(c.valor*100)<n)return 'Cada parcela precisa ter pelo menos R$ 0,01.';if(!dataValida(c.d))return 'Escolha uma data válida.';const dono=S.temV11&&c.dono?{dono:c.dono}:{};
   if(c.rec){
     if(n>1)return 'Uma compra recorrente é cobrada uma vez por mês: deixem 1 parcela.';
     const ini=c.d.slice(0,7),reg={tipo:'gasto',descricao:c.desc||CAT[c.categoria].nome,categoria:c.categoria,valor:c.valor,dia:Number(c.d.slice(8,10)),inicio:ini,ativa:true,auto:true,meio:'credito',cartao_id:card.id,...dono};
+    if(c.restantes&&(!Number.isInteger(c.restantes)||c.restantes<1||c.restantes>120))return 'Informe de 1 a 120 cobranças.';
     if(c.restantes){if(!S.temV11)return 'Falta rodar o arquivo schema-v11.sql no Supabase para limitar os meses.';reg.fim=addMes(ini,c.restantes-1)}
-    const r=await sb.from('recorrentes').insert(reg);
+    const r=c.operacoesDepois?.length?{data:await transacao([op('recorrentes','insert',reg,{},1),...c.operacoesDepois])}:await inserirSeguro('recorrentes',reg);
     if(r.error){if(/cartao_id|meio/.test(r.error.message||''))return 'Falta rodar o arquivo schema-v10.sql no Supabase.';if(/dono|fim/.test(r.error.message||''))return 'Falta rodar o arquivo schema-v11.sql no Supabase.';throw r.error}
     toast('Compra recorrente criada: entra todo mês na fatura do '+card.nome+(c.restantes?` (${c.restantes} cobranças)`:''));
   }else{
     const linhas=parcelasCompra(card,c.valor,n,c.d,c.fm).map(p=>({tipo:'gasto',valor:p.valor,descricao:(c.desc||CAT[c.categoria].nome)+(n>1?` (${p.k}/${n})`:''),categoria:c.categoria,data:p.data,
       cartao_id:card.id,compra_id:p.compra,parcela:p.k,parcelas:n,fatura_mes:p.fm,status:'comprometido',meio:'credito',...(c.livre?{livre:true}:{}),...(c.extras||{}),...dono}));
-    const {error}=await sb.from('lancamentos').insert(linhas);if(error){if(/dono/.test(error.message||''))return 'Falta rodar o arquivo schema-v11.sql no Supabase.';throw error}
+    if(c.operacoesDepois?.length)await transacao([...linhas.map(l=>op('lancamentos','insert',l,{},1)),...c.operacoesDepois]);else await transacao(linhas.map(l=>op('lancamentos','insert',l,{},1)));
     toast(n>1?`Compra lançada em ${n}x de ${R(linhas[n>1?1:0].valor)}`:`Compra lançada · fatura de ${soMes(refDe(card,linhas[0].fatura_mes))} agora ${R(infoFatura(card,linhas[0].fatura_mes).total+soma(linhas))} (vence ${dataBR(vencFatura(card,linhas[0].fatura_mes))})`);
   }
   if(['contas','gastos','orcamento','calendario'].includes(S.view)&&c.d.slice(0,7)!==S.mes)S.mes=c.d.slice(0,7);
@@ -1937,25 +2028,27 @@ function modalCompraCartao(o={}){
     ${extrasBox()}
     ${btns('Lançar compra')}`,
   async()=>{
-    const valor=parseValor(val('mValor')),d=val('mData'),rest=parseInt(val('mRest'),10)||0;
-    if(!valor)return 'Digite o valor da compra.';if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
-    return salvarCompraCredito({cardId:sel('cartao'),valor,n:parseInt(val('mParc'),10)||1,d,fm:$('mdl').querySelector('#mFat').value,desc:val('mDesc').trim().slice(0,70),categoria:sel('cat'),dono:sel('dono'),
-      livre:!!$('mdl').querySelector('#mLivre')?.checked,rec:!!$('mdl').querySelector('#mRec')?.checked,restantes:rest,extras:await lerExtras(),after:o.after});
+    const valor=parseValor(val('mValor')),d=val('mData'),rest=Number(val('mRest')||0);
+    if(!valor)return 'Digite o valor da compra.';if(!dataValida(d))return 'Escolha a data.';
+    return salvarCompraCredito({cardId:sel('cartao'),valor,n:Number(val('mParc')||1),d,fm:$('mdl').querySelector('#mFat').value,desc:val('mDesc').trim().slice(0,70),categoria:sel('cat'),dono:sel('dono'),
+      livre:!!$('mdl').querySelector('#mLivre')?.checked,rec:!!$('mdl').querySelector('#mRec')?.checked,restantes:rest,extras:await lerExtras(),after:o.after,operacoesDepois:o.operacoesDepois});
   });
   let manual=!!o.fm;
   const fatSel=$('mdl').querySelector('#mFat');fatSel.addEventListener('change',()=>{manual=true;upd()});
   const upd=()=>{const card=S.cartoes.find(c=>c.id===sel('cartao')),v=parseValor(val('mValor')),rec=$('mdl').querySelector('#mRec').checked,n=rec?1:Math.max(1,Math.min(48,parseInt(val('mParc'),10)||1)),d=val('mData');const el=$('mdl').querySelector('#cpResumo');
     $('mdl').querySelector('#mParc').disabled=rec;$('mdl').querySelector('#restWrap').hidden=!rec;$('mdl').querySelector('#fatWrap').hidden=rec;
-    if(card&&/^\d{4}-\d{2}-\d{2}$/.test(d)){const keep=manual?fatSel.value:null;fatSel.innerHTML=opcoesFatura(card,d,keep)}
-    if(!card||!v||!/^\d{4}-\d{2}-\d{2}$/.test(d)){el.innerHTML='<span class="mut">Preencham o valor para ver onde a compra cai.</span>';return}
-    const fm=rec?null:fatSel.value,ps=parcelasCompra(card,v,n,d,fm),rst=parseInt(val('mRest'),10)||0;
+    if(card&&dataValida(d)){const keep=manual?fatSel.value:null;fatSel.innerHTML=opcoesFatura(card,d,keep)}
+    if(!card||!v||!dataValida(d)){el.innerHTML='<span class="mut">Preencham o valor para ver onde a compra cai.</span>';return}
+    if(Math.round(v*100)<n){el.textContent='Cada parcela precisa ter pelo menos R$ 0,01.';return}
+    const fm=rec?null:fatSel.value,ps=parcelasCompra(card,v,n,d,fm),rst=Number(val('mRest')||0);
     el.innerHTML=rec?`<div class="sd-l"><span>Conta como gasto</span><span><b class="neg">${R(v)} por mês</b> · ${rst?`${rst} cobranças, de ${mesAno(d.slice(0,7))} a ${mesAno(addMes(d.slice(0,7),rst-1))}`:'a partir de '+mesAno(d.slice(0,7))}</span></div><div class="sd-l"><span>Primeira fatura</span><span>de <b class="ref">${soMes(refDe(card,ps[0].fm))}</b> · vence ${dataBR(vencFatura(card,ps[0].fm))}</span></div><div class="sd-l"><span>Caixa hoje</span><span><b class="pos">não muda</b> · sai ao pagar cada fatura</span></div>`
      :`<div class="sd-l"><span>Conta como gasto em</span><span><b class="neg">${n>1?R(ps[0].valor)+' por mês':R(v)}</b> · ${n>1?mesAno(ps[0].data.slice(0,7))+' a '+mesAno(ps[n-1].data.slice(0,7)):mesAno(d.slice(0,7))}</span></div>
       <div class="sd-l"><span>${n>1?'Primeira fatura':'Fatura'}</span><span>de <b class="ref">${soMes(refDe(card,ps[0].fm))}</b> · fecha ${dataBR(fechamentoFatura(card,ps[0].fm))} · vence ${dataBR(vencFatura(card,ps[0].fm))}</span></div><div class="sd-l"><span>Caixa hoje</span><span><b class="pos">não muda</b> · sai ao pagar a fatura</span></div>`};
   ['mValor','mParc','mData','mRest'].forEach(id=>$('mdl').querySelector('#'+id).addEventListener('input',upd));$('mdl').querySelector('#mRec').addEventListener('change',upd);$('mdl').querySelector('[data-g="cartao"]').addEventListener('click',()=>{manual=false;setTimeout(upd,0)});upd();
 }
 function parcelasCompra(card,valor,n,d,fmEscolhida){
-  const fm0=fmEscolhida||mesFatura(card,d),compra=uuid(),base=Math.floor(valor/n*100)/100,resto=Math.round((valor-base*n)*100)/100,dia=Number(d.slice(8,10));
+  if(!Number.isInteger(n)||n<1||n>48||Math.round(valor*100)<n)throw new Error('Parcelamento inválido.');
+  const fm0=fmEscolhida||mesFatura(card,d),compra=uuid(),total=Math.round(valor*100),base=Math.floor(total/n)/100,resto=(total-Math.round(base*100)*n)/100,dia=Number(d.slice(8,10));
   return [...Array(n)].map((_,k)=>({k:k+1,compra,valor:Math.round((base+(k===0?resto:0))*100)/100,data:diaNoMes(addMes(d.slice(0,7),k),dia),fm:addMes(fm0,k)}));
 }
 /* editar um lançamento existente: vale só para ele */
@@ -1972,14 +2065,15 @@ function modalEditarLanc(item){
     ${extrasBox(item)}
     ${btns('Salvar alterações')}`,
   async()=>{
-    const valor=parseValor(val('mValor')),d=val('mData');if(!valor)return 'Digite um valor válido.';if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
+    const valor=parseValor(val('mValor')),d=val('mData');if(!valor)return 'Digite um valor válido.';if(!dataValida(d))return 'Escolha a data.';
     const up={valor,descricao:val('mDesc').trim().slice(0,80),data:d};if(sel('cat'))up.categoria=sel('cat');
     if(item.tipo==='gasto'&&$('mdl').querySelector('#mLivre'))up.livre=!!$('mdl').querySelector('#mLivre').checked;
     if(item.recorrente_id&&(valor!==item.valor||d!==item.data))up.editado=true;
     if(item.status==='pago'&&!item.cartao_id&&d!==item.data)up.data_caixa=d;
     if(item.cartao_id&&d!==item.data){const cd=S.cartoes.find(c=>c.id===item.cartao_id);if(cd&&item.fatura_mes===mesFatura(cd,item.data))up.fatura_mes=mesFatura(cd,d)}
     Object.assign(up,await lerExtras());
-    const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast('Lançamento atualizado');
+    if(item.investimento_id&&efetivo(item)){const mov=movimentoInvest(item,valor);up.principal_investido=mov.principal;await transacao([mov.operacao,op('lancamentos','update',up,{id:item.id,valor:item.valor,status:item.status},1)])}
+    else{const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error}toast('Lançamento atualizado');
   });
 }
 /* "+ Novo": um só lugar para registrar qualquer fato financeiro */
@@ -2063,9 +2157,9 @@ function modalMeta(m){
   async()=>{
     const nome=val('mNome').trim(),alvo=parseValor(val('mAlvo'));
     if(!nome)return 'Dê um nome para a meta.';if(!alvo)return 'Digite o valor que vocês querem juntar.';
-    const reg={nome,emoji:sel('emoji')||'🎯',alvo,prazo:val('mPrazo')||null};
+    const prazo=val('mPrazo');if(prazo&&!dataValida(prazo))return 'Escolha um prazo válido.';const reg={nome,emoji:sel('emoji')||'🎯',alvo,prazo:prazo||null};
     if(S.temV4)reg.reserva=!!$('mdl').querySelector('#mRes')?.checked;
-    const {error}=m?await sb.from('metas').update(reg).eq('id',m.id):await sb.from('metas').insert(reg);
+    const {error}=m?await sb.from('metas').update(reg).eq('id',m.id):await inserirSeguro('metas',reg);
     if(error)throw error;toast(m?'Meta atualizada':'Meta criada');
   });
 }
@@ -2078,10 +2172,9 @@ function modalAporte(m,tipo){
     ${btns(tipo==='aporte'?'Guardar':'Resgatar')}`,
   async()=>{
     const valor=parseValor(val('mValor')),d=val('mData');
-    if(!valor)return 'Digite um valor maior que zero.';
+    if(!valor)return 'Digite um valor maior que zero.';if(!dataValida(d))return 'Escolha uma data válida.';
     if(tipo==='resgate'&&valor>g+0.001)return 'O valor é maior do que está guardado nesta meta.';
-    const {error}=await sb.from('lancamentos').insert({tipo,valor,descricao:(tipo==='aporte'?'Guardado: ':'Resgate: ')+m.nome,categoria:'meta',data:d,meta_id:m.id});
-    if(error)throw error;toast(tipo==='aporte'?'Dinheiro guardado':'Resgate registrado');
+    const operacao=op('lancamentos','insert',{tipo,valor,descricao:(tipo==='aporte'?'Guardado: ':'Resgate: ')+m.nome,categoria:'meta',data:d,meta_id:m.id,status:d>HOJE?'previsto':'pago'}, {},1);if(tipo==='resgate'&&d<=HOJE){operacao.meta_saldo_antes=g;operacao.ate=HOJE}await transacao([operacao]);toast(tipo==='aporte'?'Dinheiro guardado':'Resgate registrado');
   });
 }
 function modalExcluirReserva(m,g){
@@ -2104,12 +2197,12 @@ function modalReserva(){
     ${btns('Criar reserva')}`,
   async()=>{
     const alvo=parseValor(val('mAlvo')),ja=parseValor(val('mJa'));
-    if(!alvo)return 'Digite quanto querem juntar na reserva.';
-    const reg={nome:'Reserva de emergência',emoji:'🛟',alvo};if(S.temV4)reg.reserva=true;
-    const {data,error}=await sb.from('metas').insert(reg).select('id');
-    if(error)throw error;
-    if(ja&&data&&data[0]){const r=await sb.from('lancamentos').insert({tipo:'aporte',valor:ja,descricao:'Já guardado: Reserva de emergência',categoria:'meta',data:HOJE,meta_id:data[0].id});if(r.error)throw r.error;
-      await sb.from('config').upsert({id:'casal',saldo_inicial:Math.round((S.saldoInicial+ja)*100)/100,atualizado_em:new Date().toISOString()})}
+    if(!alvo)return 'Digite quanto querem juntar na reserva.';if(val('mJa').trim()&&!ja)return 'O valor já guardado está inválido.';
+    const reg={id:uuid(),nome:'Reserva de emergência',emoji:'🛟',alvo};if(S.temV4)reg.reserva=true;
+    const operacoes=[op('metas','insert',reg,{},1)];
+    if(ja){operacoes.push(op('lancamentos','insert',{tipo:'aporte',valor:ja,descricao:'Já guardado: Reserva de emergência',categoria:'meta',data:HOJE,meta_id:reg.id,status:'pago'}, {},1));
+      operacoes.push(op('config','upsert',{id:'casal',saldo_inicial:cent(S.saldoInicial+ja),atualizado_em:new Date().toISOString()},{saldo_inicial:S.saldoInicial},1))}
+    await transacao(operacoes);
     toast('Reserva criada');
   });
 }
@@ -2145,11 +2238,13 @@ function modalInvest(x){
     if(!t.produtos&&!nome)return `Informe o ${t.lbl.toLowerCase()}.`;
     if(!aplicado)return 'Digite o valor aplicado.';
     if(atualTxt&&!valor)return 'O valor atual está inválido.';
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
+    if(!dataValida(d))return 'Escolha a data.';
     const reg={tipo,produto,valor,nome,instituicao:val('mInst').trim(),data:d};if(S.temV8)reg.aplicado=aplicado;
-    const {data:novo,error}=x?await sb.from('investimentos').update(reg).eq('id',x.id).select('id'):await sb.from('investimentos').insert(reg).select('id');
-    if(error){if(/produto|investimentos_tipo_check|check constraint/.test(error.message||''))return 'Falta rodar o arquivo schema-v7.sql no Supabase.';if(/investimentos/.test(error.message||''))return 'Falta rodar o arquivo schema-v5.sql no Supabase.';throw error}
-    if(!x&&sel('origem')!=='ja'&&novo&&novo[0]){const r2=await sb.from('lancamentos').insert({tipo:'aporte',valor:aplicado,descricao:'Investido: '+(produto||nome||t.nome),categoria:'investimentos',data:d,investimento_id:novo[0].id,status:d<=HOJE?'pago':'previsto'});if(r2.error)throw r2.error}
+    if(!x&&d>HOJE)return 'Cadastre investimentos realizados até hoje.';
+    if(x)await transacao([op('investimentos','update',reg,{id:x.id,valor:x.valor,aplicado:x.aplicado},1)]);
+    else{reg.id=uuid();const operacoes=[op('investimentos','insert',reg,{},1)];
+      if(sel('origem')!=='ja')operacoes.push(op('lancamentos','insert',{tipo:'aporte',valor:aplicado,principal_investido:aplicado,descricao:'Investido: '+(produto||nome||t.nome),categoria:'investimentos',data:d,investimento_id:reg.id,status:'pago'}, {},1));
+      await transacao(operacoes)}
     toast(x?'Investimento atualizado':'Investimento adicionado');
   });
 }
@@ -2161,11 +2256,13 @@ function modalMovInvest(x,tipo){
     <label>Valor (R$)<input class="field big" id="mValor" inputmode="decimal" placeholder="0,00"></label>
     <label>Data<input class="field" id="mData" type="date" value="${HOJE}"></label>${btns(tipo==='aporte'?'Aportar':'Resgatar')}`,
   async()=>{
-    const v=parseValor(val('mValor')),d=val('mData');if(!v)return 'Digite o valor.';if(tipo==='resgate'&&v>x.valor+0.001)return 'O valor é maior que a posição atual.';
+    const v=parseValor(val('mValor')),d=val('mData');if(!v)return 'Digite o valor.';if(!dataValida(d)||d>HOJE)return 'Escolha uma data válida até hoje.';if(tipo==='resgate'&&v>x.valor+0.001)return 'O valor é maior que a posição atual.';
     const prop=tipo==='resgate'&&x.valor>0?x.aplicado/x.valor:1;
     const novoValor=Math.round((x.valor+(tipo==='aporte'?v:-v))*100)/100,novoApl=Math.max(0,Math.round((x.aplicado+(tipo==='aporte'?v:-v*prop))*100)/100);
-    const r1=await sb.from('investimentos').update({valor:novoValor,aplicado:novoApl}).eq('id',x.id);if(r1.error)throw r1.error;
-    const r2=await sb.from('lancamentos').insert({tipo,valor:v,descricao:(tipo==='aporte'?'Investido: ':'Resgate: ')+(x.produto||x.nome||t.nome),categoria:'investimentos',data:d,investimento_id:x.id,status:'pago'});if(r2.error)throw r2.error;
+    await transacao([
+      op('investimentos','update',{valor:novoValor,aplicado:novoApl},{id:x.id,valor:x.valor,aplicado:x.aplicado},1),
+      op('lancamentos','insert',{tipo,valor:v,principal_investido:tipo==='aporte'?v:cent(x.aplicado-novoApl),descricao:(tipo==='aporte'?'Investido: ':'Resgate: ')+(x.produto||x.nome||t.nome),categoria:'investimentos',data:d,investimento_id:x.id,status:'pago'}, {},1)
+    ]);
     toast(tipo==='aporte'?'Aporte registrado':'Resgate registrado');
   });
 }
@@ -2177,9 +2274,9 @@ function modalConfirmarOc(item){
     <label>Data do ${ent?'recebimento':'pagamento'}<input class="field" id="mData" type="date" value="${HOJE}" max="${HOJE}"></label>
     <p class="mut" style="font-size:13px;margin:-6px 0 14px">${item.recorrente_id?'Mudar o valor aqui vale só para este mês.':''} ${ent?'O valor entra no caixa.':item.cartao_id?'O valor entra na fatura do cartão; o caixa só muda ao pagar a fatura.':'O valor sai do caixa e conta no orçamento.'}</p>${btns(ent?'Confirmar':'Marcar como paga')}`,
   async()=>{
-    const v=parseValor(val('mValor')),d=val('mData');if(!v)return 'Digite o valor.';if(d>HOJE)return 'A data não pode ser no futuro.';
+    const v=parseValor(val('mValor')),d=val('mData');if(!v)return 'Digite o valor.';if(!dataValida(d))return 'Escolha uma data válida.';if(d>HOJE)return 'A data não pode ser no futuro.';
     const up=item.cartao_id?{status:'comprometido',valor:v}:{status:'pago',valor:v,data_caixa:d};if(v!==item.valor&&item.recorrente_id)up.editado=true;if(!item.recorrente_id&&!item.cartao_id)up.data=d;
-    const {error}=await sb.from('lancamentos').update(up).eq('id',item.id);if(error)throw error;toast(ent?`Recebimento confirmado · caixa aumentou ${R(v)}`:item.cartao_id?`Lançado na fatura do cartão · o caixa só muda ao pagar a fatura`:`Pagamento registrado · caixa reduzido em ${R(v)}`);
+    await transacao([op('lancamentos','update',up,{id:item.id,status:item.status,valor:item.valor},1)]);toast(ent?`Recebimento confirmado · caixa aumentou ${R(v)}`:item.cartao_id?`Lançado na fatura do cartão · o caixa só muda ao pagar a fatura`:`Pagamento registrado · caixa reduzido em ${R(v)}`);
   });
 }
 /* data prevista de pagamento: só muda onde a fatura aparece no Calendário e na Projeção; o caixa muda ao pagar */
@@ -2190,7 +2287,7 @@ function modalPagPrev(card,fm){
     <label>Quando vocês pretendem pagar<input class="field" id="mData" type="date" value="${atual||''}"></label>
     <p class="mut" style="font-size:13px;margin:-6px 0 14px">Vale entre hoje e o dia do vencimento, dentro de ${esc(soMes(mesV))}. Deixe em branco para voltar à data de vencimento. O caixa só muda quando vocês usarem <b>Pagar fatura</b>.</p>${btns('Salvar')}`,
   async()=>{const d=val('mData');
-    if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||d<HOJE||d>f.venc))return 'Escolha uma data entre hoje e '+dataBR(f.venc)+'.';
+    if(d&&(!dataValida(d)||d<HOJE||d>f.venc))return 'Escolha uma data entre hoje e '+dataBR(f.venc)+'.';
     const novo={...S.pagPrev},k=card.id+'|'+fm;if(d)novo[k]=d;else delete novo[k];
     const {error}=await sb.from('config').upsert({id:'casal',pag_previstos:novo,atualizado_em:new Date().toISOString()});if(error)throw error;
     S.pagPrev=novo;toast(d?'Pagamento previsto para '+dataBR(d):'Voltou para o vencimento');});
@@ -2202,7 +2299,7 @@ function modalPatrIni(){
     <label>Esse patrimônio já existia desde<input class="field" id="mData" type="date" value="${S.patrIni||''}"></label>
     <p class="mut" style="font-size:13px;margin:-6px 0 14px">Use o dia em que vocês começaram a usar o site (por exemplo 01/09/2026). Deixe em branco para voltar a contar só a partir do cadastro.</p>${btns('Salvar')}`,
   async()=>{const d=val('mData');
-    if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||d>HOJE))return 'Escolha uma data que já passou.';
+    if(d&&(!dataValida(d)||d>HOJE))return 'Escolha uma data que já passou.';
     const {error}=await sb.from('config').upsert({id:'casal',patr_inicial:d||null,atualizado_em:new Date().toISOString()});if(error)throw error;
     S.patrIni=d;toast(d?'Patrimônio inicial definido':'Patrimônio inicial removido');});
 }
@@ -2302,7 +2399,7 @@ function modalBusca(){
     <div class="btns"><button class="btn ghost" data-m="cancelar">Fechar</button></div>`);
   const q=$('mdl').querySelector('#bQ');let t=null,seq=0;
   setTimeout(()=>q.focus(),60);
-  q.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>buscar(q.value,++seq,()=>seq),260)});
+  q.addEventListener('input',()=>{clearTimeout(t);const meu=++seq;t=setTimeout(()=>buscar(q.value,meu,()=>seq),260)});
 }
 async function buscar(txt,meu,atual){
   const box=$('bRes');if(!box)return;
@@ -2312,7 +2409,7 @@ async function buscar(txt,meu,atual){
   const my=nq.match(/\b(20\d\d)\b/);if(my){ano=Number(my[1]);nq=nq.replace(my[0],' ')}
   MESES_BUSCA.forEach((n,i)=>{if(mes===null&&new RegExp('\\b'+n+'\\b').test(nq)){mes=i+1;nq=nq.replace(n,' ')}});
   nq=nq.replace(/\s+/g,' ').trim();
-  const limpo=nq.replace(/[,()%*]/g,' ').replace(/\s+/g,' ').trim();
+  const limpo=nq.replace(/[,().:%*\\"']/g,' ').replace(/\s+/g,' ').trim();
   const numTxt=/^[\d.,]+$/.test(nq)?normNum(nq):null,num=numTxt&&isFinite(Number(numTxt))&&Number(numTxt)>0?Number(numTxt):null;
   const cats=Object.entries(CAT).filter(([id,c])=>limpo&&(semAcento(c.nome).includes(limpo)||id===limpo)).map(([id])=>id);
   let qr=sb.from('lancamentos').select('*').neq('status','cancelado').order('data',{ascending:false}).limit(80);
@@ -2320,7 +2417,7 @@ async function buscar(txt,meu,atual){
     if(mes!==null){const a=`${y}-${pad(mes)}-01`,b=mes===12?`${y+1}-01-01`:`${y}-${pad(mes+1)}-01`;qr=qr.gte('data',a).lt('data',b)}else qr=qr.gte('data',`${y}-01-01`).lt('data',`${y+1}-01-01`)}
   if(limpo){const f=[`descricao.ilike.%${limpo}%`];if(cats.length)f.push(`categoria.in.(${cats.join(',')})`);if(num!==null)f.push(`valor.eq.${num}`);qr=qr.or(f.join(','))}
   const {data,error}=await qr;
-  if(meu!==undefined&&atual&&meu!==atual())return;
+  if($('bRes')!==box||(meu!==undefined&&atual&&meu!==atual()))return;
   if(error){box.innerHTML='<p class="mut">Não deu para buscar agora. Tentem de novo.</p>';return}
   const itens=(data||[]).map(deLinha);
   const extras=[];
@@ -2346,10 +2443,10 @@ function modalPagarFatura(card,fm){
     <div class="sim-depois" style="margin-bottom:14px"><div class="sd-l"><span>Caixa hoje</span><span>${R(emCaixa())}</span></div><div class="sd-l"><span>Caixa após o pagamento</span><span><b class="${cS(depois)}">${R(depois)}</b></span></div></div>
     <ul class="cons"><li>A fatura será marcada como paga.</li><li>Nenhuma nova despesa será criada: os gastos do mês não mudam.</li>${depois<0?'<li class="neg">O caixa ficará negativo.</li>':''}</ul>
     <label>Data do pagamento<input class="field" id="mData" type="date" value="${HOJE}" max="${HOJE}"></label>${btns('Pagar fatura')}`,
-  async()=>{const d=val('mData');if(d>HOJE)return 'A data não pode ser no futuro.';
-    const {data,error}=await sb.from('lancamentos').update({status:'pago',data_caixa:d}).eq('cartao_id',card.id).eq('fatura_mes',fm).eq('status','comprometido').select('id');if(error)throw error;
-    if(!data||!data.length)return 'Esta fatura já foi paga. Atualize a tela para ver.';
-    toastDesfazer(`Fatura paga · caixa reduzido em ${R(f.aberto)} (agora ${R(depois)})`,async()=>{const r=await sb.from('lancamentos').update({status:'comprometido',data_caixa:null}).in('id',data.map(x=>x.id));if(r.error)throw r.error});});
+  async()=>{const d=val('mData');if(!dataValida(d))return 'Escolha uma data válida.';if(d>HOJE)return 'A data não pode ser no futuro.';
+    const pagar=op('lancamentos','update',{status:'pago',data_caixa:d},{cartao_id:card.id,fatura_mes:fm,status:'comprometido'});pagar.total_antes=f.aberto;
+    const [data]=await transacao([pagar]);if(!data.length)return 'Esta fatura já foi paga. Atualize a tela para ver.';
+    toastDesfazer(`Fatura paga · caixa reduzido em ${R(f.aberto)} (agora ${R(depois)})`,async()=>{await transacao(data.map(x=>op('lancamentos','update',{status:'comprometido',data_caixa:null},{id:x.id,status:'pago',data_caixa:d,valor:Number(x.valor)})))});});
 }
 function modalPagarDivida(dv){
   const inf=infoDivida(dv),juros=Math.round(inf.jurosProx*100)/100,principal=Math.round((dv.parcela-juros)*100)/100;
@@ -2358,10 +2455,10 @@ function modalPagarDivida(dv){
       <div class="sd-l"><span>Abate a dívida</span><span><b class="ref">${R(principal)}</b></span></div>${juros?`<div class="sd-l"><span>Juros (conta como gasto)</span><span><b class="neg">${R(juros)}</b></span></div>`:''}
       <div class="sd-l"><span>Saldo devedor</span><span>${R0(inf.saldo)} → <b>${R0(Math.max(0,inf.saldo-principal))}</b></span></div></div>
     <label>Data do pagamento<input class="field" id="mData" type="date" value="${S.mes===MES_ATUAL?HOJE:diaNoMes(S.mes,dv.dia)}"></label>${btns('Pagar parcela')}`,
-  async()=>{const d=val('mData');
+  async()=>{const d=val('mData');if(!dataValida(d)||d>HOJE)return 'Escolha uma data válida até hoje.';if(inf.rest<=0)return 'Esta dívida já está quitada.';
     const regs=[{tipo:'divida',valor:principal,descricao:'Parcela: '+dv.nome,categoria:'dividas',data:d,divida_id:dv.id,status:'pago'}];
     if(juros>0)regs.push({tipo:'gasto',valor:juros,descricao:'Juros: '+dv.nome,categoria:'dividas',data:d,divida_id:dv.id,status:'pago'});
-    const {error}=await sb.from('lancamentos').insert(regs);if(error)throw error;toast('Parcela paga');});
+    const operacoes=regs.map(x=>op('lancamentos','insert',x,{},1));operacoes[0].pagamentos_antes=S.pagDiv.filter(x=>x.divida_id===dv.id).length;operacoes[0].ate=HOJE;await transacao(operacoes);toast('Parcela paga');});
 }
 /* ---------- conta nova: a pagar ou automática ---------- */
 window.__trocaMovCR=b=>{const ent=b.dataset.v==='entrada',lista=ent?CATS_E:CATS_G;$('mdl').querySelector('[data-g="cat"]').innerHTML=chipsCat(lista,ent?'salario':'contas');const mw=$('mdl').querySelector('#meioCR');if(mw)mw.hidden=ent;const cw=$('mdl').querySelector('#credCR');if(cw&&ent)cw.hidden=true;layoutModal()};
@@ -2390,15 +2487,15 @@ function modalContaNova(){
     if(!nome)return 'Dê um nome.';if(!valor)return 'Digite o valor.';
     const meio=mov==='gasto'?(sel('meio')||'pix'):'',card=meio==='credito'?S.cartoes.find(c=>c.id===sel('cartao')):null;
     if(meio==='credito'&&!card)return 'Escolham o cartão.';
-    if(freq==='uma'){const d=val('mDataU');if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return 'Escolha a data.';
+    if(freq==='uma'){const d=val('mDataU');if(!dataValida(d))return 'Escolha a data.';
       if(card)return salvarCompraCredito({cardId:card.id,valor,n:1,d,desc:nome,categoria:sel('cat'),dono:sel('dono')});
-      const {error}=await sb.from('lancamentos').insert({tipo:mov,valor,descricao:nome,categoria:sel('cat'),data:d,status:'previsto',meio,...(S.temV11&&sel('dono')?{dono:sel('dono')}:{})});if(error)throw error;toast('Agendado para '+dataBR(d));return}
-    const dia=parseInt(val('mDia'),10);if(!(dia>=1&&dia<=31))return 'O dia vai de 1 a 31.';
+      const {error}=await inserirSeguro('lancamentos',{tipo:mov,valor,descricao:nome,categoria:sel('cat'),data:d,status:'previsto',meio,...(S.temV11&&sel('dono')?{dono:sel('dono')}:{})});if(error)throw error;toast('Agendado para '+dataBR(d));return}
+    const dia=Number(val('mDia'));if(!(Number.isInteger(dia)&&dia>=1&&dia<=31))return 'O dia vai de 1 a 31.';
     const ini=val('mIni');
-    const reg={tipo:mov,descricao:nome,valor,dia,categoria:sel('cat'),inicio:/^\d{4}-\d{2}$/.test(ini)?ini:MES_ATUAL,ativa:true,auto:sel('como')==='auto'};
-    const rest=parseInt(val('mRest'),10)||0;if(S.temV11){if(sel('dono'))reg.dono=sel('dono');if(rest)reg.fim=addMes(reg.inicio,rest-1)}else if(rest)return 'Falta rodar o arquivo schema-v11.sql no Supabase para limitar os meses.';
+    const reg={tipo:mov,descricao:nome,valor,dia,categoria:sel('cat'),inicio:mesValido(ini)?ini:MES_ATUAL,ativa:true,auto:sel('como')==='auto'};
+    const rest=Number(val('mRest')||0);if(!Number.isInteger(rest)||rest<0||rest>120)return 'Informe de 1 a 120 cobranças, ou deixe em branco.';if(S.temV11){if(sel('dono'))reg.dono=sel('dono');if(rest)reg.fim=addMes(reg.inicio,rest-1)}else if(rest)return 'Falta rodar o arquivo schema-v11.sql no Supabase para limitar os meses.';
     if(S.temV10){reg.meio=meio;if(card)reg.cartao_id=card.id}else if(card)return 'Falta rodar o arquivo schema-v10.sql no Supabase para contas no crédito.';
-    const {error}=await sb.from('recorrentes').insert(reg);
+    const {error}=await inserirSeguro('recorrentes',reg);
     if(error){if(/auto/.test(error.message||''))return 'Falta rodar o arquivo schema-v9.sql no Supabase.';if(/meio|cartao_id/.test(error.message||''))return 'Falta rodar o arquivo schema-v10.sql no Supabase.';throw error}
     toast('Conta cadastrada');
   });
@@ -2413,8 +2510,8 @@ function modalConta(c){
     ${c?`<label style="margin-bottom:0">Situação</label><div class="seg" data-g="ativa"><button type="button" data-v="1" aria-pressed="${c.ativa}">Ativa</button><button type="button" data-v="0" aria-pressed="${!c.ativa}">Pausada</button></div>`:''}
     ${btns(c?'Salvar alterações':'Cadastrar conta')}`,
   async()=>{
-    const nome=val('mNome').trim(),valor=parseValor(val('mValor')),dia=parseInt(val('mDia'),10);
-    if(!nome)return 'Dê um nome para a conta.';if(!valor)return 'Digite o valor da conta.';if(!(dia>=1&&dia<=31))return 'O dia do vencimento vai de 1 a 31.';
+    const nome=val('mNome').trim(),valor=parseValor(val('mValor')),dia=Number(val('mDia'));
+    if(!nome)return 'Dê um nome para a conta.';if(!valor)return 'Digite o valor da conta.';if(!(Number.isInteger(dia)&&dia>=1&&dia<=31))return 'O dia do vencimento vai de 1 a 31.';
     const reg={nome,valor,dia,categoria:sel('cat')||'contas'};if(c)reg.ativa=sel('ativa')!=='0';
     const {error}=c?await sb.from('contas_fixas').update(reg).eq('id',c.id):await sb.from('contas_fixas').insert(reg);
     if(error)throw error;toast(c?'Conta atualizada':'Conta cadastrada');
@@ -2431,8 +2528,8 @@ function modalCartao(c){
     <p class="mut" style="font-size:13px;margin:-6px 0 14px">Compras feitas depois do fechamento entram na fatura do mês seguinte.</p>
     ${btns(c?'Salvar alterações':'Cadastrar cartão')}`,
   async()=>{
-    const nome=val('mNome').trim(),limite=parseLivre(val('mLim'))||0,fechamento=parseInt(val('mFech'),10),vencimento=parseInt(val('mVenc'),10);
-    if(!nome)return 'Dê um nome para o cartão.';if(!(fechamento>=1&&fechamento<=31))return 'O dia do fechamento vai de 1 a 31.';if(!(vencimento>=1&&vencimento<=31))return 'O dia do vencimento vai de 1 a 31.';
+    const nome=val('mNome').trim(),limite=val('mLim').trim()?parseLivre(val('mLim')):0,fechamento=Number(val('mFech')),vencimento=Number(val('mVenc'));
+    if(!nome)return 'Dê um nome para o cartão.';if(limite===null||limite<0)return 'Digite um limite válido, maior ou igual a zero.';if(!(Number.isInteger(fechamento)&&fechamento>=1&&fechamento<=31))return 'O dia do fechamento vai de 1 a 31.';if(!(Number.isInteger(vencimento)&&vencimento>=1&&vencimento<=31))return 'O dia do vencimento vai de 1 a 31.';
     const reg={nome,limite:Math.max(0,limite),fechamento,vencimento,cor:sel('cor')||CORES_CARTAO[0]};
     const {error}=c?await sb.from('cartoes').update(reg).eq('id',c.id):await sb.from('cartoes').insert(reg);
     if(error)throw error;toast(c?'Cartão atualizado':'Cartão cadastrado');
@@ -2455,16 +2552,24 @@ function modalRecorrente(r){
     <p class="mut" style="font-size:13px;margin:-6px 0 14px">As ocorrências ainda não confirmadas são atualizadas, exceto as que vocês ajustaram manualmente. As já confirmadas ficam como estão.</p>
     ${btns('Salvar alterações')}`,
   async()=>{
-    const descricao=val('mDesc').trim(),valor=parseValor(val('mValor')),dia=parseInt(val('mDia'),10);
-    if(!descricao)return 'Dê um nome.';if(!valor)return 'Digite o valor.';if(!(dia>=1&&dia<=31))return 'O dia vai de 1 a 31.';
+    const descricao=val('mDesc').trim(),valor=parseValor(val('mValor')),dia=Number(val('mDia'));
+    if(!descricao)return 'Dê um nome.';if(!valor)return 'Digite o valor.';if(!(Number.isInteger(dia)&&dia>=1&&dia<=31))return 'O dia vai de 1 a 31.';
     const reg={descricao,valor,dia,categoria:sel('cat'),auto:sel('como')==='auto',ativa:sel('ativa')!=='0'};
     if(r.tipo==='gasto'&&S.temV10){const meio=sel('meio')||'pix';reg.meio=meio;reg.cartao_id=meio==='credito'?(sel('cartao')||null):null;if(meio==='credito'&&!reg.cartao_id)return 'Escolham o cartão.'}
-    if(S.temV11){if(sel('dono'))reg.dono=sel('dono');const rest=parseInt(val('mRest'),10)||0;reg.fim=rest?addMes(proxCobranca(r),rest-1):null}
-    const {error}=await sb.from('recorrentes').update(reg).eq('id',r.id);if(error)throw error;
-    if(S.temV11&&reg.fim)await sb.from('lancamentos').update({status:'cancelado'}).eq('recorrente_id',r.id).eq('status','previsto').gt('ref_mes',reg.fim);
-    const pend=S.itens.filter(i=>i.recorrente_id===r.id&&i.status==='previsto'&&!i.editado);
-    for(const p of pend){await sb.from('lancamentos').update({valor,descricao,categoria:reg.categoria,data:diaNoMes(p.ref_mes||p.mes,dia)}).eq('id',p.id)}
-    if(!reg.ativa)await sb.from('lancamentos').update({status:'cancelado'}).eq('recorrente_id',r.id).eq('status','previsto').gt('data',HOJE);
+    if(S.temV11){if(sel('dono'))reg.dono=sel('dono');const rest=Number(val('mRest')||0);if(!Number.isInteger(rest)||rest<0||rest>120)return 'Informe de 1 a 120 cobranças, ou deixe em branco.';reg.fim=rest?addMes(proxCobranca(r),rest-1):null}
+    const {data:linhas}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').eq('recorrente_id',r.id).eq('status','previsto')));
+    const operacoes=[op('recorrentes','update',reg,{id:r.id,valor:r.valor,dia:r.dia},1)];
+    for(const p of linhas){
+      const mes=p.ref_mes||p.data.slice(0,7),d=diaNoMes(mes,dia);
+      const cancela=(reg.fim&&mes>reg.fim)||(!reg.ativa&&p.data>HOJE);
+      if(cancela){operacoes.push(op('lancamentos','update',{status:'cancelado'},{id:p.id,status:'previsto'},1));continue}
+      if(p.editado)continue;
+      const up={valor,descricao,categoria:reg.categoria,data:d};
+      if(S.temV10){const card=S.cartoes.find(c=>c.id===reg.cartao_id);up.meio=reg.meio||'';up.cartao_id=card?.id||null;up.fatura_mes=card?mesFatura(card,d):null;up.data_caixa=null}
+      if(S.temV11)up.dono=reg.dono||null;
+      operacoes.push(op('lancamentos','update',up,{id:p.id,status:'previsto',valor:Number(p.valor)},1));
+    }
+    await transacao(operacoes);
     toast('Conta atualizada');
   });
 }
@@ -2482,9 +2587,9 @@ function modalDivida(d){
     <label>Juros ao mês, em % (opcional)<input class="field" id="mJur" inputmode="decimal" placeholder="Ex.: 1,99" value="${d&&d.juros?fmtInput(d.juros):''}"></label>
     ${btns(d?'Salvar alterações':'Cadastrar dívida')}`,
   async()=>{
-    const nome=val('mNome').trim(),parcela=parseValor(val('mParc')),dia=parseInt(val('mDia'),10),tot=parseInt(val('mTot'),10),pag=parseInt(val('mPag'),10)||0,jur=parseLivre(val('mJur'))||0;
-    if(!nome)return 'Dê um nome para a dívida.';if(!parcela)return 'Digite o valor da parcela.';if(!(dia>=1&&dia<=31))return 'O dia vai de 1 a 31.';
-    if(!(tot>=1))return 'Informe o total de parcelas.';if(pag<0||pag>tot)return 'As parcelas já pagas não podem passar do total.';
+    const nome=val('mNome').trim(),parcela=parseValor(val('mParc')),dia=Number(val('mDia')),tot=Number(val('mTot')),pag=Number(val('mPag')||0),jur=val('mJur').trim()?parseLivre(val('mJur')):0;
+    if(!nome)return 'Dê um nome para a dívida.';if(jur===null||jur<0)return 'Digite uma taxa de juros válida, maior ou igual a zero.';if(!parcela)return 'Digite o valor da parcela.';if(!(Number.isInteger(dia)&&dia>=1&&dia<=31))return 'O dia vai de 1 a 31.';
+    if(!(Number.isInteger(tot)&&tot>=1))return 'Informe o total de parcelas.';if(!Number.isInteger(pag)||pag<0||pag>tot)return 'As parcelas já pagas não podem passar do total.';
     const reg={nome,credor:val('mCred').trim(),parcela,dia,parcelas_total:tot,pagas_inicial:pag,juros:Math.max(0,jur)};
     if(S.temV10){const ex=await lerExtras();reg.nota=ex.nota||'';if(ex.anexo)reg.anexo=ex.anexo}
     const {error}=d?await sb.from('dividas').update(reg).eq('id',d.id):await sb.from('dividas').insert(reg);
@@ -2505,7 +2610,7 @@ function modalDesejo(d){
     if(!nome)return 'Dê um nome para o desejo.';if(!valor)return 'Digite o valor estimado.';
     if(link&&!/^https?:\/\//.test(link))return 'O link precisa começar com http:// ou https://';
     const reg={nome,valor,emoji:sel('emoji')||'✨',prioridade:parseInt(sel('prio')||'2',10),link};
-    const {error}=d?await sb.from('desejos').update(reg).eq('id',d.id):await sb.from('desejos').insert(reg);
+    const {error}=d?await sb.from('desejos').update(reg).eq('id',d.id):await inserirSeguro('desejos',reg);
     if(error)throw error;toast(d?'Desejo atualizado':'Desejo adicionado');
   });
 }
@@ -2554,10 +2659,11 @@ document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.tar
 function qrSrc(q){if(!q)return '';const m=String(q).match(/^data:image\/svg\+xml;(?:charset=)?utf-8,(.*)$/is);return m&&!/%3C/i.test(m[1])?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(m[1]):q}
 async function modalSeguranca(){
   modal(`<h2>🔐 Segurança da conta</h2><p class="mut">Verificando…</p>`);
-  const [f,dbRes,aal]=await Promise.all([fatorTotp().catch(()=>null),sb.rpc('mfa_ok').then(r=>r,()=>({error:true})),nivelAAL().catch(()=>null)]);
-  const noBanco=!dbRes.error;
-  const linhaBanco=noBanco?`<div class="sec-l ok"><b>Trava no banco de dados</b><span>Ativa: quem ligou a verificação só acessa os dados com o código.</span></div>`
-    :`<div class="sec-l aviso"><b>Trava no banco de dados</b><span>Ainda não instalada. Rodem o <b>schema-v12.sql</b> no Supabase. Sem ele, a verificação vale só na tela do site e alguém com a senha poderia ignorá-la.</span></div>`;
+  const [f,dbRes,aal]=await Promise.all([fatorTotp().catch(()=>undefined),sb.rpc('mfa_ok').then(r=>r,()=>({error:true})),nivelAAL().catch(()=>null)]);
+  if(f===undefined||!aal){info('Segurança da conta','<p>Não deu para verificar a segurança da sessão. Tente novamente.</p>');return}
+  const noBanco=!dbRes.error&&dbRes.data===true;
+  const linhaBanco=noBanco?`<div class="sec-l ok"><b>Trava no banco de dados</b><span>A função de segurança respondeu à sessão atual. A aplicação da trava depende das políticas de acesso configuradas no Supabase.</span></div>`
+    :`<div class="sec-l aviso"><b>Trava no banco de dados</b><span>Não foi possível confirmar a proteção no banco. O administrador precisa conferir as políticas de acesso e a função mfa_ok no Supabase.</span></div>`;
   if(f){
     modal(`<h2>🔐 Segurança da conta</h2>
       <div class="sec-l ok"><b>Verificação em 2 etapas: ativada ✅</b><span>Ao entrar, o site pede o código do aplicativo autenticador${f.friendly_name?` (${esc(f.friendly_name)})`:''}.</span></div>
@@ -2574,8 +2680,8 @@ async function modalSeguranca(){
   }
 }
 async function iniciarEnroll(){
-  const lista=await sb.auth.mfa.listFactors();
-  for(const x of ((lista.data&&lista.data.all)||[]).filter(x=>x.status==='unverified'))await sb.auth.mfa.unenroll({factorId:x.id});
+  const lista=await sb.auth.mfa.listFactors();if(lista.error)throw lista.error;
+  for(const x of ((lista.data&&lista.data.all)||[]).filter(x=>x.status==='unverified')){const r=await sb.auth.mfa.unenroll({factorId:x.id});if(r.error)throw r.error}
   const {data,error}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'Controle 360 · '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})});
   if(error){toast(erroPT(error));return}
   const chave=data.totp.secret;
@@ -2638,22 +2744,25 @@ function modalExportar(){
     <div class="btns" style="margin-top:16px"><button class="btn ghost" data-m="cancelar">Fechar</button></div>`);
 }
 function carregarScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)&&window.XLSX)return res();const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.append(s)})}
+function dadosExcel(rows){
+  const ord=[...rows].filter(i=>i.status!=='cancelado').sort((a,b)=>a.data.localeCompare(b.data)),real=ord.filter(efetivo);
+  const TIPO={gasto:'Gasto',entrada:'Entrada',divida:'Amortização de dívida'};
+  const linhas=ord.map(i=>{const cc=S.cartoes.find(c=>c.id===i.cartao_id),[y,m,d]=i.data.split('-');
+    return {'Data':`${d}/${m}/${y}`,'Tipo':TIPO[i.tipo]||(i.tipo==='aporte'?(i.meta_id?'Aporte em meta':'Aporte em investimento'):(i.meta_id?'Resgate de meta':'Resgate de investimento')),'Descrição':descVis(i),'Categoria':catVis(i).nome,'Valor (R$)':(i.tipo==='entrada'||i.tipo==='resgate'?1:-1)*i.valor,'Quem lançou':nomeDe(i.autor)||'Automático','Cartão':cc?.nome||'','Situação':i.status,'Data do caixa':i.data_caixa||''};
+  });
+  const f=(a,t)=>soma(a.filter(x=>x.tipo===t)),meses=[...new Set(ord.map(i=>i.data.slice(0,7)))];
+  const resumoM=meses.map(m=>{const a=real.filter(x=>x.data.slice(0,7)===m),e=f(a,'entrada'),g=f(a,'gasto'),metas=a.filter(x=>x.meta_id),inv=a.filter(x=>x.investimento_id),ap=cent(f(metas,'aporte')-f(metas,'resgate')),iv=cent(f(inv,'aporte')-f(inv,'resgate')),dv=f(a,'divida');return {'Mês':nomeMes(m),'Entradas':e,'Gastos':g,'Guardado em metas':ap,'Investimentos':iv,'Dívidas amortizadas':dv,'Sobra':cent(e-g-ap-iv-dv)}});
+  const cats={};real.filter(x=>x.tipo==='gasto').forEach(x=>{const n=catVis(x).nome;cats[n]=cent((cats[n]||0)+x.valor)});
+  return {linhas,resumoM,catRows:Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({'Categoria':k,'Total gasto':v}))};
+}
 async function exportarExcel(periodo){
   fechar();toast('Preparando o arquivo…');
   try{await carregarScript('xlsx.full.min.js')}catch(e){toast('Não deu para carregar o gerador de Excel.');return}
   let rows,nome;
   if(periodo==='mes'){rows=doMes(S.mes);nome='planejamento-'+S.mes}
-  else{const ano=S.view==='retro'?S.ano:ANO_ATUAL;if(!S.retro[ano])await carregarRetro(ano);rows=S.retro[ano]||[];nome='planejamento-'+ano}
+  else{const ano=S.view==='retro'?S.ano:ANO_ATUAL;if(!S.retro[ano]&&!await carregarRetro(ano))return;rows=S.retro[ano]||[];nome='planejamento-'+ano}
   if(!rows.length){toast('Não há lançamentos nesse período.');return}
-  const TIPO={gasto:'Gasto',entrada:'Entrada',aporte:'Guardado em meta',resgate:'Resgate de meta'};
-  const ord=[...rows].sort((a,b)=>a.data.localeCompare(b.data));
-  const linhas=ord.map(i=>{const cc=i.cartao_id&&S.cartoes.find(c=>c.id===i.cartao_id);const [y,m,d]=i.data.split('-');
-    return {'Data':`${d}/${m}/${y}`,'Tipo':TIPO[i.tipo]||i.tipo,'Descrição':descVis(i),'Categoria':catVis(i).nome,'Valor (R$)':(i.tipo==='entrada'||i.tipo==='resgate'?1:-1)*i.valor,'Quem lançou':nomeDe(i.autor)||'Automático','Cartão':cc?cc.nome:''}});
-  const meses=[...new Set(ord.map(i=>i.data.slice(0,7)))];
-  const f=(a,t)=>a.filter(x=>x.tipo===t).reduce((s,x)=>s+x.valor,0);
-  const resumoM=meses.map(m=>{const a=ord.filter(x=>x.data.slice(0,7)===m);const e=f(a,'entrada'),g=f(a,'gasto'),ap=f(a,'aporte')-f(a,'resgate');return {'Mês':nomeMes(m),'Entradas':e,'Gastos':g,'Guardado em metas':ap,'Sobra':e-g-ap}});
-  const cats={};ord.filter(x=>x.tipo==='gasto').forEach(x=>{const n=(CAT[x.categoria]||{nome:x.categoria}).nome;cats[n]=(cats[n]||0)+x.valor});
-  const catRows=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({'Categoria':k,'Total gasto':v}));
+  const {linhas,resumoM,catRows}=dadosExcel(rows);
   const wb=XLSX.utils.book_new();
   const w1=XLSX.utils.json_to_sheet(linhas);w1['!cols']=[{wch:12},{wch:18},{wch:38},{wch:24},{wch:14},{wch:16},{wch:14}];
   const w2=XLSX.utils.json_to_sheet(resumoM);w2['!cols']=[{wch:20},{wch:14},{wch:14},{wch:18},{wch:14}];
@@ -2669,7 +2778,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='28';
+const VERSAO='29';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
@@ -2691,29 +2800,34 @@ document.addEventListener('click',async e=>{
   if(a.closest('.fat-view')&&['editar','apagar','fatura-pagar','fatura-add','fatura-prev'].includes(act))S.fatVoltar={...S.fatView};
   const item=S.itens.find(i=>i.id===id)||S.card.find(i=>i.id===id),meta=S.metas.find(m=>m.id===id),conta=S.contas.find(c=>c.id===id),cartao=S.cartoes.find(c=>c.id===id),
     rec=S.recorrentes.find(r=>r.id===id),div=S.dividas.find(d=>d.id===id),des=S.desejos.find(d=>d.id===id);
-  switch(act){
-    case 'mes-1':S.mes=addMes(S.mes,-1);await carregarItens();render();break;
-    case 'mes+1':S.mes=addMes(S.mes,1);await carregarItens();render();break;
+  if(['duplicar','des-meta','des-reabrir','div-desfazer','item-mover','oc-pular','oc-reativar','oc-desfazer','fatura-desfazer','orc-copiar','orc-padrao'].includes(act))a.disabled=true;
+  try{switch(act){
+    case 'mes-1':S.mes=addMes(S.mes,-1);await recarregar();break;
+    case 'mes+1':S.mes=addMes(S.mes,1);await recarregar();break;
     case 'ano-1':S.ano--;render();break;
     case 'ano+1':S.ano++;render();break;
     case 'novo':modalLancamento(a.dataset.tipo||'gasto',null,{cat:a.dataset.cat,data:a.dataset.data,livre:a.dataset.livre==='1'});break;
     case 'editar':if(item)modalLancamento(null,item);break;
     case 'apagar':if(!item)break;
       if(item.recorrente_id)confirmar('Pular este mês?',`${esc(descVis(item))} deixa de acontecer em ${esc(soMes(item.ref_mes||item.mes))}. A conta continua nos próximos meses.`,'Pular este mês',async()=>{const antes=item.status;const {error}=await sb.from('lancamentos').update({status:'cancelado'}).eq('id',id);if(error)throw error;toastDesfazer('Mês pulado',async()=>{const r=await sb.from('lancamentos').update({status:antes}).eq('id',id);if(r.error)throw r.error})});
-      else if(item.compra_id&&item.parcelas>1)confirmar('Apagar compra parcelada?',`${esc(item.descricao.replace(/\s\(\d+\/\d+\)$/,''))} tem ${item.parcelas} parcelas. Todas saem dos gastos, das faturas e das projeções.`,'Apagar compra inteira',async()=>{const {data:orig}=await sb.from('lancamentos').select('*').eq('compra_id',item.compra_id);const {error}=await sb.from('lancamentos').delete().eq('compra_id',item.compra_id);if(error)throw error;
-        if(orig&&orig.length)toastDesfazer('Compra apagada',async()=>{const r=await sb.from('lancamentos').insert(orig);if(r.error)throw r.error});else toast('Compra apagada')});
-      else confirmar('Apagar lançamento?',`${esc(descVis(item))} de ${R(item.valor)} sai de todo o site para vocês dois.`,'Apagar',async()=>{const {data:orig}=await sb.from('lancamentos').select('*').eq('id',id);const {error}=await sb.from('lancamentos').delete().eq('id',id);if(error)throw error;
-        if(orig&&orig.length)toastDesfazer('Lançamento apagado',async()=>{const r=await sb.from('lancamentos').insert(orig);if(r.error)throw r.error});else toast('Lançamento apagado')});break;
+      else if(item.compra_id&&item.parcelas>1)confirmar('Apagar compra parcelada?',`${esc(item.descricao.replace(/\s\(\d+\/\d+\)$/,''))} tem ${item.parcelas} parcelas. Todas saem dos gastos, das faturas e das projeções.`,'Apagar compra inteira',async()=>{const [orig]=await transacao([op('lancamentos','delete',{}, {compra_id:item.compra_id})]);
+        if(orig.length)toastDesfazer('Compra apagada',async()=>{await transacao(orig.map(x=>op('lancamentos','insert',x,{},1)))});else toast('Compra apagada')});
+      else confirmar('Apagar lançamento?',`${esc(descVis(item))} de ${R(item.valor)} sai de todo o site para vocês dois.`,'Apagar',async()=>{
+        const operacoes=[];let posicao=null;
+        if(item.investimento_id&&efetivo(item)){posicao={...S.invest.find(x=>x.id===item.investimento_id)};operacoes.push(movimentoInvest(item,0,true).operacao)}
+        operacoes.push(op('lancamentos','delete',{}, {id,valor:item.valor,status:item.status},1));
+        const resultado=await transacao(operacoes),orig=resultado.at(-1);
+        toastDesfazer('Lançamento apagado',async()=>{const voltar=[];if(posicao){const mov=operacoes[0].valores;voltar.push(op('investimentos','update',{valor:posicao.valor,aplicado:posicao.aplicado},{id:posicao.id,valor:mov.valor,aplicado:mov.aplicado},1))}voltar.push(...orig.map(x=>op('lancamentos','insert',x,{},1)));await transacao(voltar)});
+      });break;
     case 'duplicar':{if(!item||!(item.tipo==='gasto'||item.tipo==='entrada')||item.recorrente_id||item.parcelas>1){toast('Só gastos e entradas avulsos podem ser duplicados.');break}
       a.disabled=true;const cd=item.cartao_id&&S.cartoes.find(c=>c.id===item.cartao_id);
       const nova={tipo:item.tipo,valor:item.valor,descricao:item.descricao,categoria:item.categoria,data:HOJE,meio:item.meio||'',...(item.livre?{livre:true}:{}),...(item.dono?{dono:item.dono}:{}),...(item.tags&&item.tags.length?{tags:item.tags}:{}),
         ...(cd?{cartao_id:cd.id,fatura_mes:mesFatura(cd,HOJE),status:'comprometido',meio:'credito',compra_id:uuid(),parcela:1,parcelas:1}:{status:'pago'})};
-      const {data:ins,error}=await sb.from('lancamentos').insert(nova).select('id');a.disabled=false;
-      if(error){toast('Não deu para duplicar agora.');break}
+      const [ins]=await transacao([op('lancamentos','insert',nova,{},1)]);a.disabled=false;
       if(HOJE.slice(0,7)!==S.mes){S.mes=HOJE.slice(0,7)}
       toastDesfazer(`Duplicado para hoje · ${R(item.valor)}`,async()=>{const r=await sb.from('lancamentos').delete().in('id',(ins||[]).map(x=>x.id));if(r.error)throw r.error});break}
     case 'busca':modalBusca();break;
-    case 'busca-ir':{const m=a.dataset.mes,v=a.dataset.v;fechar();S.mes=m;await carregarItens();ir(v);break}
+    case 'busca-ir':{const m=a.dataset.mes,v=a.dataset.v;fechar();S.mes=m;await recarregar();ir(v);break}
     case 'cal-dia':S.calDia=a.dataset.d;render();break;
     case 'meta-nova':modalMeta();break;
     case 'meta-editar':if(meta)modalMeta(meta);break;
@@ -2726,7 +2840,7 @@ document.addEventListener('click',async e=>{
     case 'cartao-editar':if(cartao)modalCartao(cartao);break;
     case 'cartao-apagar':if(cartao)confirmar('Excluir cartão?',`O cartão ${esc(cartao.nome)} será removido. As compras já lançadas continuam nos gastos.`,'Excluir cartão',async()=>{const {error}=await sb.from('cartoes').delete().eq('id',id);if(error)throw error;toast('Cartão excluído')});break;
     case 'rec-editar':if(rec)modalRecorrente(rec);break;
-    case 'rec-apagar':if(rec)confirmar('Excluir conta?',`${esc(rec.descricao)} deixa de acontecer nos próximos meses. O que já foi confirmado continua no histórico.`,'Excluir',async()=>{await sb.from('lancamentos').delete().eq('recorrente_id',id).eq('status','previsto');const {error}=await sb.from('recorrentes').delete().eq('id',id);if(error)throw error;toast('Conta excluída')});break;
+    case 'rec-apagar':if(rec)confirmar('Excluir conta?',`${esc(rec.descricao)} deixa de acontecer nos próximos meses. O que já foi confirmado continua no histórico.`,'Excluir',async()=>{await transacao([op('lancamentos','delete',{}, {recorrente_id:id,status:'previsto'}),op('recorrentes','delete',{}, {id},1)]);toast('Conta excluída')});break;
     case 'div-nova':modalDivida();break;
     case 'div-editar':if(div)modalDivida(div);break;
     case 'div-apagar':if(div)confirmar('Excluir dívida?',`${esc(div.nome)} será removida. Os pagamentos já lançados continuam nos gastos.`,'Excluir',async()=>{const {error}=await sb.from('dividas').delete().eq('id',id);if(error)throw error;toast('Dívida excluída')});break;
@@ -2738,13 +2852,14 @@ document.addEventListener('click',async e=>{
     case 'des-apagar':if(des)confirmar('Excluir desejo?',`${esc(des.nome)} sai da lista.`,'Excluir',async()=>{const {error}=await sb.from('desejos').delete().eq('id',id);if(error)throw error;toast('Desejo excluído')});break;
     case 'des-aba':S.abaDesejos=a.dataset.v;render();break;
     case 'des-simular':if(des){S.sim={nome:des.nome,valor:fmtInput(des.valor),forma:'vista',n:10};render();window.scrollTo({top:0,behavior:'smooth'})}break;
-    case 'des-meta':if(des){a.disabled=true;const {error}=await sb.from('metas').insert({nome:des.nome.slice(0,60),emoji:EMOJIS_META.includes(des.emoji)?des.emoji:'🎯',alvo:des.valor});
-      if(error){toast('Não deu para criar a meta.');a.disabled=false;break}await sb.from('desejos').update({status:'meta'}).eq('id',des.id);toast('Virou meta! Vejam em Metas.');recarregar()}break;
-    case 'des-comprado':if(des)modalLancamento('gasto',null,{valor:des.valor,desc:des.nome,cat:'compras',after:async()=>{await sb.from('desejos').update({status:'comprado'}).eq('id',des.id)}});break;
-    case 'des-reabrir':if(des){await sb.from('desejos').update({status:'aberto'}).eq('id',des.id);recarregar()}break;
-    case 'orc-zerar':{const k=a.dataset.cat,pl=planejado(S.mes);if(!pl.gastos[k])break;const g={...pl.gastos};delete g[k];S.orc[S.mes]={gastos:g,entradas:pl.entradas||0};render();
-      const {error}=await sb.from('orcamentos').upsert({mes:S.mes,gastos:g,entradas:pl.entradas||0,atualizado_em:new Date().toISOString()});
-      if(error)toast('Não deu para zerar agora.');else toast((CAT[k]||{nome:''}).nome+': planejado zerado')}break;
+    case 'des-meta':if(des){a.disabled=true;await transacao([
+      op('metas','insert',{nome:des.nome.slice(0,60),emoji:EMOJIS_META.includes(des.emoji)?des.emoji:'🎯',alvo:des.valor}, {},1),
+      op('desejos','update',{status:'meta'},{id:des.id,status:des.status},1)
+    ]);toast('Virou meta! Vejam em Metas.');await recarregar()}break;
+    case 'des-comprado':if(des)modalLancamento('gasto',null,{valor:des.valor,desc:des.nome,cat:'compras',operacoesDepois:[op('desejos','update',{status:'comprado'},{id:des.id,status:des.status},1)]});break;
+    case 'des-reabrir':if(des){const {error}=await sb.from('desejos').update({status:'aberto'}).eq('id',des.id);if(error)throw error;await recarregar()}break;
+    case 'orc-zerar':{const mes=S.mes,k=a.dataset.cat,pl=planejado(mes);if(!pl.gastos[k])break;const g={...pl.gastos};delete g[k];S.orc[mes]={gastos:g,entradas:pl.entradas||0};render();
+      if(await salvarOrc(mes))toast((CAT[k]||{nome:''}).nome+': planejado zerado')}break;
     case 'orc-padrao':{const p=planejado(S.mes);a.disabled=true;const {error}=await sb.from('config').upsert({id:'casal',limites:p.gastos,atualizado_em:new Date().toISOString()});a.disabled=false;
       if(error)toast('Não deu para salvar agora.');else{toast('Este orçamento virou o padrão dos próximos meses');recarregar()}}break;
     case 'orc-copiar':{const p=planejado(addMes(S.mes,-1));a.disabled=true;const {error}=await sb.from('orcamentos').upsert({mes:S.mes,gastos:p.gastos,entradas:p.entradas||0,atualizado_em:new Date().toISOString()});a.disabled=false;
@@ -2753,9 +2868,9 @@ document.addEventListener('click',async e=>{
     case 'inv-editar':{const x=S.invest.find(i=>i.id===id);if(x)modalInvest(x)}break;
     case 'inv-apagar':{const x=S.invest.find(i=>i.id===id);if(!x)break;const movs=S.itens.filter(i=>i.investimento_id===x.id).length;
       confirmar('Excluir investimento?',`${esc(x.produto||x.nome||(INVT[x.tipo]||{nome:''}).nome)} sai da carteira e <b>todos os aportes e resgates dele também são desfeitos</b>: o caixa, o patrimônio, o calendário e os relatórios são recalculados como se ele nunca tivesse existido.${movs?'':' (Investimentos cadastrados como "já tínhamos" não mexem no caixa.)'} Se o dinheiro voltou de verdade para a conta, usem Resgatar em vez de excluir.`,'Excluir e desfazer',
-        async()=>{const r1=await sb.from('lancamentos').delete().eq('investimento_id',x.id);if(r1.error)throw r1.error;const {error}=await sb.from('investimentos').delete().eq('id',x.id);if(error)throw error;toast('Investimento e aportes excluídos')})}break;
-    case 'seguranca':modalSeguranca();break;
-    case 'mfa-ativar':iniciarEnroll();break;
+        async()=>{await transacao([op('lancamentos','delete',{}, {investimento_id:x.id}),op('investimentos','delete',{}, {id:x.id,valor:x.valor,aplicado:x.aplicado},1)]);toast('Investimento e aportes excluídos')})}break;
+    case 'seguranca':await modalSeguranca();break;
+    case 'mfa-ativar':await iniciarEnroll();break;
     case 'mfa-desativar':confirmar('Desativar a verificação em 2 etapas?','A conta volta a entrar só com a senha (ou o Google). Seus dados ficam menos protegidos.','Desativar',async()=>{const f=await fatorTotp();if(!f)return 'Nada para desativar.';const {error}=await sb.auth.mfa.unenroll({factorId:f.id});if(error)return erroPT(error);toast('Verificação em 2 etapas desativada')});break;
     case 'copiar-chave':{try{await navigator.clipboard.writeText(a.dataset.v);toast('Chave copiada')}catch(x){toast('Não deu para copiar. Selecione a chave e copie.')}}break;
     case 'novo-global':modalNovo();break;
@@ -2779,9 +2894,9 @@ document.addEventListener('click',async e=>{
     case 'faturas':abrirFaturas(id,a.dataset.fm||mesFatura(S.cartoes.find(c=>c.id===id)||{fechamento:28,vencimento:5},HOJE));break;
     case 'fat-nav':abrirFaturas(S.fatView.cartao,addMes(S.fatView.fm,Number(a.dataset.d)));break;
     case 'item-mover':{const x=S.card.find(i=>i.id===id);if(!x)break;a.disabled=true;const delta=difMes(x.fatura_mes,a.dataset.fm);
-      const lote=x.compra_id&&x.parcelas>1?S.card.filter(i=>i.compra_id===x.compra_id):[x];let falhou=false;
-      for(const y of lote){const {error}=await sb.from('lancamentos').update({fatura_mes:addMes(y.fatura_mes,delta)}).eq('id',y.id);if(error)falhou=true}
-      toast(falhou?'Não deu para mover agora.':(lote.length>1?`${lote.length} parcelas movidas`:'Movida para a fatura certa'));
+      const lote=x.compra_id&&x.parcelas>1?S.card.filter(i=>i.compra_id===x.compra_id):[x];
+      await transacao(lote.map(y=>op('lancamentos','update',{fatura_mes:addMes(y.fatura_mes,delta),...(y.recorrente_id?{editado:true}:{})},{id:y.id,fatura_mes:y.fatura_mes},1)));
+      toast(lote.length>1?`${lote.length} parcelas movidas`:'Movida para a fatura certa');
       const v={...S.fatView};await recarregar();abrirFaturas(v.cartao,v.fm)}break;
     case 'fatura-add':if(cartao){const fm=a.dataset.fm,fech=fechamentoFatura(cartao,fm);modalCompraCartao({cartao:cartao.id,fm,data:HOJE<=fech?HOJE:fech})}break;
     case 'fatura-pagar':if(cartao)modalPagarFatura(cartao,a.dataset.fm);break;
@@ -2793,15 +2908,16 @@ document.addEventListener('click',async e=>{
     case 'det-proj':modalProjecao();break;
     case 'det-edit':{const it=S.itens.find(x=>x.id===a.dataset.id);if(it)modalLancamento(null,it)}break;
     case 'glossario':modalGlossario();break;
-    case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido'}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
+    case 'fatura-desfazer':if(cartao){const volta=a.closest('.fat-view')?{...S.fatView}:null;a.disabled=true;const {error}=await sb.from('lancamentos').update({status:'comprometido',data_caixa:null}).eq('cartao_id',cartao.id).eq('fatura_mes',a.dataset.fm).eq('status','pago');
       if(error){toast('Não deu para desfazer.');a.disabled=false}else{toast('Pagamento da fatura desfeito');await recarregar();if(volta)abrirFaturas(volta.cartao,volta.fm)}}break;
     case 'sim-comprar':{const v=parseValor(S.sim.valor);if(!v)break;if(S.sim.forma==='parc')modalCompraCartao({valor:v,desc:S.sim.nome,n:parseInt(S.sim.n,10)||2});else modalLancamento('gasto',null,{valor:v,desc:S.sim.nome,cat:'compras'})}break;
     case 'n-divida':modalEscolherDivida();break;
     case 'ver-anexo':{const p=a.dataset.path;if(!p)break;const {data,error}=await sb.storage.from('anexos').createSignedUrl(p,300);if(error||!data){toast('Não deu para abrir o anexo.');break}window.open(data.signedUrl,'_blank','noopener')}break;
-    case 'fechar-mes':{if(!S.temV10){toast('Falta rodar o arquivo schema-v10.sql no Supabase.');break}if(!S.hist){await carregarHist()}const m=S.mes,res=resumoFech(m);
+    case 'fechar-mes':{if(!S.temV10){toast('Falta rodar o arquivo schema-v10.sql no Supabase.');break}if(!S.hist&&!await carregarHist())break;const m=S.mes,res=resumoFech(m);
       confirmar('Fechar '+soMes(m)+'?',`${m===MES_ATUAL&&HOJE<m+'-'+pad(ultimoDia(m))?`<b class="neg">O mês ainda não terminou</b> (hoje é ${dataBR(HOJE)}). Fechar agora salva um resumo parcial. `:''}O resumo do mês fica salvo como está agora: entradas <b class="pos">${R0(res.entradas)}</b>, gastos <b class="neg">${R0(res.gastos)}</b>, investimentos <b class="ref">${R0(res.investimentos)}</b>, metas <b class="ref">${R0(res.metas)}</b>${res.saldo_final!=null?`, saldo final <b>${R0(res.saldo_final)}</b>`:''}. ${S.orc[addMes(m,1)]?'':'O orçamento deste mês também é copiado para '+soMes(addMes(m,1))+', para começar o próximo período. '}Os lançamentos continuam editáveis; dá para reabrir o mês depois.`,'Fechar mês',
-        async()=>{const {error}=await sb.from('fechamentos').upsert({mes:m,resumo:res,criado_em:new Date().toISOString()});if(error)throw error;
-          const prox=addMes(m,1);if(!S.orc[prox]){const p=planejado(m);await sb.from('orcamentos').upsert({mes:prox,gastos:p.gastos,entradas:p.entradas||0,atualizado_em:new Date().toISOString()})}
+        async()=>{const operacoes=[op('fechamentos','upsert',{mes:m,resumo:res,criado_em:new Date().toISOString()}, {},1)];
+          const prox=addMes(m,1);if(!S.orc[prox]){const p=planejado(m);operacoes.push(op('orcamentos','upsert',{mes:prox,gastos:p.gastos,entradas:p.entradas||0,atualizado_em:new Date().toISOString()}, {},1))}
+          await transacao(operacoes);
           toast(cap(soMes(m))+' fechado')})}break;
     case 'reabrir-mes':confirmar('Reabrir '+soMes(S.mes)+'?','O resumo salvo no fechamento é descartado. Os lançamentos do mês não mudam.','Reabrir mês',async()=>{const {error}=await sb.from('fechamentos').delete().eq('mes',S.mes);if(error)throw error;toast('Mês reaberto')});break;
     case 'reserva-excluir':{const m=S.metas.find(x=>x.reserva);if(!m)break;const g=guardadoMeta(m.id);modalExcluirReserva(m,g)}break;
@@ -2811,12 +2927,12 @@ document.addEventListener('click',async e=>{
     case 'mais':modalMais();break;
     case 'ir-retro':S.ano=hojeD.getMonth()===0?ANO_ATUAL-1:ANO_ATUAL;ir('retro');break;
     case 'exportar':modalExportar();break;
-    case 'exp-excel-mes':exportarExcel('mes');break;
-    case 'exp-excel-ano':exportarExcel('ano');break;
+    case 'exp-excel-mes':await exportarExcel('mes');break;
+    case 'exp-excel-ano':await exportarExcel('ano');break;
     case 'exp-pdf':fechar();setTimeout(()=>window.print(),350);break;
     case 'instalar':instalar();break;
-    case 'sair':sair();break;
-  }
+    case 'sair':await sair();break;
+  }}catch(e){toast('Não deu para concluir: '+(e?.message||'tente novamente.'))}finally{a.disabled=false}
 });
 window.addEventListener('hashchange',()=>{let v=location.hash.slice(1);v=ALIAS[v]||v;if(VIEWS.some(x=>x.id===v)&&v!==S.view){S.view=v;S.ultima[grupoDe(v).id]=v;render()}});
 
@@ -2838,52 +2954,56 @@ function erroPT(e){const m=(e&&e.message)||'';
   if(/provider is not enabled|Unsupported provider/i.test(m))return 'O login com Google ainda não foi ativado no Supabase.';
   return m||'Algo deu errado. Tente de novo.'}
 /* verificação em 2 etapas: depois do login, quem ativou precisa confirmar o código antes de ver qualquer dado */
-async function nivelAAL(){if(!sb.auth.mfa)return null;const {data,error}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();return error?null:data}
-async function fatorTotp(){if(!sb.auth.mfa)return null;const {data}=await sb.auth.mfa.listFactors();const all=(data&&data.all)||[];
-  return all.find(f=>(f.factor_type||f.type)==='totp'&&f.status==='verified')||((data&&data.totp)||[])[0]||null}
-let entrando=false;
+async function nivelAAL(){if(!sb.auth.mfa)throw new Error('Verificação de segurança indisponível.');const {data,error}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(error||!data)throw error||new Error('Não deu para verificar a segurança da sessão.');return data}
+async function fatorTotp(){if(!sb.auth.mfa)throw new Error('Verificação em 2 etapas indisponível.');const {data,error}=await sb.auth.mfa.listFactors();if(error)throw error;
+  return [...(data?.all||[]),...(data?.totp||[])].find(f=>(f.factor_type||f.type||'totp')==='totp'&&f.status==='verified')||null}
+let entrando=false,geracaoAuth=0;
 async function aposLogin(sessao){
-  if(entrando)return;entrando=true;
-  try{const a=await nivelAAL();
+  if(entrando)return;entrando=true;const geracao=geracaoAuth;
+  try{const a=await nivelAAL();if(geracao!==geracaoAuth)return;
     if(a&&a.nextLevel==='aal2'&&a.currentLevel!=='aal2'){telaMfa();return}
-    await entrar(sessao)}
+    await entrar(sessao,geracao)}
+  catch(e){telaLogin('Não deu para concluir o login: '+erroPT(e));}
   finally{entrando=false}
 }
 function telaMfa(){$('app').hidden=true;$('login').hidden=false;modoLogin('lMfa');$('lSair').hidden=true;$('lCodigo').value='';setTimeout(()=>$('lCodigo').focus(),60)}
 async function verificarMfa(){
-  const code=$('lCodigo').value.trim();
+  if($('lVerificar').disabled)return;const code=$('lCodigo').value.trim();
   if(!/^\d{6}$/.test(code))return msgLogin('Digite os 6 números do aplicativo.',true);
   $('lVerificar').disabled=true;msgLogin('Verificando…');
-  const f=await fatorTotp();
-  if(!f){$('lVerificar').disabled=false;return msgLogin('Não encontrei a verificação em 2 etapas desta conta. Entre de novo.',true)}
-  const {error}=await sb.auth.mfa.challengeAndVerify({factorId:f.id,code});
-  $('lVerificar').disabled=false;
-  if(error){$('lCodigo').value='';$('lCodigo').focus();return msgLogin(erroPT(error),true)}
-  if(S.voltarSenha){S.voltarSenha=false;modoLogin('lNova');return msgLogin('Código confirmado. Agora salve a nova senha.')}
-  msgLogin('');const {data:{session}}=await sb.auth.getSession();if(session)await entrar(session);
+  try{
+    const f=await fatorTotp();if(!f)return msgLogin('Não encontrei a verificação em 2 etapas desta conta. Entre de novo.',true);
+    const {error}=await sb.auth.mfa.challengeAndVerify({factorId:f.id,code});if(error)throw error;
+    if(S.voltarSenha){S.voltarSenha=false;modoLogin('lNova');return msgLogin('Código confirmado. Agora salve a nova senha.')}
+    const {data,error:erro}=await sb.auth.getSession();if(erro)throw erro;if(!data?.session)throw new Error('Sua sessão expirou. Entre novamente.');await aposLogin(data.session);
+  }catch(e){$('lCodigo').value='';$('lCodigo').focus();msgLogin(erroPT(e),true)}finally{$('lVerificar').disabled=false}
 }
 $('lVerificar').addEventListener('click',verificarMfa);
 $('lCodigo').addEventListener('keydown',e=>{if(e.key==='Enter')verificarMfa()});
 $('lCodigo').addEventListener('input',()=>{if($('lCodigo').value.length===6)verificarMfa()});
 $('lVoltarMfa').addEventListener('click',()=>sair());
-async function entrar(sessao){
+async function entrar(sessao,geracao=geracaoAuth){
   S.me=(sessao.user.email||'').toLowerCase();
-  const {data,error}=await sb.from('membros').select('email,nome');
-  if(error||!data||!data.length){telaLogin('A conta '+S.me+' não está na lista de quem pode usar este site.',true);$('lSair').hidden=false;return}
+  const {data,error}=await sb.from('membros').select('email,nome');if(geracao!==geracaoAuth)return;
+  if(error)throw error;
+  if(!data||!data.length||!data.some(m=>m.email.toLowerCase()===S.me)){telaLogin('A conta '+S.me+' não está na lista de quem pode usar este site.',true);$('lSair').hidden=false;return}
   S.nomes=Object.fromEntries(data.map(m=>[m.email.toLowerCase(),m.nome]));
   $('whoName').textContent=S.nomes[S.me]||S.me.split('@')[0];if($('ver'))$('ver').textContent='Versão '+VERSAO;$('whoMail').textContent=S.me;
   if(standalone())$('instBtn').hidden=true;
   if(/access_token|type=/.test(location.hash))history.replaceState(null,'',location.pathname);
   let h=location.hash.slice(1);h=ALIAS[h]||h;if(VIEWS.some(v=>v.id===h)){S.view=h;S.ultima[grupoDe(h).id]=h}
-  $('login').hidden=true;$('app').hidden=false;
-  render();await recarregar();assinar();
+  if(!await recarregar()){telaLogin('Não deu para carregar seus dados. Tente entrar novamente.');return}
+  if(geracao!==geracaoAuth)return;$('login').hidden=true;$('app').hidden=false;assinar();
 }
 $('lGoogle').addEventListener('click',async()=>{
+  if($('lGoogle').disabled)return;try{
   $('lGoogle').disabled=true;msgLogin('Abrindo o Google…');
   const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:URL_SITE,queryParams:{prompt:'select_account'}}});
-  if(error){$('lGoogle').disabled=false;msgLogin(erroPT(error),true)}
+  if(error)throw error;
+  }catch(e){$('lGoogle').disabled=false;msgLogin(erroPT(e),true)}
 });
 async function entrarSenha(){
+  if($('lEntrar').disabled)return;try{
   const email=$('lEmail').value.trim(),password=$('lSenha').value;
   if(!/^\S+@\S+\.\S+$/.test(email))return msgLogin('Digite um e-mail válido.',true);
   if(!password)return msgLogin('Digite sua senha.',true);
@@ -2891,13 +3011,15 @@ async function entrarSenha(){
   const {data,error}=await sb.auth.signInWithPassword({email,password});
   $('lEntrar').disabled=false;
   if(error)return msgLogin(erroPT(error),true);
-  msgLogin('');aposLogin(data.session);
+  msgLogin('');await aposLogin(data.session);
+  }catch(e){msgLogin(erroPT(e),true)}finally{$('lEntrar').disabled=false}
 }
 $('lEntrar').addEventListener('click',entrarSenha);
 $('lSenha').addEventListener('keydown',e=>{if(e.key==='Enter')entrarSenha()});
 $('lEsqueci').addEventListener('click',()=>{modoLogin('lReset');$('lEmailR').value=$('lEmail').value;$('lEmailR').focus()});
 $('lVoltar').addEventListener('click',()=>modoLogin('lForm'));
 $('lEnviarR').addEventListener('click',async()=>{
+  if($('lEnviarR').disabled)return;try{
   const email=$('lEmailR').value.trim();
   if(!/^\S+@\S+\.\S+$/.test(email))return msgLogin('Digite um e-mail válido.',true);
   $('lEnviarR').disabled=true;
@@ -2905,8 +3027,10 @@ $('lEnviarR').addEventListener('click',async()=>{
   $('lEnviarR').disabled=false;
   if(error)return msgLogin(erroPT(error),true);
   msgLogin('Pronto! Se esse e-mail tiver acesso, chega um link em instantes. Abra-o neste aparelho para criar a senha.');
+  }catch(e){msgLogin(erroPT(e),true)}finally{$('lEnviarR').disabled=false}
 });
 $('lSalvarSenha').addEventListener('click',async()=>{
+  if($('lSalvarSenha').disabled)return;try{
   const s1=$('lSenha1').value,s2=$('lSenha2').value;
   if(s1.length<8)return msgLogin('Use pelo menos 8 caracteres.',true);
   if(s1!==s2)return msgLogin('As duas senhas não são iguais.',true);
@@ -2916,9 +3040,10 @@ $('lSalvarSenha').addEventListener('click',async()=>{
   if(error&&/aal2/i.test(error.message||'')){S.voltarSenha=true;telaMfa();return msgLogin('Para trocar a senha, confirme primeiro o código do aplicativo autenticador.',true)}
   if(error)return msgLogin(erroPT(error),true);
   recuperando=false;toast('Senha salva');
-  const {data:{session}}=await sb.auth.getSession();if(session)aposLogin(session);
+  const {data,error:erroSessao}=await sb.auth.getSession();if(erroSessao)throw erroSessao;if(data?.session)await aposLogin(data.session);
+  }catch(e){msgLogin(erroPT(e),true)}finally{$('lSalvarSenha').disabled=false}
 });
-async function sair(){fechar();await sb.auth.signOut();location.hash='';location.reload()}
+async function sair(){fechar();try{const {error}=await sb.auth.signOut();if(error)throw error;location.hash='';location.reload()}catch(e){toast('Não deu para sair: '+erroPT(e))}}
 $('lSair').addEventListener('click',sair);
 
 (async()=>{
@@ -2926,11 +3051,12 @@ $('lSair').addEventListener('click',sair);
   sb=window.supabase.createClient(CFG.url.replace(/\/(rest|auth)\/v1\/?$/,'').replace(/\/$/,''),CFG.anonKey);
   sb.auth.onAuthStateChange((ev,s)=>{
     if(ev==='PASSWORD_RECOVERY'){recuperando=true;$('app').hidden=true;$('login').hidden=false;modoLogin('lNova');return}
-    if(ev==='SIGNED_IN'&&s&&!recuperando&&$('app').hidden&&$('lSair').hidden)aposLogin(s);
+    if(ev==='SIGNED_OUT'){geracaoAuth++;clearTimeout(timer);S.me='';S.itens=[];S.card=[];S.cardTodos=[];S.metas=[];S.movMetas=[];S.cartoes=[];S.recorrentes=[];S.dividas=[];S.pagDiv=[];S.desejos=[];S.invest=[];S.hist=null;S._histV=(S._histV||0)+1;S.retro={};S._retroC={};S._retroV=(S._retroV||0)+1;S.saldoInicial=0;S.movCaixa=0;pedidosPendentes.clear();S._movCarregado=false;S._ultimaAssMov=undefined;if(canal){sb.removeChannel(canal);canal=null}fechar();$('view').innerHTML='';telaLogin();return}
+    if(ev==='SIGNED_IN'&&s&&!recuperando&&$('app').hidden&&$('lSair').hidden)setTimeout(()=>aposLogin(s),0);
   });
   const {data:{session}}=await sb.auth.getSession();
   if(recuperando&&session){$('app').hidden=true;$('login').hidden=false;modoLogin('lNova');return}
   const erroUrl=new URLSearchParams(location.hash.slice(1)+'&'+location.search.slice(1)).get('error_description');
   if(session)aposLogin(session);else telaLogin(erroUrl?'Não deu para entrar: '+erroUrl.replace(/\+/g,' '):'');
-})();
+})().catch(e=>telaLogin('Não deu para iniciar a sessão: '+erroPT(e)));
 })();
