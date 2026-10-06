@@ -570,26 +570,47 @@ function linhasProjecao(sm){
   tl.forEach(e=>{saldo+=e.entra?e.valor:-e.valor;linhas.push({d:e.data,t:e.txt,k:e.k,v:e.entra?e.valor:-e.valor,s:saldo,ic:e.ic||e.em})});
   return linhas;
 }
-/* gráfico em linha do tempo: entradas, gastos e investimentos mês a mês */
+/* gráfico em linha do tempo: entradas, gastos e investimentos de agosto/2026 até dezembro do ano seguinte.
+   Meses passados = realizado; do mês atual em diante = realizado + previsto (contas, entradas e aportes já programados). */
+const LINHA_INICIO='2026-08';
+function projecaoMes(m){
+  const r=resumo(m);let e=r.entradas,g=r.gastos,i=r.investido,prev=false;
+  if(m>=MES_ATUAL){
+    prev=true;
+    Object.values(eventosMes(m)).forEach(es=>es.forEach(x=>{
+      if(x.feito)return;const v=x.pend!=null?x.pend:x.valor;
+      if(x.transf){if((x.k||'').startsWith('Investimento · aporte'))i+=v;else if((x.k||'').startsWith('Investimento · resgate'))i-=v;return}
+      if(x.cartao||x.divida)return; // compras no cartão já entram pelo mês da compra
+      if(x.entra)e+=v;else if(x.sai)g+=v;
+    }));
+  }
+  return {m,e:cent(e),g:cent(g),i:cent(i),prev};
+}
 function graficoLinhaTempo(){
-  const n=S.tlN===6?6:12,vw=(document.getElementById('view')||{}).clientWidth||900,W=Math.round(Math.min(1300,Math.max(300,vw-64))),H=W<500?190:170,pl=W<500?40:46,pr=14,pt=10,pb=24;
-  const ms=[...Array(n)].map((_,i)=>addMes(S.mes,i-(n-1))),d=ms.map(m=>{const r=resumo(m);return {m,e:r.entradas,g:r.gastos,i:r.investido}});
+  const fim=(ANO_ATUAL+1)+'-12',ini=LINHA_INICIO<fim?LINHA_INICIO:addMes(MES_ATUAL,-2);
+  const ms=[];for(let m=ini;m<=fim;m=addMes(m,1))ms.push(m);
+  const n=ms.length,vw=(document.getElementById('view')||{}).clientWidth||900,W=Math.round(Math.min(1300,Math.max(300,vw-64))),H=W<500?190:170,pl=W<500?40:46,pr=14,pt=10,pb=24;
+  const d=ms.map(projecaoMes);
   const SER=[['e','Entradas','#16f27a'],['g','Gastos','#ff4560'],['i','Investimentos','#ffd76a']];
   const vals=d.flatMap(x=>[x.e,x.g,x.i]),mx=Math.max(1,...vals),mn=Math.min(0,...vals);
   const passo=(()=>{const bruto=(mx-mn)/3,p=Math.pow(10,Math.floor(Math.log10(bruto||1))),f=bruto/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p})();
   const topo=Math.ceil(mx/passo)*passo,base=Math.floor(mn/passo)*passo;
   const X=i=>pl+(n===1?0:i*(W-pl-pr)/(n-1)),Y=v=>pt+(topo-v)/(topo-base||1)*(H-pt-pb),larg=(W-pl-pr)/Math.max(1,n-1);
+  const ia=Math.max(0,ms.indexOf(MES_ATUAL));
   let grade='';for(let v=base;v<=topo+1e-6;v+=passo)grade+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" class="${v===0?'tl-zero':'tl-grade'}"/><text x="${pl-7}" y="${Y(v)+4}" text-anchor="end" class="tl-eixo">${KS(v)}</text>`;
-  const rot=d.map((x,i)=>`<text x="${X(i)}" y="${H-7}" text-anchor="middle" class="tl-eixo${x.m===S.mes?' atual':''}">${nomeMes(x.m,true)}${n>6&&x.m.slice(5)==='01'?' '+x.m.slice(2,4):''}</text>`).join('');
-  const linhas=SER.map(([k,nome,cor],si)=>`<polyline class="tl-linha" pathLength="1" style="animation-delay:${si*.12}s" fill="none" stroke="${cor}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="${d.map((x,i)=>X(i)+','+Y(x[k])).join(' ')}"/>`).join('');
-  const pts=d.map((x,i)=>SER.map(([k,,cor])=>`<circle class="tl-pt" data-i="${i}" cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===S.mes?4:2.8}" fill="${cor}"/>`).join('')).join('');
+  const pulo=W<700?2:1;
+  const rot=d.map((x,i)=>{const mostra=i%pulo===0||x.m===MES_ATUAL||x.m.slice(5)==='01';if(!mostra)return '';const ano=(i===0||x.m.slice(5)==='01')?`<tspan class="tl-ano" x="${X(i)}" dy="11">${x.m.slice(0,4)}</tspan>`:'';
+    return `<text x="${X(i)}" y="${H-14}" text-anchor="middle" class="tl-eixo${x.m===MES_ATUAL?' atual':''}">${nomeMes(x.m,true)}${ano}</text>`}).join('');
+  const faixa=ia<n-1?`<rect class="tl-prev" x="${X(ia)}" y="${pt}" width="${X(n-1)-X(ia)}" height="${H-pt-pb}"/><text x="${X(n-1)}" y="${pt+10}" text-anchor="end" class="tl-prevl">previsão</text>`:'';
+  const pol=(k,cor,de,ate,tracejado)=>`<polyline class="tl-linha${tracejado?' tl-tr':''}" ${tracejado?'':'pathLength="1" '}fill="none" stroke="${cor}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="${d.slice(de,ate+1).map((x,j)=>X(de+j)+','+Y(x[k])).join(' ')}"/>`;
+  const linhas=SER.map(([k,,cor])=>pol(k,cor,0,ia,false)+(ia<n-1?pol(k,cor,ia,n-1,true):'')).join('');
+  const pts=d.map((x,i)=>SER.map(([k,,cor])=>`<circle class="tl-pt${x.prev&&x.m>MES_ATUAL?' fut':''}" data-i="${i}" cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===MES_ATUAL?4:2.8}" fill="${cor}" style="--c:${cor}"/>`).join('')).join('');
   const hit=d.map((x,i)=>`<rect class="tl-hit" data-i="${i}" x="${X(i)-larg/2}" y="0" width="${larg}" height="${H}"/>`).join('');
-  const dados=JSON.stringify(d.map(x=>({t:nomeMes(x.m),v:SER.map(([k,nome,cor])=>[nome,cor,R(x[k])])}))).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  const atual=d[d.length-1];
-  return `<div class="panel tl-panel"><div class="panel-head"><div><h2>Linha do tempo</h2><p class="sub">Entradas, gastos e investimentos mês a mês, até ${esc(soMes(S.mes))}</p></div>
-    <div class="tl-n" role="group" aria-label="Período"><button data-act="tl-n" data-n="6" ${n===6?'aria-pressed="true"':''}>6 meses</button><button data-act="tl-n" data-n="12" ${n===12?'aria-pressed="true"':''}>12 meses</button></div></div>
-    <div class="tl-wrap" data-d="${dados}"><svg class="tl-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Gráfico em linha de entradas, gastos e investimentos por mês">${grade}${rot}<line class="tl-guia" y1="${pt}" y2="${H-pb}" x1="0" x2="0"/>${linhas}${pts}${hit}</svg><div class="tl-tip" hidden></div></div>
-    <div class="legend tl-leg">${SER.map(([k,nome,cor])=>`<span><i style="background:${cor}"></i>${nome} <b>${R0(atual[k])}</b></span>`).join('')}<span class="mut">valores de ${esc(soMes(S.mes))}</span></div></div>`;
+  const dados=JSON.stringify(d.map(x=>({t:nomeMes(x.m)+(x.m===MES_ATUAL?' · realizado + previsto':x.prev?' · previsto':''),v:SER.map(([k,nome,cor])=>[nome,cor,R(x[k])])}))).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const atual=d[ia];
+  return `<div class="panel tl-panel"><div class="panel-head"><div><h2>Linha do tempo</h2><p class="sub">${esc(nomeMes(ms[0]))} até ${esc(nomeMes(fim))} · do mês atual em diante, realizado + previsto</p></div></div>
+    <div class="tl-wrap" data-d="${dados}"><svg class="tl-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Gráfico em linha de entradas, gastos e investimentos por mês, com previsão até ${fim.slice(0,4)}">${faixa}${grade}${rot}<line class="tl-guia" y1="${pt}" y2="${H-pb}" x1="0" x2="0"/>${linhas}${pts}${hit}</svg><div class="tl-tip" hidden></div></div>
+    <div class="legend tl-leg">${SER.map(([k,nome,cor])=>`<span><i style="background:${cor}"></i>${nome} <b>${R0(atual[k])}</b></span>`).join('')}<span class="mut">valores de ${esc(soMes(MES_ATUAL))} (realizado + previsto)</span></div></div>`;
 }
 /* passar o mouse (ou tocar) no gráfico: guia, pontos em destaque e quadro com os valores do mês */
 (function(){
