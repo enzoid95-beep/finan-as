@@ -516,8 +516,8 @@ function vGeral(){
   const r=resumo(S.mes),pl=planejado(S.mes).gastos,pc=porCategoria(r.it);
   const dados=[...Array(6)].map((_,i)=>addMes(S.mes,i-5)).map(m=>({m,...resumo(m)}));
   const maxV=Math.max(1,...dados.map(d=>Math.max(d.entradas,d.gastos)));
-  const chart=dados.map(d=>`<div class="cg ${d.m===S.mes?'atual':''}" title="${esc(nomeMes(d.m))}: entrou ${R(d.entradas)}, saiu ${R(d.gastos)}">
-    <div class="cpair"><div class="cb"><i class="e" style="height:${d.entradas/maxV*100}%"></i></div><div class="cb"><i class="g" style="height:${d.gastos/maxV*100}%"></i></div></div><small>${nomeMes(d.m,true)}</small></div>`).join('');
+  const chart=dados.map(d=>`<div class="cg ${d.m===S.mes?'atual':''}">
+    <div class="cpair">${barraGrafico('e',d.entradas/maxV*100,d.m,'Entradas',d.entradas,[['Gastos do mês',d.gastos],['Saldo do mês',cent(d.entradas-d.gastos)]])}${barraGrafico('g',d.gastos/maxV*100,d.m,'Gastos',d.gastos,[['Entradas do mês',d.entradas],['Saldo do mês',cent(d.entradas-d.gastos)]])}</div><small>${nomeMes(d.m,true)}</small></div>`).join('');
   const cats=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,6),maxC=Math.max(1,...cats.map(c=>c[1]));
   const catsHTML=cats.length?cats.map(([id,v])=>{const c=CAT[id]||{em:'•',nome:id};const lim=Number(pl[id])||0;const ratio=lim?v/lim:v/maxC;
     return pbar(`${c.em} ${esc(c.nome)}`,R(v),lim?RF('de '+R0(lim)):'',ratio,lim?clsLim(ratio):'','neg')}).join(''):vazio('Nenhum gasto ainda','Lancem o primeiro gasto do mês para ver para onde o dinheiro está indo.',BTN('novo','Novo gasto','data-tipo="gasto"'));
@@ -777,7 +777,7 @@ function vCartoes(){
   ${histCartoes()}
   <div class="grid g2">
     <div class="panel"><h2>Próximas faturas</h2><p class="sub">Compromissos já assumidos, por mês de fechamento (fatura de setembro = fecha em setembro)</p>
-      <div class="chart" style="height:180px">${prox.map(p=>`<div class="cg ${p.m===MES_ATUAL?'atual':''}" title="${R(p.v)}${p.a<p.v?' · '+R(p.v-p.a)+' já pagos':''}"><div class="cpair"><div class="cb" style="max-width:38px;width:60%"><i class="g" style="height:${p.v/maxP*100}%"></i></div></div><small>${nomeMes(p.m,true)}</small></div>`).join('')}</div>
+      <div class="chart" style="height:180px">${prox.map(p=>`<div class="cg ${p.m===MES_ATUAL?'atual':''}"><div class="cpair">${barraGrafico('g',p.v/maxP*100,p.m,'Total das faturas',p.v,[['Já pago',cent(p.v-p.a)],['A pagar',p.a]],'max-width:38px;width:60%')}</div><small>${nomeMes(p.m,true)}</small></div>`).join('')}</div>
       <p class="nota">${pctRenda>30?'<span class="neg">Mais de 30% da renda já está comprometida no cartão. Segurem novas compras parceladas.</span>':'O ideal é manter o cartão abaixo de 30% da renda mensal.'}</p></div>
     <div class="panel"><h2>Compras parceladas</h2><p class="sub">Em andamento</p>
       ${parc.length?`<div class="mini">${parc.map(p=>`<div class="mini-row"><div class="em cc" style="--cc:${esc(p.cc?p.cc.cor:'#555')}">💳</div><div class="nm"><b>${esc(p.nome)}</b><small>${p.rest} de ${p.de} parcelas restantes · <span class="ref">${R0(p.total)}</span> a pagar · compra de ${R0(p.compra)} · termina ${mesAno(p.fim)}</small></div><div class="vl neg">${R(p.parcela)}<small class="mut" style="font:500 12px Barlow">/mês</small></div></div>`).join('')}</div>`:vazio('Nada parcelado','Nenhuma compra parcelada em andamento.')}
@@ -997,7 +997,7 @@ function vDividas(){
       return {m,v:at.reduce((s,x)=>s+saldoDevedor(x.d,Math.max(0,x.i.rest-k)),0)}});
       const mx=Math.max(1,...meses.map(x=>x.v)),passo=Math.ceil(meses.length/16);
       return `<div class="panel" style="margin-top:16px"><h2>Evolução do saldo devedor</h2><p class="sub">Pagando as parcelas em dia, mês a mês até a quitação</p>
-        <div class="chart div-chart">${meses.filter((_,k)=>k%passo===0||k===meses.length-1).map(x=>`<div class="cg" title="${esc(nomeMes(x.m))}: ${R(x.v)}"><div class="cpair"><div class="cb" style="width:70%;max-width:34px"><i class="g" style="height:${x.v/mx*100}%"></i></div></div><small>${mesAno(x.m).replace('/20','/')}</small></div>`).join('')}</div></div>`})()}
+        <div class="chart div-chart">${meses.filter((_,k)=>k%passo===0||k===meses.length-1).map(x=>`<div class="cg"><div class="cpair">${barraGrafico('g',x.v/mx*100,x.m,'Saldo devedor',x.v,[],'width:70%;max-width:34px')}</div><small>${mesAno(x.m).replace('/20','/')}</small></div>`).join('')}</div></div>`})()}
   <p class="nota">Dica: se houver mais de uma dívida, priorizem quitar antes a de <b>maior juros</b>. Ao pagar uma parcela, a parte que abate a dívida reduz o saldo devedor; só os juros contam como gasto.</p>`;
 }
 
@@ -1192,7 +1192,7 @@ function vRetro(){
   </div>
   <div class="grid g21">
     <div class="panel"><h2>Mês a mês</h2><p class="sub">Entradas e gastos de ${ano}</p>
-      <div class="chart12" style="grid-template-columns:repeat(${Math.max(meses.length,6)},1fr)">${meses.map(x=>`<div class="cg" title="${esc(nomeMes(x.m))}: entrou ${R(x.ent)}, saiu ${R(x.gas)}"><div class="cpair"><div class="cb"><i class="e" style="height:${x.ent/maxV*100}%"></i></div><div class="cb"><i class="g" style="height:${x.gas/maxV*100}%"></i></div></div><small>${nomeMes(x.m,true).charAt(0)}</small></div>`).join('')}</div>
+      <div class="chart12" style="grid-template-columns:repeat(${Math.max(meses.length,6)},1fr)">${meses.map(x=>`<div class="cg"><div class="cpair">${barraGrafico('e',x.ent/maxV*100,x.m,'Entradas',x.ent,[['Gastos do mês',x.gas],['Saldo do mês',cent(x.ent-x.gas)]])}${barraGrafico('g',x.gas/maxV*100,x.m,'Gastos',x.gas,[['Entradas do mês',x.ent],['Saldo do mês',cent(x.ent-x.gas)]])}</div><small>${nomeMes(x.m,true).charAt(0)}</small></div>`).join('')}</div>
       <div class="legend"><span><i style="background:#16f27a"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
     <div class="panel"><h2>Para onde foi o dinheiro</h2><p class="sub">Categorias do ano</p>
       ${topC.slice(0,8).map(([id,v])=>{const c=CAT[id]||{em:'•',nome:id};return pbar(`${c.em} ${esc(c.nome)}`,R0(v),Math.round(v/gas*100)+'%',v/topC[0][1],'','neg')}).join('')}</div>
@@ -1283,6 +1283,51 @@ function ligarPizza(){
     el.addEventListener('mouseleave',()=>ativar(null));
     el.addEventListener('click',e=>{e.stopPropagation();ativar(el.classList.contains('on')&&e.pointerType!=='mouse'?null:i,e)});
   });
+}
+
+/* ================= barras com relevo e detalhes ================= */
+function barraGrafico(classe,altura,mes,label,valor,extra=[],style=''){
+  const h=Number.isFinite(altura)?Math.max(0,Math.min(100,altura)):0;
+  return `<div class="cb bar-track"${style?` style="${esc(style)}"`:''}><i class="${classe==='g'?'g':'e'} bar-3d${cent(valor)===0?' bar-zero':''}" style="height:${h}%" tabindex="0" role="img" aria-label="${esc(label+' · '+nomeMes(mes))}" aria-describedby="chartBarTip" data-bar-value="${cent(valor)}" data-bar-period="${esc(nomeMes(mes))}" data-bar-label="${esc(label)}" data-bar-extra="${esc(JSON.stringify(extra))}"></i></div>`;
+}
+function conteudoBarra(bar){
+  const money=v=>S.priv?'R$ •••':R(Number(v)||0),d=bar.dataset;
+  let extra=[];try{extra=JSON.parse(d.barExtra||'[]')}catch(e){}
+  return `<div class="bar-tip-month">${esc(d.barPeriod)}</div><div class="bar-tip-heading"><i class="${bar.classList.contains('g')?'g':'e'}"></i><b>${esc(d.barLabel)}</b></div><div class="bar-tip-value">${money(d.barValue)}</div>${extra.length?`<div class="bar-tip-details">${extra.map(([label,value])=>`<div><span>${esc(label)}</span><b>${money(value)}</b></div>`).join('')}</div>`:''}`;
+}
+let BAR_CTL=null;
+function ligarBarras(root=$('view')){
+  if(BAR_CTL)BAR_CTL.abort();
+  let tip=document.getElementById('chartBarTip');if(tip)tip.hidden=true;
+  const bars=[...root.querySelectorAll('[data-bar-value]')];if(!bars.length)return;
+  BAR_CTL=new AbortController();const signal=BAR_CTL.signal;
+  if(!tip){tip=document.createElement('div');tip.id='chartBarTip';tip.className='bar-tip';tip.setAttribute('role','tooltip');tip.hidden=true;document.body.append(tip)}
+  let active=null;
+  const hide=()=>{if(active)active.classList.remove('bar-active');active=null;tip.hidden=true};
+  const position=(bar,e)=>{
+    const r=bar.getBoundingClientRect(),t=tip.getBoundingClientRect();
+    const x=e&&Number.isFinite(e.clientX)?e.clientX:r.left+r.width/2;
+    const y=e&&Number.isFinite(e.clientY)?e.clientY:r.top;
+    const left=Math.min(Math.max(10,x+16),Math.max(10,window.innerWidth-t.width-10));
+    let top=y-t.height-14;if(top<10)top=y+20;
+    tip.style.left=left+'px';tip.style.top=Math.min(Math.max(10,top),Math.max(10,window.innerHeight-t.height-10))+'px';
+  };
+  const show=(bar,e)=>{
+    if(active&&active!==bar)active.classList.remove('bar-active');active=bar;bar.classList.add('bar-active');
+    tip.innerHTML=conteudoBarra(bar);tip.hidden=false;position(bar,e);
+  };
+  bars.forEach(bar=>{
+    const track=bar.closest('.bar-track');
+    track.addEventListener('pointerenter',e=>{if(e.pointerType!=='touch')show(bar,e)},{signal});
+    track.addEventListener('pointermove',e=>{if(active===bar&&e.pointerType!=='touch')position(bar,e)},{signal});
+    track.addEventListener('pointerleave',()=>{if(document.activeElement===bar)show(bar);else if(active===bar)hide()},{signal});
+    track.addEventListener('click',e=>{e.stopPropagation();show(bar,e)},{signal});
+    bar.addEventListener('focus',()=>show(bar),{signal});
+    bar.addEventListener('blur',()=>{if(active===bar)hide()},{signal});
+    bar.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();hide()}else if(['Enter',' '].includes(e.key)){e.preventDefault();show(bar)}},{signal});
+  });
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.bar-track'))hide()},{signal});
+  window.addEventListener('scroll',hide,{signal,capture:true});window.addEventListener('resize',hide,{signal});
 }
 
 /* ================= movimento: números e barras ================= */
@@ -1401,7 +1446,7 @@ function vPatrimonio(){
     <div class="tile"><div class="k">Dívidas</div><div class="v ${at.dividas>0?'neg':'zero'}">${R0(at.dividas)}</div><div class="d">saldo devedor</div></div>
   </div>
   <div class="panel"><h2>Desde setembro de 2026</h2><p class="sub">Patrimônio registrado em cada mês · o mês atual mostra o valor de hoje</p>
-    <div class="chart-pat" style="--n:${meses.length}">${meses.map(x=>`<div class="cg ${x.m===MES_ATUAL?'atual':''}" title="${esc(nomeMes(x.m))}: ${R(x.liquido)}"><small class="cval ${cS(x.liquido)}">${R0(x.liquido)}</small><div class="cpair"><div class="cb"><i class="${x.liquido>=0?'e':'g'}" style="height:${Math.abs(x.liquido)/mx*100}%"></i></div></div><small>${nomeMes(x.m,true)}${x.m===MES_ATUAL?' (atual)':''}</small></div>`).join('')}</div>
+    <div class="chart-pat" style="--n:${meses.length}">${meses.map(x=>`<div class="cg ${x.m===MES_ATUAL?'atual':''}"><small class="cval ${cS(x.liquido)}">${R0(x.liquido)}</small><div class="cpair">${barraGrafico(x.liquido>=0?'e':'g',Math.abs(x.liquido)/mx*100,x.m,'Patrimônio líquido',x.liquido,[['Caixa',x.caixa],['Metas e reserva',x.metas],['Investimentos',x.invest],['Dívidas',x.dividas]])}</div><small>${nomeMes(x.m,true)}${x.m===MES_ATUAL?' (atual)':''}</small></div>`).join('')}</div>
     <div class="tbl-wrap" style="margin-top:14px"><table><thead><tr><th>Mês</th><th class="r">Caixa</th><th class="r">Metas</th><th class="r">Investimentos</th><th class="r">Dívidas</th><th class="r">Patrimônio</th></tr></thead><tbody>
     ${[...meses].reverse().map(x=>`<tr class="row"><td>${esc(nomeMes(x.m))}${x.m===MES_ATUAL?' (atual)':''}</td><td class="r vl ${cS(x.caixa)}">${R0(x.caixa)}</td><td class="r vl ${cS(x.metas)}">${R0(x.metas)}</td><td class="r vl ${cS(x.invest)}">${R0(x.invest)}</td><td class="r vl ${x.dividas>0?'neg':'zero'}">${R0(x.dividas)}</td><td class="r vl ${cS(x.liquido)}">${R0(x.liquido)}</td></tr>`).join('')}
     </tbody></table></div>
@@ -1572,9 +1617,10 @@ function render(animarMovimento=false){
   $('view').innerHTML=subAbas()+(V[S.view]||vGeral)();
   ligarOrcamento();
   ligarPizza();
+  ligarBarras();
   ligarCardsDetalhes($('view'));
   animar(animarMovimento);
-  if(S.view==='radar')window.ControleRadar.bind($('view'),{redraw:()=>render(),toast,mark:marcarValores,openModal:html=>modal(html),fetchMarket:async()=>{const {data,error}=await sb.functions.invoke(CFG.radarFunction||'radar-mercado',{body:{}});if(error)throw error;return data}});
+  if(S.view==='radar')window.ControleRadar.bind($('view'),{redraw:()=>render(),toast,mark:marcarValores,openModal:html=>modal(html),fetchMarket:async(body={})=>{const {data,error}=await sb.functions.invoke(CFG.radarFunction||'radar-mercado',{body:{...body,stocksOnly:true}});if(error)throw error;return data}});
   const ctc=$('ctCartao');if(ctc)ctc.addEventListener('change',()=>{S.ctF.cartao=ctc.value;render()});
   marcarValores($('view'));melhorarDatas($('view'));melhorarSelects($('view'));soNumeros($('view'));
   const b=$('fBusca'),c=$('fCat');
@@ -2629,7 +2675,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='25';
+const VERSAO='26';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
