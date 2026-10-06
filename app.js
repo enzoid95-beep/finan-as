@@ -629,7 +629,7 @@ function vCalendario(){
   const sel=ev[S.calDia]||[];
   const tot=Object.values(ev).flat();
   const entM=tot.filter(e=>e.entra).reduce((s,e)=>s+e.valor,0),saiM=tot.filter(e=>e.sai).reduce((s,e)=>s+e.valor,0);
-  const pendM=tot.filter(e=>!e.feito&&e.sai).reduce((s,e)=>s+e.valor,0);
+  const pendM=tot.filter(e=>!e.feito&&e.sai).reduce((s,e)=>s+(e.pend!=null?e.pend:e.valor),0);
   const entRec=tot.filter(e=>e.entra&&e.feito).reduce((s,e)=>s+e.valor,0);
   return head('Calendário','Tudo que entra e sai, dia a dia.',BTN('novo','Novo lançamento','data-tipo="gasto"'))+`
   <div class="tiles">
@@ -1498,8 +1498,9 @@ function render(animarMovimento=false){
   $('view').innerHTML=subAbas()+(V[S.view]||vGeral)();
   ligarOrcamento();
   ligarPizza();
+  ligarCardsDetalhes($('view'));
   animar(animarMovimento);
-  if(S.view==='radar')window.ControleRadar.bind($('view'),{redraw:()=>render(),toast,mark:marcarValores,fetchMarket:async()=>{const {data,error}=await sb.functions.invoke(CFG.radarFunction||'radar-mercado',{body:{}});if(error)throw error;return data}});
+  if(S.view==='radar')window.ControleRadar.bind($('view'),{redraw:()=>render(),toast,mark:marcarValores,openModal:html=>modal(html),fetchMarket:async()=>{const {data,error}=await sb.functions.invoke(CFG.radarFunction||'radar-mercado',{body:{}});if(error)throw error;return data}});
   const ctc=$('ctCartao');if(ctc)ctc.addEventListener('change',()=>{S.ctF.cartao=ctc.value;render()});
   marcarValores($('view'));melhorarDatas($('view'));melhorarSelects($('view'));soNumeros($('view'));
   const b=$('fBusca'),c=$('fCat');
@@ -1516,10 +1517,142 @@ function render(animarMovimento=false){
     ['simNome','simValor','simN'].forEach(id=>$(id).addEventListener('input',upd));$('simForma').addEventListener('change',upd);
   }
 }
+/* ================= cards: composição dos valores ================= */
+function ligarCardsDetalhes(root,origem=S.view){
+  root.querySelectorAll('.tile,.kpi,.fact').forEach(card=>{
+    if(card.dataset.act)return; // mantém as janelas de detalhe que já existiam
+    const title=card.querySelector('.k')||card.querySelector('small');
+    const value=card.querySelector('.v')||card.querySelector('b');
+    if(!title||!value)return;
+    const snapshot={origem:card.closest('.fat-view')?'fatura':origem,titulo:title.textContent.trim(),valor:value.textContent.trim(),sub:card.querySelector('.d')?.textContent.trim()||'',fechado:!!card.closest('.fech-p')};
+    card.classList.add('valor-card');card.setAttribute('role','button');card.tabIndex=0;
+    card.setAttribute('aria-label',snapshot.titulo+': '+snapshot.valor+'. Ver composição detalhada');
+    card.title='Clique para ver de onde vem este valor';
+    card.addEventListener('click',e=>{if(e.target.closest('button,a,input,select,summary,details'))return;e.stopPropagation();modalCardDetalhe(snapshot)});
+    card.addEventListener('keydown',e=>{if(e.target!==card||!['Enter',' '].includes(e.key))return;e.preventDefault();e.stopPropagation();modalCardDetalhe(snapshot)});
+  });
+}
+function dadosCardDetalhe(view,titulo,fechado=false){
+  const key=semAcento(titulo),m=S.mes,r=resumo(m),sm=situacaoMes(),groups=[],lines=[];
+  let formula='',nota='';
+  const row=(label,value,detail='',tipo='money')=>({label,value,detail,tipo});
+  const add=(title,rows,total)=>groups.push({title,rows,total});
+  const line=(label,value,detail='',tipo='money')=>lines.push(row(label,value,detail,tipo));
+  const tx=i=>row(descVis(i),i.tipo==='resgate'?-i.valor:i.valor,[i.data?dataLonga(i.data):'',catVis(i).nome,i.status==='comprometido'?'No cartão · ainda a pagar':i.status==='previsto'?'Previsto':'Confirmado',i.parcelas>1?`Parcela ${i.parcela}/${i.parcelas}`:''].filter(Boolean).join(' · '));
+  const ev=e=>row(e.txt,e.valor,[e.data?dataLonga(e.data):'',e.k,e.feito?'Realizado':'Pendente'].filter(Boolean).join(' · '));
+  const total=a=>cent(a.reduce((s,x)=>s+x.valor,0));
+  const eventos=Object.entries(eventosMes(m)).flatMap(([data,es])=>es.map(e=>({...e,data}))).sort((a,b)=>a.data.localeCompare(b.data));
+  const transactions=(title,arr,signed=false)=>add(title,arr.map(tx),signed?cent(arr.reduce((s,i)=>s+(i.tipo==='resgate'?-i.valor:i.valor),0)):total(arr));
+  if(fechado){
+    const f=S.fech[m],o=f?.resumo||{};formula='Este card é uma fotografia salva no fechamento do mês; não é recalculado com lançamentos posteriores.';
+    [['Entradas',o.entradas],['Gastos',o.gastos],['Investimentos',o.investimentos],['Metas',o.metas],['Saldo final',o.saldo_final]].forEach(([n,v])=>line(n,v==null?'Não registrado':v,'',v==null?'text':'money'));
+    nota=f?'Fechamento registrado em '+dataLonga((f.criado_em||HOJE).slice(0,10))+'. Os lançamentos atuais podem diferir desta fotografia.':'';
+  }else if(view==='calendario'){
+    const entradas=eventos.filter(e=>e.entra),saidas=eventos.filter(e=>e.sai),pendentes=saidas.filter(e=>!e.feito).map(e=>({...e,valor:e.pend!=null?e.pend:e.valor}));
+    if(key.startsWith('entradas')){formula='Entradas previstas no mês = entradas e resgates realizados + entradas e resgates ainda previstos.';add('Já recebido / resgatado',entradas.filter(e=>e.feito).map(ev),total(entradas.filter(e=>e.feito)));add('Ainda previsto',entradas.filter(e=>!e.feito).map(ev),total(entradas.filter(e=>!e.feito)));}
+    else if(key==='ainda a pagar'){formula='Ainda a pagar = eventos de saída pendentes neste mês. Para faturas parcialmente pagas, conta apenas a parte pendente.';add('Compromissos pendentes',pendentes.map(ev),total(pendentes));}
+    else if(key.startsWith('resultado')){formula='Resultado projetado = total de entradas do calendário − total de saídas do calendário. Não representa o saldo em caixa.';line('Entradas do calendário',total(entradas));line('Saídas do calendário',-total(saidas));add('Entradas',entradas.map(ev),total(entradas));add('Saídas',saidas.map(ev),total(saidas));}
+    else{formula='Saídas previstas = eventos de saída já realizados + total dos eventos de saída previstos, incluindo faturas, parcelas e transferências.';add('Saídas realizadas',saidas.filter(e=>e.feito).map(ev),total(saidas.filter(e=>e.feito)));add('Saídas em eventos ainda pendentes',saidas.filter(e=>!e.feito).map(ev),total(saidas.filter(e=>!e.feito)));}
+    nota='Período: '+nomeMes(m)+'. O calendário representa movimentação de caixa, incluindo transferências; uma compra no cartão aparece na fatura para evitar contá-la duas vezes.';
+  }else if(view==='entradas'){
+    if(key==='recebido no mes'){formula='Recebido no mês = soma das entradas confirmadas no mês selecionado.';transactions('Entradas recebidas',r.ef.filter(i=>i.tipo==='entrada'));}
+    else if(key==='ainda previsto'){formula='Ainda previsto = entradas automáticas e agendadas que ainda não foram recebidas. No mês atual, inclui entradas atrasadas de meses anteriores.';const a=previstasEntrar();add('Entradas a receber',a.map(ev),total(a));nota='A previsão só passa a recebido quando a ocorrência for confirmada. Resgates de investimentos não fazem parte desta lista de entradas.';}
+    else if(key==='media mensal'){formula='Média mensal = entradas dos três meses anteriores ÷ 3, inclusive meses com zero.';[1,2,3].map(k=>addMes(m,-k)).forEach(mes=>line(nomeMes(mes),resumo(mes).entradas));line('Divisor',3,'','text');}
+    else{const ant=resumo(addMes(m,-1)).entradas;formula='Variação = (recebido no mês − recebido no mês anterior) ÷ recebido no mês anterior × 100.';line('Recebido em '+nomeMes(m),r.entradas);line('Recebido em '+nomeMes(addMes(m,-1)),ant);nota=ant>0?'O card arredonda a variação para um percentual inteiro.':'Sem entradas no mês anterior, não é possível calcular a variação percentual.';}
+  }else if(view==='gastos'){
+    const gastos=r.ef.filter(i=>i.tipo==='gasto'),cartao=gastos.filter(i=>i.cartao_id&&i.status==='comprometido');
+    if(key==='orcamento usado'){const orc=planejado(m).gastos;formula='Orçamento usado = gastos realizados ÷ soma dos limites planejados das categorias × 100.';line('Gastos realizados',r.gastos);add('Limites por categoria',CATS_G.map(c=>row(c.nome,Number(orc[c.id])||0)),CATS_G.reduce((s,c)=>s+(Number(orc[c.id])||0),0));}
+    else if(key==='maior gasto'){formula='Maior valor entre os gastos realizados do mês que podem ser detalhados para esta conta.';const maior=[...gastos].filter(i=>!outroLivre(i)).sort((a,b)=>b.valor-a.valor)[0];transactions('Lançamento de maior valor',maior?[maior]:[]);}
+    else if(key==='a ser pago no cartao'){formula='Compras do mês com status comprometido: já são despesa, mas ainda não saíram do caixa.';transactions('Compras com fatura pendente',cartao);}
+    else{formula='Total gasto = gastos pagos fora do cartão + compras no cartão, inclusive faturas ainda pendentes.';transactions('Gastos realizados',gastos);}
+  }else if(view==='transf'){
+    let a=doMes(m).filter(i=>i.tipo==='aporte'||i.tipo==='resgate'||i.tipo==='divida');
+    if(key==='para metas e reserva'){a=a.filter(i=>i.meta_id&&efetivo(i));formula='Transferências para metas e reserva = aportes − resgates no mês.';}
+    else if(key==='para investimentos'){a=a.filter(i=>efetivo(i)&&!i.meta_id&&(i.tipo==='aporte'||i.tipo==='resgate'));formula='Transferências para investimentos = aportes − resgates no mês.';}
+    else if(key==='dividas amortizadas'){a=a.filter(i=>i.tipo==='divida');formula='Soma dos pagamentos de dívida registrados neste mês, incluindo os previstos que aparecem na tela.';nota='O valor pago pode incluir juros; confira a parcela e o saldo devedor na aba Dívidas.';}
+    else{formula='Quantidade de transferências e pagamentos de dívidas realizados no mês.';line('Movimentações',a.length,'','text');}
+    transactions('Movimentações do mês',a,true);
+  }else if(view==='cartoes'){
+    if(key==='limite disponivel'){formula='Limite disponível = limites cadastrados − compras comprometidas em todas as faturas.';add('Limites por cartão',S.cartoes.map(c=>row(c.nome,c.limite,'Limite cadastrado')),S.cartoes.reduce((s,c)=>s+c.limite,0));add('Uso por cartão',S.cartoes.map(c=>row(c.nome,usadoCartao(c.id),'Compras ainda comprometidas')),S.cartoes.reduce((s,c)=>s+usadoCartao(c.id),0));}
+    else if(key==='parcelado futuro'){formula='Soma das compras comprometidas em faturas que fecham depois da próxima fatura.';transactions('Compras e parcelas futuras',S.card.filter(i=>i.status==='comprometido'&&refDoItem(i)>addMes(MES_ATUAL,1)));}
+    else{const ref=key==='fatura de '+semAcento(soMes(MES_ATUAL))?MES_ATUAL:addMes(MES_ATUAL,1);formula='Fatura = soma das compras no período de fechamento de cada cartão.';S.cartoes.forEach(c=>{const f=faturaRef(c,ref);transactions(c.nome+' · vence '+dataLonga(f.venc),f.it)});nota='A referência exibida é o mês em que a fatura fecha. O vencimento pode ocorrer no mês seguinte.';}
+  }else if(view==='contas'){
+    const f=S.ctF||{};const out=[];
+    S.recorrentes.forEach(reg=>{const st=statusConta(reg,m),oc=st.oc,ativo=(reg.ativa&&reg.inicio<=m&&!(reg.fim&&m>reg.fim))||oc;if(!ativo||oc?.status==='cancelado')return;out.push({nome:reg.descricao,valor:oc?oc.valor:reg.valor,tipo:reg.tipo,dono:reg.dono||'',cartao:reg.cartao_id||'',data:oc?.data||diaNoMes(m,reg.dia),pago:st.k==='ok'||oc?.status==='comprometido',aberto:oc?.status==='comprometido',status:st.txt})});
+    doMes(m).filter(i=>!i.recorrente_id&&i.status==='previsto').forEach(i=>out.push({nome:descVis(i),valor:i.valor,tipo:i.tipo,dono:i.dono||'',cartao:i.cartao_id||'',data:i.data,pago:false,aberto:false,status:'Agendado'}));
+    S.card.filter(i=>!i.recorrente_id&&i.mes===m&&efetivo(i)).forEach(i=>out.push({nome:descVis(i),valor:i.valor,tipo:'gasto',dono:i.dono||'',cartao:i.cartao_id||'',data:i.data,pago:true,aberto:i.status==='comprometido',status:i.status==='comprometido'?'No cartão · a pagar':'Fatura paga'}));
+    let a=out.filter(x=>(!f.dono||x.dono===f.dono)&&(!f.cartao||(f.cartao==='sem'?!x.cartao:x.cartao===f.cartao)));
+    if(key==='entradas previstas'){a=a.filter(x=>x.tipo==='entrada');formula='Soma das entradas das contas que valem para o mês, recebidas ou ainda previstas.';}
+    else{a=a.filter(x=>x.tipo==='gasto');if(key==='ja realizado como despesa'){a=a.filter(x=>x.pago);formula='Contas realizadas + compras no cartão, mesmo com fatura pendente.';}else if(key==='ainda a pagar'){a=a.filter(x=>!x.pago||x.aberto);formula='Contas ainda pendentes + contas e compras já realizadas no cartão com fatura em aberto.';}else formula='Total das despesas das contas ativas e das compras do cartão neste mês, incluindo pagas e pendentes.';}
+    add('Composição com os filtros da tela',a.map(x=>row(x.nome,x.valor,dataLonga(x.data)+' · '+x.status)),total(a));nota='Os filtros de pessoa e cartão da tela também são aplicados aqui. Contas pausadas, fora do prazo ou puladas são excluídas.';
+  }else if(view==='dividas'){
+    const a=S.dividas.map(d=>({...d,info:infoDivida(d)})).filter(d=>d.info.rest>0);const saldo=a.reduce((s,d)=>s+d.info.saldo,0);
+    if(key==='saldo devedor'){formula='Soma dos saldos devedores estimados das dívidas ativas.';add('Dívidas ativas',a.map(d=>row(d.nome,d.info.saldo,`${d.info.rest} parcelas restantes · juros ${d.juros||0}% ao mês`)),saldo);}
+    else if(key==='parcela mensal'){formula='Soma das parcelas mensais das dívidas ativas.';add('Parcelas',a.map(d=>row(d.nome,d.parcela,`${d.info.rest} parcelas restantes`)),a.reduce((s,d)=>s+d.parcela,0));}
+    else if(key==='juros medios'){formula='Juros médios = soma de (saldo × juros mensais) ÷ saldo devedor total.';add('Taxas e pesos',a.map(d=>row(d.nome,(d.juros||0)+'% a.m.',`Saldo ${R(d.info.saldo)} · peso ${saldo>0?(d.info.saldo/saldo*100).toFixed(2):0}%`,'text')));}
+    else{formula='Previsão de quitação = último mês de término das dívidas ativas, mantendo as parcelas em dia.';add('Previsões por dívida',a.map(d=>row(d.nome,d.info.fim?nomeMes(d.info.fim):'Quitada',`${d.info.rest} parcelas restantes`,'text')));}
+    nota='Saldo estimado pelas parcelas restantes e juros informados. Se houver juros, usa o valor presente das parcelas; confira o saldo oficial com a instituição.';
+  }else if(view==='metas'){
+    const a=S.metas.filter(x=>!x.reserva);
+    if(key==='guardado neste mes'){formula='Guardado no mês = aportes em metas e reserva − resgates, no mês selecionado.';transactions('Aportes e resgates',r.ef.filter(i=>i.meta_id),true);}
+    else if(key==='valor das metas'){formula='Soma dos alvos das metas, sem a reserva de emergência.';add('Alvos cadastrados',a.map(x=>row(x.nome,alvoMeta(x),`Guardado: ${R(guardadoMeta(x.id))}`)),a.reduce((s,x)=>s+alvoMeta(x),0));}
+    else if(key==='metas batidas'){formula='Metas com saldo guardado maior ou igual ao alvo cadastrado.';add('Situação de cada meta',a.map(x=>row(x.nome,guardadoMeta(x.id)>=alvoMeta(x)?'Batida':'Em andamento',`Guardado ${R(guardadoMeta(x.id))} / alvo ${R(alvoMeta(x))}`,'text')));}
+    else{formula='Soma dos saldos guardados em metas, sem a reserva de emergência.';add('Saldo por meta',a.map(x=>row(x.nome,guardadoMeta(x.id),`Alvo ${R(alvoMeta(x))}`)),a.reduce((s,x)=>s+guardadoMeta(x.id),0));}
+  }else if(view==='reserva'){
+    const med=media(),meta=S.metas.find(x=>x.reserva);formula=key.startsWith('ideal')?'Ideal = gasto médio × 6, arredondado para a centena mais próxima.':key.startsWith('previsao')?'Previsão baseada no ritmo líquido de aportes dos últimos três meses.':'Gasto médio calculado nos meses com histórico, dentre os últimos três meses fechados; sem histórico, utiliza o mês atual.';
+    let ms=[1,2,3].map(k=>addMes(MES_ATUAL,-k)).filter(mes=>S.base.some(x=>x.mes===mes));if(!ms.length)ms=[MES_ATUAL];
+    add('Gastos usados na média',ms.map(mes=>row(nomeMes(mes),S.base.filter(x=>x.mes===mes&&x.tipo==='gasto').reduce((s,x)=>s+x.valor,0))));line('Gasto médio mensal',med.gas);line('Reserva guardada',reservaAtual());line('Referência de 6 meses',reservaIdeal());
+    if(meta){line('Alvo cadastrado',meta.alvo);line('Falta para o alvo',Math.max(0,meta.alvo-guardadoMeta(meta.id)));line('Previsão',previsaoMeta(meta).txt,'','text');}
+  }else if(view==='investimentos'){
+    const a=S.invest,aplicado=a.reduce((s,x)=>s+x.aplicado,0),atual=totalInvest();
+    if(key==='aportes no mes'){formula='Aportes do mês atual − resgates do mês atual, sem transferências para metas.';const rr=resumo(MES_ATUAL);transactions('Movimentações de investimentos',rr.ef.filter(i=>!i.meta_id&&(i.tipo==='aporte'||i.tipo==='resgate')),true);}
+    else{formula=key==='rentabilidade'?'Rentabilidade = (valor atual − capital aplicado) ÷ capital aplicado × 100. Não é rentabilidade anualizada.':key==='resultado'?'Resultado = soma dos valores atuais − soma do capital aplicado.':'Patrimônio investido = soma dos valores atuais cadastrados.';line('Valor atual total',atual);line('Capital aplicado total',aplicado);line('Diferença',atual-aplicado);add('Aplicações cadastradas',a.map(x=>row(x.produto||x.nome||(INVT[x.tipo]||{}).nome||x.tipo,x.valor,`${x.nome||''} · aplicado ${R(x.aplicado)} · resultado ${R(x.valor-x.aplicado)} · ${x.instituicao||'Instituição não informada'}`)),atual);}
+    nota='Valores cadastrados no dashboard. Não são atualizados automaticamente pela cotação de mercado.';
+  }else if(view==='patrimonio'||view==='relmes'){
+    if(view==='relmes'&&(key==='entradas'||key==='gastos')){const type=key==='entradas'?'entrada':'gasto';formula='Soma dos lançamentos realizados do tipo selecionado no mês.';transactions('Lançamentos de '+nomeMes(m),r.ef.filter(i=>i.tipo===type));}
+    else if(view==='relmes'&&key==='investimentos e metas'){formula='Investimentos e metas = aportes líquidos em investimentos + aportes líquidos em metas e reserva.';transactions('Aportes menos resgates',r.ef.filter(i=>i.tipo==='aporte'||i.tipo==='resgate'),true);line('Investimentos líquidos',r.investido);line('Metas e reserva líquidas',r.guardado);}
+    else{const period=view==='patrimonio'?MES_ATUAL:m,pat=patrimonioEm(period);formula=key==='caixa + metas'?'Caixa + saldos das metas e reserva na data de referência.':key==='investimentos'?'Valor dos investimentos na data de referência.':key==='dividas'?'Saldo devedor das dívidas na data de referência.':key==='caixa atual'||key==='saldo final do mes'?'Caixa = saldo inicial + entradas e resgates − saídas confirmadas até a data de referência.':'Patrimônio líquido = caixa + metas e reserva + investimentos − dívidas.';line('Caixa',pat.caixa);line('Metas e reserva',pat.metas);line('Investimentos',pat.invest);line('Dívidas',-pat.dividas);line('Patrimônio líquido',pat.liquido);nota='Referência: '+nomeMes(period)+'. Meses passados usam o histórico de lançamentos; o mês atual usa os valores atuais do dashboard.';}
+  }else if(view==='desejos'){
+    let a=S.desejos;if(key==='prioridade alta')a=a.filter(x=>x.status==='aberto'&&x.prioridade===1);else if(key==='viraram meta')a=a.filter(x=>x.status==='meta');else a=a.filter(x=>x.status==='comprado');formula='Quantidade de desejos com o status indicado no card.';line('Quantidade',a.length,'','text');add('Desejos incluídos',a.map(x=>row(x.nome,x.valor,`Status: ${x.status} · prioridade ${x.prioridade}`)),total(a));
+  }else if(view==='retro'){
+    const a=(S.retro[S.ano]||[]).filter(i=>i.data<=HOJE),meses=[...new Set(a.map(i=>i.mes))];const por=meses.map(mes=>{const its=a.filter(i=>i.mes===mes),ent=total(its.filter(i=>i.tipo==='entrada')),gas=total(its.filter(i=>i.tipo==='gasto'));return {mes,its,ent,gas,saldo:ent-gas}});
+    if(key.startsWith('mes campeao')||key==='mes mais apertado'){const p=[...por].sort((a,b)=>key.startsWith('mes campeao')?b.saldo-a.saldo:a.saldo-b.saldo)[0];formula='Comparação dos resultados (entradas − gastos) entre os meses com lançamentos.';if(p){line('Mês',nomeMes(p.mes),'','text');line('Entradas',p.ent);line('Gastos',p.gas);line('Resultado',p.saldo);transactions('Lançamentos do mês',p.its.filter(i=>['entrada','gasto'].includes(i.tipo)));}}
+    else if(key==='categoria que mais pesou'){const cats=porCategoria(a),top=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];formula='Categoria com maior soma de gastos realizados no ano.';if(top)transactions((CAT[top[0]]||{nome:top[0]}).nome,a.filter(i=>i.tipo==='gasto'&&i.categoria===top[0]));}
+    else if(key==='maior gasto'){formula='Maior gasto realizado no ano visível para esta conta.';const maior=a.filter(i=>i.tipo==='gasto'&&!outroLivre(i)).sort((a,b)=>b.valor-a.valor)[0];transactions('Lançamento',maior?[maior]:[]);}
+    else if(key==='gasto no cartao'){formula='Soma dos gastos feitos no cartão durante o ano.';transactions('Compras no cartão',a.filter(i=>i.tipo==='gasto'&&i.cartao_id));}
+    else if(key==='meses no azul'){formula='Quantidade de meses com entradas maiores ou iguais aos gastos.';add('Resultado por mês',por.map(x=>row(nomeMes(x.mes),x.saldo,x.saldo>=0?'No azul':'No vermelho')));}
+    else if(key==='media guardada por mes'){formula='(Aportes − resgates no ano) ÷ meses com lançamentos.';transactions('Transferências',a.filter(i=>i.tipo==='aporte'||i.tipo==='resgate'),true);line('Meses considerados',meses.length,'','text');}
+    else{formula='Gastos realizados no ano ÷ quantidade de meses com lançamentos.';add('Gastos por mês',por.map(x=>row(nomeMes(x.mes),x.gas)),total(a.filter(i=>i.tipo==='gasto')));line('Meses considerados',meses.length,'','text');}
+    nota='Ano '+S.ano+'. Lançamentos previstos, cancelados e posteriores a hoje não entram nos destaques.';
+  }else if(view==='radar'){
+    const a=window.RadarCore.analisar({caixa:sm.caixa,compromissos:sm.compromissos,verba:sm.verba,metasMes:sm.sugestaoMetas,gastos:media().gas,reserva:reservaAtual(),invest:S.invest},null);
+    formula=key==='em caixa'?'Caixa = saldo inicial + movimentações confirmadas de caixa.':key==='compromissos'?'Compromissos = saídas ainda pendentes neste mês + atrasados anteriores.':key==='caixa livre'?'Caixa livre = caixa atual − compromissos registrados.':'Sobra estimada = máximo de zero e (caixa livre − verba pessoal restante − aportes planejados para metas − um mês de gastos médios).';
+    line('Caixa atual',a.caixa);line('Compromissos',-a.compromissos);line('Caixa livre',a.livre);if(key==='sobra estimada'){line('Verba pessoal restante',-a.verba);line('Aportes planejados para metas',-a.metasMes);line('Colchão de um mês de gastos',-a.margem);line('Sobra estimada',a.sobra);}
+    add('Compromissos do mês',sm.itens.filter(e=>e.sai).map(ev),total(sm.itens.filter(e=>e.sai)));line('Atrasados de faturas anteriores',sm.atrCartao);line('Outras contas atrasadas',sm.atrContas);nota='Salários futuros não entram no caixa livre. Despesas ainda não registradas ficam fora da estimativa.';
+  }else if(view==='geral'){
+    if(key.startsWith('previsao')){formula='Previsão de caixa = caixa atual + entradas previstas − compromissos pendentes.';line('Caixa atual',sm.caixa);line('Ainda entra',sm.entra);line('Ainda sai',-sm.sai);line('Previsão',sm.previsao);add('Entradas previstas',sm.itens.filter(e=>e.entra).map(ev),sm.entra);add('Saídas previstas',sm.itens.filter(e=>e.sai).map(ev));line('Atrasados anteriores',sm.atrCartao+sm.atrContas);}
+    else{formula='Caixa atual = saldo inicial cadastrado + saldo líquido de todas as movimentações confirmadas de caixa até hoje.';line('Saldo inicial cadastrado',S.saldoInicial);line('Movimentações líquidas confirmadas',S.movCaixa);line('Em caixa hoje',emCaixa());nota='Movimentações líquidas incluem entradas e resgates menos gastos, aportes e pagamentos confirmados. Compras no cartão pendentes não saem do caixa até pagar a fatura.';}
+  }else if(view==='fatura'){
+    const card=S.cartoes.find(c=>c.id===S.fatView?.cartao);if(card){const d=dadosFatura(card,S.fatView.fm);let a=d.it;if(key==='ja paga')a=a.filter(x=>x.status==='pago');else if(key==='a pagar')a=a.filter(x=>x.status==='comprometido');
+    formula=key==='a pagar'?'Compras e parcelas comprometidas nesta fatura.':key==='ja paga'?'Compras e parcelas com pagamento confirmado nesta fatura.':key==='lancamentos'?'Quantidade de compras cadastradas + recorrências ainda previstas para a fatura.':'Soma de todas as compras cadastradas na fatura; previsões extras aparecem separadas.';
+    transactions('Compras da fatura',a);if(key==='lancamentos'||key==='total da fatura')transactions('Recorrências ainda previstas',d.prev);line('Período da fatura',dataLonga(d.per.ini)+' até '+dataLonga(d.per.fim),'','text');line('Vencimento',dataLonga(d.venc),'','text');}
+  }else{
+    formula='Valores registrados na tela selecionada.';line('Saldo em caixa',sm.caixa);line('Compromissos pendentes',sm.compromissos);nota='Consulte também os lançamentos do período para acompanhar a composição.';
+  }
+  return {formula,nota,lines,groups};
+}
+function modalCardDetalhe(snapshot){
+  const d=dadosCardDetalhe(snapshot.origem,snapshot.titulo,snapshot.fechado),volta=snapshot.origem==='fatura'?{...S.fatView}:null;
+  const fmt=r=>r.tipo==='text'?esc(r.value):R(r.value);
+  const linha=(r,extra='')=>`<div class="card-detail-row ${extra}"><span>${esc(r.label)}${r.detail?`<small>${esc(r.detail)}</small>`:''}</span><b class="${r.tipo==='text'?'':cS(r.value)}">${fmt(r)}</b></div>`;
+  modal(`<h2>${esc(snapshot.titulo)}</h2><div class="card-detail-value">${esc(snapshot.valor)}</div>${snapshot.sub?`<p class="card-detail-note">${esc(snapshot.sub)}</p>`:''}<div class="card-detail-formula">${esc(d.formula)}</div>${d.lines.length?`<div class="card-detail-group"><h3>Como o valor é formado</h3>${d.lines.map(x=>linha(x)).join('')}</div>`:''}${d.groups.map(g=>`<section class="card-detail-group"><h3>${esc(g.title)}</h3>${g.rows.length?g.rows.map(x=>linha(x)).join(''):'<p class="card-detail-note">Nenhum item neste grupo.</p>'}${g.total!==undefined?linha({label:'Total deste grupo',value:g.total},'total'):''}</section>`).join('')}${d.nota?`<p class="card-detail-note">${esc(d.nota)}</p>`:''}<div class="btns" style="margin-top:18px"><button class="btn ghost" data-m="cancelar">${volta?'Voltar à fatura':'Fechar'}</button></div>`);
+  if(volta)S.fatVoltar=volta;
+}
+
 /* ================= modal ================= */
 let onSave=null;
 function modal(html,salvar){
-  S.fatAtiva=false;$('mdl').innerHTML=html;onSave=salvar||null;fecharDP();fecharSel();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarSelects($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('mdl').scrollTop=0;marcarValores($('mdl'));caberModal();
+  S.fatAtiva=false;$('mdl').innerHTML=html;onSave=salvar||null;fecharDP();fecharSel();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarSelects($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('mdl').scrollTop=0;marcarValores($('mdl'));ligarCardsDetalhes($('mdl'));caberModal();
   const f=$('mdl').querySelector('input.big,input:not([type=checkbox])');if(f&&salvar)setTimeout(()=>f.focus(),40);
   $('mdl').querySelectorAll('.seg,.chips').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!g.contains(b))return;g.querySelectorAll(':scope>button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));if(g.dataset.onchange&&window[g.dataset.onchange])window[g.dataset.onchange](b)}));
 }
@@ -2422,7 +2555,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='23';
+const VERSAO='24';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){

@@ -28,3 +28,29 @@
 .radar button:focus-visible,.radar summary:focus-visible,.radar a:focus-visible{outline:2px solid var(--g2);outline-offset:4px}
 @media(max-width:1050px){.radar-layout{grid-template-columns:1fr}.radar-tiles{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.radar .panel{padding:17px}.radar-market-head{align-items:flex-start;flex-direction:column}.radar-class{grid-template-columns:1fr}.radar-sim-form{grid-template-columns:1fr}.radar .view-head h1{font-size:28px}.radar-cash-lines>div{font-size:13px}.radar-tiles .v{font-size:23px}.radar-allocation>div:first-child{font-size:13px}.radar .sub{font-size:13px}}
+
+/* Mercado em destaque; os quatro blocos de planejamento foram removidos. */
+.radar-eyebrow{font-size:11px;letter-spacing:.16em;color:var(--g2);display:block;margin-bottom:8px}
+.radar-focus .view-head h1{font-size:clamp(30px,3vw,44px)}
+.radar-focus .radar-main{padding:28px;border-color:rgba(245,179,1,.42);box-shadow:0 0 25px rgba(245,179,1,.075)}
+.radar-focus .radar-market-head h3{font-size:24px}
+.radar-focus .radar-tabs{gap:10px;margin:22px 0}.radar-focus .radar-tabs button{padding:12px 17px;font-size:15px}
+.radar-focus .radar-market-grid{min-height:170px;align-items:start}
+.radar-focus .radar-empty{padding:28px;min-height:100px;display:flex;align-items:center}
+.radar-context-head{margin-top:28px}.radar-context-head h2{margin-bottom:5px}.radar-tools summary{font-size:16px}
+.valor-card{cursor:pointer;position:relative}.valor-card:hover{border-color:var(--g2)!important;filter:brightness(1.07)}
+.valor-card:focus-visible{outline:2px solid var(--g2);outline-offset:4px}
+.valor-card .k,.valor-card>small:first-child{padding-right:18px}
+.valor-card::after{content:'ⓘ';position:absolute;right:12px;top:12px;font-size:13px;color:var(--g2);opacity:.85;pointer-events:none}
+.card-detail-value{font-family:'Barlow Condensed',sans-serif;font-size:clamp(30px,5vw,44px);font-weight:800;color:var(--g2);margin:10px 0 14px}
+.card-detail-formula{border:1px solid rgba(245,179,1,.22);border-radius:10px;padding:12px 14px;background:rgba(245,179,1,.04);font-size:14px;line-height:1.5;margin-bottom:16px}
+.card-detail-group{margin:18px 0}.card-detail-group h3{font-size:16px;margin:0 0 8px;color:var(--g2)}
+.card-detail-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line2);font-size:14px}
+.card-detail-row small{display:block;color:var(--muted);font-size:12px;margin-top:4px;line-height:1.5}.card-detail-row b{white-space:nowrap}
+.card-detail-row.total{font-weight:600;background:rgba(245,179,1,.05);padding:11px 9px;border-radius:7px;margin-top:5px}
+.card-detail-note{color:var(--muted);font-size:13px;line-height:1.6}
+@media(max-width:600px){.radar-focus .radar-main{padding:17px}.radar-focus .radar-tabs button{font-size:14px;padding:10px 13px}.card-detail-row{font-size:13px}}
+
+.radar-product-click{cursor:pointer}.radar-product-click:hover{border-color:var(--g2)}.radar-product-click:focus-visible{outline:2px solid var(--g2);outline-offset:4px}
+
+.radar-market-actions{display:flex;gap:10px;flex-wrap:wrap}.radar-tools details{margin-top:0;border-top:0;padding-top:0}
