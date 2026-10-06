@@ -574,24 +574,28 @@ function linhasProjecao(sm){
    Meses passados = realizado; do mês atual em diante = realizado + previsto (contas, entradas e aportes já programados). */
 const LINHA_INICIO='2026-08';
 function projecaoMes(m){
-  const r=resumo(m);let e=r.entradas,g=r.gastos,i=r.investido,prev=false;
+  const r=resumo(m);let e=r.entradas,g=r.gastos,i=r.investido,pi=0,prev=false;
   if(m>=MES_ATUAL){
     prev=true;
     Object.values(eventosMes(m)).forEach(es=>es.forEach(x=>{
       if(x.feito)return;const v=x.pend!=null?x.pend:x.valor;
-      if(x.transf){if((x.k||'').startsWith('Investimento · aporte'))i+=v;else if((x.k||'').startsWith('Investimento · resgate'))i-=v;return}
+      if(x.transf){if((x.k||'').startsWith('Investimento · aporte')){i+=v;pi+=v}else if((x.k||'').startsWith('Investimento · resgate')){i-=v;pi-=v}return}
       if(x.cartao||x.divida)return; // compras no cartão já entram pelo mês da compra
       if(x.entra)e+=v;else if(x.sai)g+=v;
     }));
   }
-  return {m,e:cent(e),g:cent(g),i:cent(i),prev};
+  return {m,e:cent(e),g:cent(g),i:cent(i),pi:cent(pi),prev};
 }
 function graficoLinhaTempo(){
   const fim=(ANO_ATUAL+1)+'-12',ini=LINHA_INICIO<fim?LINHA_INICIO:addMes(MES_ATUAL,-2);
   const ms=[];for(let m=ini;m<=fim;m=addMes(m,1))ms.push(m);
   const n=ms.length,vw=(document.getElementById('view')||{}).clientWidth||900,W=Math.round(Math.min(1300,Math.max(300,vw-64))),H=W<500?190:170,pl=W<500?40:46,pr=14,pt=10,pb=24;
   const d=ms.map(projecaoMes);
-  const SER=[['e','Entradas','#16f27a'],['g','Gastos','#ff4560'],['i','Investimentos','#ffd76a']];
+  /* investimentos = valor da carteira no fim de cada mês (histórico real até hoje; depois, carteira atual + aportes programados) */
+  if(!S.hist&&typeof carregarHist==='function')carregarHist();
+  let acum=totalInvest();
+  d.forEach(x=>{if(x.m<MES_ATUAL)x.i=cent(S.hist?patrimonioEm(x.m).invest:acum);else{acum=cent(acum+x.pi);x.i=acum}});
+  const SER=[['e','Entradas','#16f27a'],['g','Gastos','#ff4560'],['i','Investimentos (carteira)','#ffd76a']];
   const vals=d.flatMap(x=>[x.e,x.g,x.i]),mx=Math.max(1,...vals),mn=Math.min(0,...vals);
   const passo=(()=>{const bruto=(mx-mn)/3,p=Math.pow(10,Math.floor(Math.log10(bruto||1))),f=bruto/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p})();
   const topo=Math.ceil(mx/passo)*passo,base=Math.floor(mn/passo)*passo;
@@ -602,9 +606,9 @@ function graficoLinhaTempo(){
   const rot=d.map((x,i)=>{const mostra=i%pulo===0||x.m===MES_ATUAL||x.m.slice(5)==='01';if(!mostra)return '';const ano=(i===0||x.m.slice(5)==='01')?`<tspan class="tl-ano" x="${X(i)}" dy="11">${x.m.slice(0,4)}</tspan>`:'';
     return `<text x="${X(i)}" y="${H-14}" text-anchor="middle" class="tl-eixo${x.m===MES_ATUAL?' atual':''}">${nomeMes(x.m,true)}${ano}</text>`}).join('');
   const faixa=ia<n-1?`<rect class="tl-prev" x="${X(ia)}" y="${pt}" width="${X(n-1)-X(ia)}" height="${H-pt-pb}"/><text x="${X(n-1)}" y="${pt+10}" text-anchor="end" class="tl-prevl">previsão</text>`:'';
-  const pol=(k,cor,de,ate,tracejado)=>`<polyline class="tl-linha${tracejado?' tl-tr':''}" ${tracejado?'':'pathLength="1" '}fill="none" stroke="${cor}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="${d.slice(de,ate+1).map((x,j)=>X(de+j)+','+Y(x[k])).join(' ')}"/>`;
+  const pol=(k,cor,de,ate,tracejado)=>`<polyline class="tl-linha${tracejado?' tl-tr':''}" ${tracejado?'':'pathLength="1" '}fill="none" stroke="${cor}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" points="${d.slice(de,ate+1).map((x,j)=>X(de+j)+','+Y(x[k])).join(' ')}"/>`;
   const linhas=SER.map(([k,,cor])=>pol(k,cor,0,ia,false)+(ia<n-1?pol(k,cor,ia,n-1,true):'')).join('');
-  const pts=d.map((x,i)=>SER.map(([k,,cor])=>`<circle class="tl-pt${x.prev&&x.m>MES_ATUAL?' fut':''}" data-i="${i}" cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===MES_ATUAL?4:2.8}" fill="${cor}" style="--c:${cor}"/>`).join('')).join('');
+  const pts=d.map((x,i)=>SER.map(([k,,cor])=>`<circle class="tl-pt${x.prev&&x.m>MES_ATUAL?' fut':''}" data-i="${i}" cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===MES_ATUAL?3:2.1}" fill="${cor}" style="--c:${cor}"/>`).join('')).join('');
   const hit=d.map((x,i)=>`<rect class="tl-hit" data-i="${i}" x="${X(i)-larg/2}" y="0" width="${larg}" height="${H}"/>`).join('');
   const dados=JSON.stringify(d.map(x=>({t:nomeMes(x.m)+(x.m===MES_ATUAL?' · realizado + previsto':x.prev?' · previsto':''),v:SER.map(([k,nome,cor])=>[nome,cor,R(x[k])])}))).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const atual=d[ia];
@@ -1581,7 +1585,7 @@ async function carregarHist(){
   S._histProm=(async()=>{try{
     const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*')));
     if(v0!==S._histV)return false;
-    S.hist=data.map(x=>({...x,valor:Number(x.valor)}));if(['relmes','patrimonio'].includes(S.view))render();return true;
+    S.hist=data.map(x=>({...x,valor:Number(x.valor)}));if(['relmes','patrimonio','geral'].includes(S.view))render();return true;
   }catch(e){toast('Não deu para carregar o histórico. Tente atualizar novamente.');return false}
   finally{if(v0===S._histV)S._histC=false}})();return S._histProm;
 }
