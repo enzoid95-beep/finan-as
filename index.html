@@ -1354,6 +1354,19 @@ body.priv .rs{filter:blur(8px)!important}
 .tl-leg{flex-wrap:wrap;gap:8px 18px;color:#fff}
 .tl-leg b{margin-left:4px;font-variant-numeric:tabular-nums}
 @media (max-width:760px){.tl-eixo{font-size:15px}.tl-n button{padding:6px 9px;font-size:12.5px}.tl-panel .panel-head{flex-wrap:wrap;gap:8px}}
+/* v58: card-resumo do mês com mais contraste e relevo */
+#view .hero-v3,#view .hero-v3:hover{
+  background:radial-gradient(120% 90% at 0% 0%,rgba(255,196,60,.30),transparent 55%),linear-gradient(135deg,#5a4313 0%,#3a2c10 45%,#241c0d 100%)!important;
+  border:1.5px solid rgba(255,205,80,.95)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.6),0 0 26px rgba(240,180,30,.28),inset 0 2px 0 rgba(255,236,170,.4),inset 0 -6px 16px rgba(0,0,0,.5)!important}
+#view .hero-v3 .kpi,#view .hero-v3 .kpi:hover{
+  background:linear-gradient(180deg,#121720,#080a0e)!important;
+  border:1px solid rgba(255,205,80,.5);
+  box-shadow:0 6px 14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -2px 6px rgba(0,0,0,.5)}
+#view .hero-v3 .kpis-bot{border-top-color:rgba(255,205,80,.35)}
+#view .hero-v3 .proj-card,#view .hero-v3 .proj-card:hover{
+  border:1px solid rgba(255,205,80,.6)!important;
+  box-shadow:0 8px 18px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -2px 8px rgba(0,0,0,.5)!important}
 </style>
 </head>
 <body>
@@ -1434,6 +1447,6 @@ body.priv .rs{filter:blur(8px)!important}
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=57"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // Controle 360 — cada endereço tem seu próprio cache.
 const RAIZ = self.registration.scope;
 const PREFIXO = 'controle360-' + encodeURIComponent(RAIZ) + '-';
-const CACHE = PREFIXO + 'v57';
+const CACHE = PREFIXO + 'v58';
 const ARQUIVOS = ['./', './index.html', './app.js', './supabase.js', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './logo-horizontal.png', './fonts.css', './xlsx.full.min.js', './barlow-latin-400-normal.woff2', './barlow-latin-500-normal.woff2', './barlow-latin-600-normal.woff2', './barlow-latin-700-normal.woff2', './barlow-condensed-latin-600-normal.woff2', './barlow-condensed-latin-700-normal.woff2', './barlow-condensed-latin-800-normal.woff2'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS.map(a => new URL(a, RAIZ).href))).then(() => self.skipWaiting()));
