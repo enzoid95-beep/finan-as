@@ -60,7 +60,7 @@ const VIEWS=[
   {id:'geral',nome:'Visão geral'},
   {id:'gastos',nome:'Gastos'},{id:'entradas',nome:'Entradas'},{id:'transf',nome:'Transferências'},
   {id:'calendario',nome:'Calendário'},{id:'orcamento',nome:'Orçamento'},{id:'contas',nome:'Contas'},
-  {id:'cartoes',nome:'Cartões'},{id:'dividas',nome:'Dívidas'},{id:'investimentos',nome:'Investimentos'},
+  {id:'cartoes',nome:'Cartões'},{id:'dividas',nome:'Dívidas'},{id:'investimentos',nome:'Investimentos'},{id:'radar',nome:'🔎 Radar de Investimentos'},
   {id:'metas',nome:'Metas'},{id:'desejos',nome:'Desejos'},{id:'reserva',nome:'Reserva'},
   {id:'livre',nome:'Dinheiro pessoal'},
   {id:'relmes',nome:'Resumo mensal'},{id:'patrimonio',nome:'Patrimônio'},
@@ -70,7 +70,7 @@ const GRUPOS=[
   {id:'g-geral',nome:'Visão geral',curto:'Geral',ic:'geral',views:['geral']},
   {id:'g-mov',nome:'Movimentações',curto:'Movimentos',ic:'mov',views:['gastos','entradas','transf']},
   {id:'g-plan',nome:'Planejamento',curto:'Planejar',ic:'calendario',views:['calendario','orcamento','contas']},
-  {id:'g-fin',nome:'Finanças',curto:'Finanças',ic:'cartoes',views:['cartoes','dividas','investimentos']},
+  {id:'g-fin',nome:'Finanças',curto:'Finanças',ic:'cartoes',views:['cartoes','dividas','investimentos','radar']},
   {id:'g-obj',nome:'Objetivos',curto:'Objetivos',ic:'metas',views:['metas','desejos','reserva']},
   {id:'g-nosso',nome:'Nosso dinheiro',curto:'Nosso',ic:'nosso',views:['livre']},
   {id:'g-rel',nome:'Relatórios',curto:'Relatórios',ic:'retro',views:['relmes','patrimonio','retro']}
@@ -157,7 +157,7 @@ async function carregarResto(){
     q('metas').select('*').order('criado_em'),
     q('config').select('*').eq('id','casal').maybeSingle(),
     q('lancamentos').select('meta_id,tipo,valor,data').in('tipo',['aporte','resgate']).not('meta_id','is',null).eq('status','pago'),
-    q('lancamentos').select('tipo,valor').eq('status','pago').lte('data_caixa',HOJE),
+    q('lancamentos').select('id,tipo,valor,data_caixa').eq('status','pago').lte('data_caixa',HOJE),
     q('lancamentos').select('tipo,valor,data,categoria,livre,status').in('status',['pago','comprometido']).gte('data',ini3).lt('data',fimAt),
     q('cartoes').select('*').order('criado_em'),
     q('recorrentes').select('*').order('dia'),
@@ -193,13 +193,17 @@ async function carregarResto(){
   {const novo=Object.fromEntries((orc.data||[]).map(o=>[o.mes,{gastos:o.gastos||{},entradas:Number(o.entradas)||0}]));if((S._orcPend||0)>0&&S.orc[S.mes])novo[S.mes]=S.orc[S.mes];S.orc=novo;}
   S.card=(card.data||[]).map(deLinha).filter(x=>x.status!=='cancelado');
   S.pagDiv=(pd.data||[]).map(x=>({divida_id:x.divida_id,mes:x.data.slice(0,7)}));
+  if(!tot.error&&!card.error)S.assMov=JSON.stringify([...(tot.data||[]).filter(x=>['gasto','entrada'].includes(x.tipo)).map(x=>[x.id,x.tipo,Number(x.valor),x.data_caixa]),...(card.data||[]).filter(x=>x.tipo==='gasto'&&x.status==='comprometido'&&x.data<=HOJE).map(x=>[x.id,x.tipo,Number(x.valor),x.data,x.status])].sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
   S.invest=(inv.data||[]).map(x=>{const v={...x,valor:Number(x.valor),aplicado:x.aplicado==null?Number(x.valor):Number(x.aplicado),produto:x.produto||''};if(INV_ANTIGO[v.tipo]){v.produto=v.produto||INV_ANTIGO[v.tipo];v.tipo='renda_fixa'}return v});
 }
 async function recarregar(){
+  const permitirMovimento=!!S._movCarregado;
   S.hist=null;S._histV=(S._histV||0)+1;S._histC=false;
   await Promise.all([carregarItens(),carregarResto()]);
-  render();
-  if(!gerando&&S.temV9){gerando=true;try{if(await gerarOcorrencias()>0){await Promise.all([carregarItens(),carregarResto()]);render()}}finally{gerando=false}}
+  const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;
+  if(S.assMov!==undefined){S._movCarregado=true;S._ultimaAssMov=S.assMov}
+  render(mudou);
+  if(!gerando&&S.temV9){gerando=true;try{if(await gerarOcorrencias()>0){await Promise.all([carregarItens(),carregarResto()]);const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;S._ultimaAssMov=S.assMov;render(mudou)}}finally{gerando=false}}
 }
 function agendar(){clearTimeout(timer);timer=setTimeout(()=>{if((S._orcEditando||0)>0||(S._orcPend||0)>0)return agendar();recarregar()},350)}
 function assinar(){
@@ -1221,14 +1225,12 @@ function ligarPizza(){
 }
 
 /* ================= movimento: números e barras ================= */
-/* Os números e barras só se mexem quando o valor muda. O último valor visto fica guardado no aparelho, então abrir a tela (ou recarregar) não anima. */
+/* Sem animação ao abrir, atualizar, navegar ou alterar investimentos/configuração.
+   Só uma mudança efetiva em gasto/entrada já carregados permite interpolação. */
 const ANIM=new Map();
-try{const o=JSON.parse(localStorage.getItem('pf-anim')||'{}');Object.entries(o).forEach(([k,v])=>ANIM.set(k,v))}catch(e){}
-let animTimer=null;
-function guardarAnim(){clearTimeout(animTimer);animTimer=setTimeout(()=>{try{const o={};let n=0;ANIM.forEach((v,k)=>{if(n++<600)o[k]=v});localStorage.setItem('pf-anim',JSON.stringify(o))}catch(e){}},400)}
 const SEM_MOV=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RX_MOEDA=/^(\s*[+−→]?\s*)(-?)R\$\s?([\d.]+)(,(\d{2}))?(\s*)$/;
-function animar(){
+function animar(permitir=false){
   if(SEM_MOV)return;
   const root=$('view'),v=S.view;
   // números: contam do valor anterior até o novo (subindo ou descendo)
@@ -1239,7 +1241,7 @@ function animar(){
     const m=t.match(RX_MOEDA);if(!m)continue;
     const val=(m[2]?-1:1)*Number(m[3].replace(/\./g,'')+(m[5]?'.'+m[5]:''));
     const dono=n.parentElement&&n.parentElement.closest('[data-ak]'),key=dono?v+'|'+dono.dataset.ak+'|'+(ANIM._c[dono.dataset.ak]=(ANIM._c[dono.dataset.ak]||0)+1):v+'|n'+(i++),ja=ANIM.has(key),de=ja?ANIM.get(key):val;ANIM.set(key,val);
-    if(Math.abs(de-val)<0.005)continue;
+    if(!permitir||Math.abs(de-val)<0.005)continue;
     if(ja&&n.parentElement){const el=n.parentElement;el.classList.remove('val-flash');void el.offsetWidth;el.classList.add('val-flash');setTimeout(()=>el.classList.remove('val-flash'),1300)}
     const fmt=m[4]?brl:brl0;
     jobs.push({n,de,para:val,pre:m[1],suf:m[6],fmt});n.nodeValue=m[1]+fmt.format(de)+m[6];
@@ -1257,14 +1259,14 @@ function animar(){
     const alvo=anel?b.getAttribute('stroke-dashoffset'):b.style[prop];
     const ini=ANIM.has(key)?ANIM.get(key):alvo;
     ANIM.set(key,alvo);
-    if(ini===alvo||alvo==null)return;
+    if(!permitir||ini===alvo||alvo==null)return;
     b.style.transition='none';b.style[prop]=ini;
     b.getBoundingClientRect();
     b.style.transition='';
     requestAnimationFrame(()=>{b.style[prop]=alvo});
   });
   // pizza: gira e abre ao entrar na tela
-  guardarAnim();
+
 }
 
 /* orçamento: clique no valor para editar; salva sozinho */
@@ -1481,15 +1483,23 @@ document.addEventListener('input',e=>{const i=e.target;if(!(i instanceof HTMLInp
   if(v!==antes){i.value=v;const p=Math.max(0,(pos||v.length)-(antes.length-v.length));try{i.setSelectionRange(p,p)}catch(x){}}
 },true);
 
+function vRadar(){
+  const sm=situacaoMes(),med=media(),pat=patrimonioLiquido();
+  return window.ControleRadar.render({email:S.me,caixa:sm.caixa,compromissos:sm.compromissos,verba:sm.verba,metasMes:sm.sugestaoMetas,
+    gastos:med.gas,renda:med.ent,reserva:reservaAtual(),patrimonio:pat.liquido,invest:S.invest,
+    metas:S.metas.filter(m=>!m.reserva).map(m=>({nome:m.nome,falta:Math.max(0,alvoMeta(m)-guardadoMeta(m.id)),dias:m.prazo?diasEntre(HOJE,m.prazo):null})),
+    dividas:S.dividas.map(d=>({saldo:infoDivida(d).saldo,juros:d.juros||0}))});
+}
 /* ================= render ================= */
-function render(){
+function render(animarMovimento=false){
   navHTML();
-  const V={relmes:vRelMes,patrimonio:vPatrimonio,transf:vTransf,geral:vGeral,calendario:vCalendario,gastos:vGastos,entradas:vEntradas,cartoes:vCartoes,orcamento:vOrcamento,contas:vContas,dividas:vDividas,metas:vMetas,desejos:vDesejos,reserva:vReserva,livre:vLivre,retro:vRetro,investimentos:vInvestimentos};
+  const V={radar:vRadar,relmes:vRelMes,patrimonio:vPatrimonio,transf:vTransf,geral:vGeral,calendario:vCalendario,gastos:vGastos,entradas:vEntradas,cartoes:vCartoes,orcamento:vOrcamento,contas:vContas,dividas:vDividas,metas:vMetas,desejos:vDesejos,reserva:vReserva,livre:vLivre,retro:vRetro,investimentos:vInvestimentos};
   if(S.temV9===false){$('view').innerHTML=`<div class="panel" style="max-width:640px;margin:40px auto">${vazio('Falta um passo para ativar a nova versão','Rodem o arquivo <b>schema-v9.sql</b> no SQL Editor do Supabase e recarreguem a página. Ele converte todos os lançamentos para o novo modelo, sem apagar nada.')}</div>`;return}
   $('view').innerHTML=subAbas()+(V[S.view]||vGeral)();
   ligarOrcamento();
   ligarPizza();
-  animar();
+  animar(animarMovimento);
+  if(S.view==='radar')window.ControleRadar.bind($('view'),{redraw:()=>render(),toast,mark:marcarValores,fetchMarket:async()=>{const {data,error}=await sb.functions.invoke(CFG.radarFunction||'radar-mercado',{body:{}});if(error)throw error;return data}});
   const ctc=$('ctCartao');if(ctc)ctc.addEventListener('change',()=>{S.ctF.cartao=ctc.value;render()});
   marcarValores($('view'));melhorarDatas($('view'));melhorarSelects($('view'));soNumeros($('view'));
   const b=$('fBusca'),c=$('fCat');
@@ -2412,7 +2422,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='22';
+const VERSAO='23';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
