@@ -1342,6 +1342,18 @@ body.priv .rs{filter:blur(8px)!important}
   #tabbar button{font-size:12px;gap:4px;padding:7px 2px}
   #tabbar svg{width:24px;height:24px}
 }
+/* v57: gráfico em linha do tempo */
+.tl-svg{display:block;width:100%;height:auto;margin-top:6px}
+.tl-eixo{font:600 12px "Barlow",sans-serif;fill:rgba(255,255,255,.75)}
+.tl-eixo.atual{fill:#ffd76a;font-weight:700}
+.tl-grade{stroke:rgba(255,255,255,.09);stroke-width:1}
+.tl-zero{stroke:rgba(255,255,255,.3);stroke-width:1.2}
+.tl-n{display:inline-flex;gap:4px;padding:3px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line2)}
+.tl-n button{padding:6px 12px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted)}
+.tl-n button[aria-pressed="true"]{background:linear-gradient(135deg,#f5b301,#ffd76a);color:#0b0d12}
+.tl-leg{flex-wrap:wrap;gap:8px 18px;color:#fff}
+.tl-leg b{margin-left:4px;font-variant-numeric:tabular-nums}
+@media (max-width:760px){.tl-eixo{font-size:15px}.tl-n button{padding:6px 9px;font-size:12.5px}.tl-panel .panel-head{flex-wrap:wrap;gap:8px}}
 </style>
 </head>
 <body>
@@ -1422,6 +1434,6 @@ body.priv .rs{filter:blur(8px)!important}
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=56"></script>
+<script src="app.js?v=57"></script>
 </body>
 </html>

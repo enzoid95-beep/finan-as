@@ -146,7 +146,7 @@ const plural=(n,s,p)=>n+' '+(n===1?s:p);
 /* ================= estado ================= */
 const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
-const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
+const S={tlN:(()=>{try{return Number(localStorage.getItem('pf-tl'))===6?6:12}catch(e){return 12}})(),fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
   ordDes:(()=>{try{return localStorage.getItem('pf-ord-des')||'prioridade'}catch(e){return 'prioridade'}})(),fCat:'',fOrd:(()=>{try{return localStorage.getItem('pf-ord')||'recente'}catch(e){return 'recente'}})(),fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
   pagPrev:{},temV12:false,patrIni:'',temPatr:false,rendaMedia:0,temRenda:false,fut:[],card:[],fech:{},ccF:{cartao:'',mes:'',ano:''},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
@@ -570,6 +570,24 @@ function linhasProjecao(sm){
   tl.forEach(e=>{saldo+=e.entra?e.valor:-e.valor;linhas.push({d:e.data,t:e.txt,k:e.k,v:e.entra?e.valor:-e.valor,s:saldo,ic:e.ic||e.em})});
   return linhas;
 }
+/* gráfico em linha do tempo: entradas, gastos e investimentos mês a mês */
+function graficoLinhaTempo(){
+  const n=S.tlN===6?6:12,W=720,H=270,pl=58,pr=18,pt=16,pb=34;
+  const ms=[...Array(n)].map((_,i)=>addMes(S.mes,i-(n-1))),d=ms.map(m=>{const r=resumo(m);return {m,e:r.entradas,g:r.gastos,i:r.investido}});
+  const SER=[['e','Entradas','#16f27a'],['g','Gastos','#ff4560'],['i','Investimentos','#ffd76a']];
+  const vals=d.flatMap(x=>[x.e,x.g,x.i]),mx=Math.max(1,...vals),mn=Math.min(0,...vals);
+  const passo=(()=>{const bruto=(mx-mn)/4,p=Math.pow(10,Math.floor(Math.log10(bruto||1))),f=bruto/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p})();
+  const topo=Math.ceil(mx/passo)*passo,base=Math.floor(mn/passo)*passo;
+  const X=i=>pl+(n===1?0:i*(W-pl-pr)/(n-1)),Y=v=>pt+(topo-v)/(topo-base||1)*(H-pt-pb);
+  let grade='';for(let v=base;v<=topo+1e-6;v+=passo)grade+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" class="${v===0?'tl-zero':'tl-grade'}"/><text x="${pl-8}" y="${Y(v)+4}" text-anchor="end" class="tl-eixo">${KS(v)}</text>`;
+  const rot=d.map((x,i)=>`<text x="${X(i)}" y="${H-10}" text-anchor="middle" class="tl-eixo${x.m===S.mes?' atual':''}">${nomeMes(x.m,true)}${n>6&&x.m.slice(5)==='01'?' '+x.m.slice(2,4):''}</text>`).join('');
+  const linhas=SER.map(([k,nome,cor])=>`<polyline fill="none" stroke="${cor}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${d.map((x,i)=>X(i)+','+Y(x[k])).join(' ')}"/>`+d.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===S.mes?5.5:3.8}" fill="${cor}" stroke="#0b0d12" stroke-width="2"><title>${nomeMes(x.m)} · ${nome}: ${R(x[k])}</title></circle>`).join('')).join('');
+  const atual=d[d.length-1];
+  return `<div class="panel tl-panel"><div class="panel-head"><div><h2>Linha do tempo</h2><p class="sub">Entradas, gastos e investimentos mês a mês, até ${esc(soMes(S.mes))}</p></div>
+    <div class="tl-n" role="group" aria-label="Período"><button data-act="tl-n" data-n="6" ${n===6?'aria-pressed="true"':''}>6 meses</button><button data-act="tl-n" data-n="12" ${n===12?'aria-pressed="true"':''}>12 meses</button></div></div>
+    <svg class="tl-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico em linha de entradas, gastos e investimentos por mês">${grade}${rot}${linhas}</svg>
+    <div class="legend tl-leg">${SER.map(([k,nome,cor])=>`<span><i style="background:${cor}"></i>${nome} <b>${R0(atual[k])}</b></span>`).join('')}<span class="mut">valores de ${esc(soMes(S.mes))}</span></div></div>`;
+}
 function vGeral(){
   const sm=situacaoMes(),r0=resumo(MES_ATUAL),mc=soMes(MES_ATUAL),pat=patrimonioLiquido();
   const fimMes=MES_ATUAL+'-'+pad(ultimoDia(MES_ATUAL));
@@ -633,7 +651,7 @@ function vGeral(){
       <div class="chart">${chart}</div>
       <div class="legend"><span><i style="background:#16f27a"></i>Entradas</span><span><i style="background:var(--neg)"></i>Gastos</span></div></div>
     <div class="panel"><div class="panel-head"><div><h2>Últimos lançamentos</h2><p class="sub">${esc(nomeMes(S.mes))}</p></div><button class="lnk" data-go="gastos">Ver todos →</button></div>${ult.length?`<div class="mini">${ult.map(linhaMini).join('')}</div>`:vazio('Mês vazio','Nada lançado em '+esc(soMes(S.mes))+'.')}</div>
-  </div>`;
+  </div>${graficoLinhaTempo()}`;
 }
 /* ================= transferências ================= */
 function vTransf(){
@@ -2819,6 +2837,7 @@ document.addEventListener('click',async e=>{
     rec=S.recorrentes.find(r=>r.id===id),div=S.dividas.find(d=>d.id===id),des=S.desejos.find(d=>d.id===id);
   if(['duplicar','des-meta','des-reabrir','div-desfazer','item-mover','oc-pular','oc-reativar','oc-desfazer','fatura-desfazer','orc-copiar','orc-padrao'].includes(act))a.disabled=true;
   try{switch(act){
+    case 'tl-n':S.tlN=Number(a.dataset.n)===6?6:12;try{localStorage.setItem('pf-tl',S.tlN)}catch(x){}render();break;
     case 'mes-1':S.mes=addMes(S.mes,-1);await recarregar();break;
     case 'mes+1':S.mes=addMes(S.mes,1);await recarregar();break;
     case 'ano-1':S.ano--;render();break;
