@@ -1,6 +1,6 @@
 // Controle 360 · service worker
 // Sempre confere com a internet se há versão nova (revalida o cache do navegador) e só usa a cópia salva sem conexão.
-const CACHE = 'pf-v50';
+const CACHE = 'pf-v51';
 const ARQUIVOS = ['./', './index.html', './app.js', './supabase.js', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './logo-horizontal.png'];
 
 self.addEventListener('install', e => {

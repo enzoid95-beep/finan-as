@@ -527,7 +527,7 @@ function vGeral(){
   const ult=[...r.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm).slice(0,5);
   const aCartaoMes=soma(r0.ef.filter(i=>i.tipo==='gasto'&&i.cartao_id&&i.status==='comprometido'));
   /* det = qual detalhe abre ao tocar no número (de onde ele vem) */
-  const kpi=(k,v,cls,sub,det)=>`<div class="kpi${det?' kpi-click':''}"${det?` data-act="kpi-det" data-k="${det}" role="button" tabindex="0" title="Ver de onde vem este número"`:''}><small>${k}${det?' <i class="kpi-i" aria-hidden="true">ⓘ</i>':''}</small><b class="${cls}">${v}</b>${sub?`<span>${sub}</span>`:''}</div>`;
+  const kpi=(k,v,cls,sub,det)=>`<div class="kpi${det?' kpi-click':''}"${det?` data-act="kpi-det" data-k="${det}" role="button" tabindex="0" title="Ver de onde vem este número"`:''}><small>${k}</small><b class="${cls}">${v}</b>${sub?`<span>${sub}</span>`:''}</div>`;
   return head('Visão geral','A situação de vocês e o que precisam saber agora.',BTN('novo-global','Novo'),true)+retro+`
   <div class="hero hero-v3">
     <div class="hv3-main">
@@ -839,7 +839,7 @@ function vOrcamento(){
     const wR=x.lim?Math.min(100,x.realizado/x.lim*100):0,wC=x.lim?Math.min(100-wR,x.comprometido/x.lim*100):0;
     const ratio=x.lim?pctF(x.usado/x.lim):'';
     return `<div class="orc-card ${x.lim?'':'sem'} ${x.estourado?'orc-estourado':''}" data-ak="orc-${x.id}" data-orc-detail="${x.id}">
-      <div class="oc-top"><span class="oc-em" aria-hidden="true">${x.em}</span><b>${esc(x.nome)}</b><span class="oc-info" aria-hidden="true">ⓘ</span></div>
+      <div class="oc-top"><span class="oc-em" aria-hidden="true">${x.em}</span><b>${esc(x.nome)}</b></div>
       <div class="oc-val"><span class="oc-real">${R0(x.realizado)}</span><span class="mut">/</span>${x.id==='__livre'?`<button class="oc-ed oc-plan" data-go="livre" title="Definir dinheiro pessoal">${x.lim?R0(x.lim):'Definir'}</button>`:`<button class="oc-ed oc-plan" data-orc-edit="${x.id}" title="Editar orçamento de ${esc(x.nome)}">${x.lim?R0(x.lim):'Definir'}</button>`}</div>
       ${x.lim?`<div class="oc-progress"><div class="tr tr2" role="meter" aria-label="Orçamento usado de ${esc(x.nome)}, incluindo compromissos" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100,Math.round(x.usado/x.lim*100))}" aria-valuetext="${ratio} utilizado"><i style="width:${wR}%"></i><i class="c" style="left:${wR}%;width:${wC}%"></i></div><span class="oc-percent">${ratio}</span></div>`:''}
       ${x.comprometido>.004?`<div class="oc-commit"><b>${R0(x.comprometido)}</b> comprometidos</div>`:''}
@@ -1988,7 +1988,7 @@ function modalProjecao(){
   const sm=situacaoMes(),r0=resumo(MES_ATUAL),lp=linhasProjecao(sm),mc=soMes(MES_ATUAL),fim=MES_ATUAL+'-'+pad(ultimoDia(MES_ATUAL));
   const feitos=[...r0.ef].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm-a.criadoEm);
   const aCartaoMes=soma(r0.ef.filter(i=>i.tipo==='gasto'&&i.cartao_id&&i.status==='comprometido')),saiuCaixa=cent(r0.gastos-aCartaoMes);
-  const fato=(t,v,c,s,det)=>`<div class="fact${det?' fact-click':''}"${det?` data-act="det-fluxo" data-k="${det}" role="button" tabindex="0" title="Ver tudo detalhado"`:''}><small>${t}${det?' <i class="kpi-i" aria-hidden="true">ⓘ</i>':''}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
+  const fato=(t,v,c,s,det)=>`<div class="fact${det?' fact-click':''}"${det?` data-act="det-fluxo" data-k="${det}" role="button" tabindex="0" title="Ver tudo detalhado"`:''}><small>${t}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
   modal(`<h2>Projeção de ${esc(mc)}</h2>
     <div class="pj-facts">
       ${fato('Em caixa hoje',R(sm.caixa),cS(sm.caixa))}
@@ -2669,7 +2669,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='27';
+const VERSAO='28';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
