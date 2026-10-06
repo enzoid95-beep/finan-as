@@ -572,22 +572,50 @@ function linhasProjecao(sm){
 }
 /* gráfico em linha do tempo: entradas, gastos e investimentos mês a mês */
 function graficoLinhaTempo(){
-  const n=S.tlN===6?6:12,W=720,H=270,pl=58,pr=18,pt=16,pb=34;
+  const n=S.tlN===6?6:12,vw=(document.getElementById('view')||{}).clientWidth||900,W=Math.round(Math.min(1300,Math.max(300,vw-64))),H=W<500?190:170,pl=W<500?40:46,pr=14,pt=10,pb=24;
   const ms=[...Array(n)].map((_,i)=>addMes(S.mes,i-(n-1))),d=ms.map(m=>{const r=resumo(m);return {m,e:r.entradas,g:r.gastos,i:r.investido}});
   const SER=[['e','Entradas','#16f27a'],['g','Gastos','#ff4560'],['i','Investimentos','#ffd76a']];
   const vals=d.flatMap(x=>[x.e,x.g,x.i]),mx=Math.max(1,...vals),mn=Math.min(0,...vals);
-  const passo=(()=>{const bruto=(mx-mn)/4,p=Math.pow(10,Math.floor(Math.log10(bruto||1))),f=bruto/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p})();
+  const passo=(()=>{const bruto=(mx-mn)/3,p=Math.pow(10,Math.floor(Math.log10(bruto||1))),f=bruto/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p})();
   const topo=Math.ceil(mx/passo)*passo,base=Math.floor(mn/passo)*passo;
-  const X=i=>pl+(n===1?0:i*(W-pl-pr)/(n-1)),Y=v=>pt+(topo-v)/(topo-base||1)*(H-pt-pb);
-  let grade='';for(let v=base;v<=topo+1e-6;v+=passo)grade+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" class="${v===0?'tl-zero':'tl-grade'}"/><text x="${pl-8}" y="${Y(v)+4}" text-anchor="end" class="tl-eixo">${KS(v)}</text>`;
-  const rot=d.map((x,i)=>`<text x="${X(i)}" y="${H-10}" text-anchor="middle" class="tl-eixo${x.m===S.mes?' atual':''}">${nomeMes(x.m,true)}${n>6&&x.m.slice(5)==='01'?' '+x.m.slice(2,4):''}</text>`).join('');
-  const linhas=SER.map(([k,nome,cor])=>`<polyline fill="none" stroke="${cor}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${d.map((x,i)=>X(i)+','+Y(x[k])).join(' ')}"/>`+d.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===S.mes?5.5:3.8}" fill="${cor}" stroke="#0b0d12" stroke-width="2"><title>${nomeMes(x.m)} · ${nome}: ${R(x[k])}</title></circle>`).join('')).join('');
+  const X=i=>pl+(n===1?0:i*(W-pl-pr)/(n-1)),Y=v=>pt+(topo-v)/(topo-base||1)*(H-pt-pb),larg=(W-pl-pr)/Math.max(1,n-1);
+  let grade='';for(let v=base;v<=topo+1e-6;v+=passo)grade+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" class="${v===0?'tl-zero':'tl-grade'}"/><text x="${pl-7}" y="${Y(v)+4}" text-anchor="end" class="tl-eixo">${KS(v)}</text>`;
+  const rot=d.map((x,i)=>`<text x="${X(i)}" y="${H-7}" text-anchor="middle" class="tl-eixo${x.m===S.mes?' atual':''}">${nomeMes(x.m,true)}${n>6&&x.m.slice(5)==='01'?' '+x.m.slice(2,4):''}</text>`).join('');
+  const linhas=SER.map(([k,nome,cor],si)=>`<polyline class="tl-linha" pathLength="1" style="animation-delay:${si*.12}s" fill="none" stroke="${cor}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="${d.map((x,i)=>X(i)+','+Y(x[k])).join(' ')}"/>`).join('');
+  const pts=d.map((x,i)=>SER.map(([k,,cor])=>`<circle class="tl-pt" data-i="${i}" cx="${X(i)}" cy="${Y(x[k])}" r="${x.m===S.mes?4:2.8}" fill="${cor}"/>`).join('')).join('');
+  const hit=d.map((x,i)=>`<rect class="tl-hit" data-i="${i}" x="${X(i)-larg/2}" y="0" width="${larg}" height="${H}"/>`).join('');
+  const dados=JSON.stringify(d.map(x=>({t:nomeMes(x.m),v:SER.map(([k,nome,cor])=>[nome,cor,R(x[k])])}))).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const atual=d[d.length-1];
   return `<div class="panel tl-panel"><div class="panel-head"><div><h2>Linha do tempo</h2><p class="sub">Entradas, gastos e investimentos mês a mês, até ${esc(soMes(S.mes))}</p></div>
     <div class="tl-n" role="group" aria-label="Período"><button data-act="tl-n" data-n="6" ${n===6?'aria-pressed="true"':''}>6 meses</button><button data-act="tl-n" data-n="12" ${n===12?'aria-pressed="true"':''}>12 meses</button></div></div>
-    <svg class="tl-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico em linha de entradas, gastos e investimentos por mês">${grade}${rot}${linhas}</svg>
+    <div class="tl-wrap" data-d="${dados}"><svg class="tl-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Gráfico em linha de entradas, gastos e investimentos por mês">${grade}${rot}<line class="tl-guia" y1="${pt}" y2="${H-pb}" x1="0" x2="0"/>${linhas}${pts}${hit}</svg><div class="tl-tip" hidden></div></div>
     <div class="legend tl-leg">${SER.map(([k,nome,cor])=>`<span><i style="background:${cor}"></i>${nome} <b>${R0(atual[k])}</b></span>`).join('')}<span class="mut">valores de ${esc(soMes(S.mes))}</span></div></div>`;
 }
+/* passar o mouse (ou tocar) no gráfico: guia, pontos em destaque e quadro com os valores do mês */
+(function(){
+  const fora=()=>{document.querySelectorAll('.tl-wrap.on').forEach(w=>{w.classList.remove('on');const t=w.querySelector('.tl-tip');if(t)t.hidden=true;w.querySelectorAll('.tl-pt.on').forEach(p=>p.classList.remove('on'))})};
+  const mover=e=>{
+    const h=e.target.closest&&e.target.closest('.tl-hit');
+    if(!h){fora();return}
+    const w=h.closest('.tl-wrap'),svg=w.querySelector('svg'),i=Number(h.dataset.i);
+    let D;try{D=JSON.parse(w.dataset.d)}catch(x){return}
+    const x=D[i];if(!x)return;
+    w.classList.add('on');
+    w.querySelectorAll('.tl-pt.on').forEach(p=>p.classList.remove('on'));
+    w.querySelectorAll(`.tl-pt[data-i="${i}"]`).forEach(p=>p.classList.add('on'));
+    const g=w.querySelector('.tl-guia'),cx=Number(h.getAttribute('x'))+Number(h.getAttribute('width'))/2;
+    g.setAttribute('x1',cx);g.setAttribute('x2',cx);
+    const tip=w.querySelector('.tl-tip');
+    tip.innerHTML=`<b>${x.t}</b>`+x.v.map(([n,c,v])=>`<span><i style="background:${c}"></i>${n}<em>${v}</em></span>`).join('');
+    tip.hidden=false;
+    const k=svg.getBoundingClientRect().width/Number(svg.getAttribute('width')),px=cx*k,tw=tip.offsetWidth;
+    tip.style.left=Math.max(4,Math.min(w.clientWidth-tw-4,px+14>w.clientWidth-tw-4?px-tw-14:px+14))+'px';
+    tip.style.top='6px';
+  };
+  document.addEventListener('pointermove',mover);
+  document.addEventListener('pointerdown',mover);
+  document.documentElement.addEventListener('pointerleave',fora);
+})();
 function vGeral(){
   const sm=situacaoMes(),r0=resumo(MES_ATUAL),mc=soMes(MES_ATUAL),pat=patrimonioLiquido();
   const fimMes=MES_ATUAL+'-'+pad(ultimoDia(MES_ATUAL));
