@@ -1332,6 +1332,16 @@ body.priv .rs{filter:blur(8px)!important}
   .tile .k{font-size:15px!important}.ct-catl{font-size:15px!important}.ct-nome{font-size:16px}.ct-v{font-size:23px}
   .oc-top b,.orc-page .oc-top b{font-size:15px!important}.oc-em,.orc-page .oc-em{font-size:18px!important}
 }
+/* v56: celular — menu e barra inferior mais legíveis */
+@media (max-width:760px){
+  .mais{gap:10px}
+  .mais button{min-height:84px;justify-content:center;padding:12px 6px;font-size:13.5px;line-height:1.2;background:linear-gradient(180deg,#131922,#0a0d12);border:1px solid var(--borda);box-shadow:0 0 6px rgba(232,169,12,.08)}
+  .mais button svg{width:26px;height:26px;padding:7px;box-sizing:content-box;border-radius:12px;background:rgba(245,179,1,.12);color:#ffd76a}
+  .mais button[aria-current="page"]{border-color:rgba(255,210,90,.85)}
+  .mais-g .side-title{font-size:13px;margin:14px 2px 8px}
+  #tabbar button{font-size:12px;gap:4px;padding:7px 2px}
+  #tabbar svg{width:24px;height:24px}
+}
 </style>
 </head>
 <body>
@@ -1412,6 +1422,6 @@ body.priv .rs{filter:blur(8px)!important}
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=55"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>

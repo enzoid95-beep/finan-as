@@ -53,7 +53,12 @@ const ICON={
   escudo:'<path d="M12 3l8 3v6c0 4.5-3.2 8.3-8 9-4.8-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   del:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>'
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  transf:'<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+  relmes:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7M9 9h2"/>',
+  patrimonio:'<path d="M3 21h18M5 21V10M9.5 21V10M14.5 21V10M19 21V10M2.5 10L12 4l9.5 6z"/>',
+  reserva:'<path d="M12 3l8 3v6c0 4.5-3.2 8.3-8 9-4.8-.7-8-4.5-8-9V6z"/><path d="M12 8v5M9.5 10.5h5"/>',
+  saldo:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2M7 3l2 3M17 3l-2 3"/>'
 };
 const svg=(k)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
 const VIEWS=[
@@ -2740,10 +2745,10 @@ function modalMesadas(){
 }
 /* ---------- menu "mais", exportar, instalar ---------- */
 function modalMais(){
-  modal(`<h2>Menu</h2>${GRUPOS.map(g=>`<div class="mais-g"><div class="side-title">${esc(g.nome)}</div><div class="mais">${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);return `<button data-go="${id}" ${S.view===id?'aria-current="page"':''}>${svg(id==='geral'?'geral':id==='reserva'?'metas':id==='contas'?'contas':id)}${esc(v.nome)}</button>`}).join('')}</div></div>`).join('')}
+  modal(`<h2>Menu</h2>${GRUPOS.map(g=>`<div class="mais-g"><div class="side-title">${esc(g.nome)}</div><div class="mais">${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);return `<button data-go="${id}" ${S.view===id?'aria-current="page"':''}>${svg(ICON[id]?id:'geral')}${esc(v.nome)}</button>`}).join('')}</div></div>`).join('')}
     <div class="side-title">Ferramentas</div>
     <div class="mais"><button data-act="priv">${svg(S.priv?'olhoF':'olho')}${S.priv?'Mostrar valores':'Esconder valores'}</button><button data-act="exportar">${svg('baixar')}Exportar</button>${standalone()?'':`<button data-act="instalar">${svg('instalar')}Instalar app</button>`}
-    <button data-act="seguranca">${svg('escudo')}Segurança</button><button data-act="ajustar-caixa">💵 Ajustar saldo</button><button data-act="sair">${svg('sair')}Sair</button></div>
+    <button data-act="seguranca">${svg('escudo')}Segurança</button><button data-act="ajustar-caixa">${svg('saldo')}Ajustar saldo</button><button data-act="sair">${svg('sair')}Sair</button></div>
     <div class="btns"><button class="btn ghost" data-m="cancelar">Fechar</button></div>`);
 }
 function modalExportar(){
