@@ -60,7 +60,7 @@ const VIEWS=[
   {id:'geral',nome:'Visão geral'},
   {id:'gastos',nome:'Gastos'},{id:'entradas',nome:'Entradas'},{id:'transf',nome:'Transferências'},
   {id:'calendario',nome:'Calendário'},{id:'orcamento',nome:'Orçamento'},{id:'contas',nome:'Contas'},
-  {id:'cartoes',nome:'Cartões'},{id:'dividas',nome:'Dívidas'},{id:'investimentos',nome:'Investimentos'},{id:'radar',nome:'🔎 Radar de Investimentos'},
+  {id:'cartoes',nome:'Cartões'},{id:'dividas',nome:'Dívidas'},{id:'investimentos',nome:'Investimentos'},{id:'radar',nome:'Radar de Investimentos'},
   {id:'metas',nome:'Metas'},{id:'desejos',nome:'Desejos'},{id:'reserva',nome:'Reserva'},
   {id:'livre',nome:'Dinheiro pessoal'},
   {id:'relmes',nome:'Resumo mensal'},{id:'patrimonio',nome:'Patrimônio'},
@@ -375,12 +375,15 @@ function aportesPlanejados(){
     return s+Math.max(0,porMes-ja)},0);
 }
 /* uso de uma categoria do orçamento: o que já aconteceu e o que já está comprometido para o mês */
-function orcUso(cat,m){
+function orcItens(cat,m){
   const it=doMes(m).filter(i=>i.tipo==='gasto'&&i.categoria===cat&&!ehLivre(i));
-  const realizado=soma(it.filter(efetivo));let comprometido=soma(it.filter(i=>i.status==='previsto'));
-  if(m>=MES_ATUAL)S.recorrentes.filter(r=>r.ativa&&r.tipo==='gasto'&&r.categoria===cat&&r.inicio<=m&&!(r.fim&&m>r.fim)&&!ocorrencia(r,m)).forEach(r=>{comprometido+=r.valor});
-  return {realizado,comprometido};
+  const realizados=it.filter(efetivo),compromissos=it.filter(i=>i.status==='previsto');
+  if(m>=MES_ATUAL)S.recorrentes.filter(r=>r.ativa&&r.tipo==='gasto'&&r.categoria===cat&&r.inicio<=m&&!(r.fim&&m>r.fim)&&!ocorrencia(r,m)).forEach(r=>{
+    compromissos.push({...r,descricao:r.descricao,data:diaNoMes(m,r.dia||1),status:'previsto',valor:r.valor});
+  });
+  return {realizados,compromissos};
 }
+function orcUso(cat,m){const it=orcItens(cat,m);return {realizado:soma(it.realizados),comprometido:soma(it.compromissos)}}
 function verbaPessoalRestante(){return Object.keys(S.nomes).reduce((s,e)=>{const m=Number(S.mesadas[e])||0;if(!m)return s;
   const u=soma(doMes(MES_ATUAL).filter(i=>i.tipo==='gasto'&&efetivo(i)&&ehLivre(i)&&i.autor===e));return s+Math.max(0,m-u)},0)}
 /* o mês agora. Metas e sugestões de aporte NÃO entram aqui: só mudam o caixa quando o aporte é registrado. */
@@ -803,43 +806,101 @@ function histCartoes(){
 /* ================= orçamento ================= */
 /* percentual a partir de uma fração: 0,62 → "62%" (nunca multiplica duas vezes) */
 function pctF(fr){if(!isFinite(fr))return '—';return Math.round(fr*100).toLocaleString('pt-BR')+'%'}
+const ORC_GRUPOS=[
+  {id:'essenciais',nome:'Essenciais',cats:['moradia','contas','mercado','saude','farmacia','transporte','educacao','manutencao']},
+  {id:'estilo',nome:'Estilo de vida',cats:['restaurantes','lazer','beleza','roupas','compras','__livre']},
+  {id:'financeiro',nome:'Financeiro',cats:['dividas','assinaturas','impostos']},
+  {id:'outros',nome:'Outros',cats:['viagens','presentes','pets','outros']}
+];
+const ORC_FILTROS=[['todos','Todos'],['com','Com orçamento'],['sem','Sem orçamento'],['estourados','Estourados'],['comprometidos','Com comprometidos']];
+function dadosOrcamento(){
+  const pl=planejado(S.mes),med=media(),entPl=pl.entradas||Math.round(med.ent);
+  const entries=CATS_G.map(c=>{const u=orcUso(c.id,S.mes),lim=Number(pl.gastos[c.id])||0;
+    return {...c,lim,realizado:cent(u.realizado),comprometido:cent(u.comprometido)};
+  });
+  const verbaPl=Object.keys(S.nomes).reduce((s,e)=>s+(Number(S.mesadas[e])||0),0);
+  const verbaUso=soma(doMes(S.mes).filter(i=>i.tipo==='gasto'&&efetivo(i)&&ehLivre(i)));
+  if(verbaPl||verbaUso)entries.push({id:'__livre',nome:'Dinheiro pessoal',em:'💸',lim:cent(verbaPl),realizado:cent(verbaUso),comprometido:0});
+  entries.forEach(x=>{x.usado=cent(x.realizado+x.comprometido);x.disp=cent(x.lim-x.usado);x.estourado=x.lim>0&&x.disp<-.004;});
+  const sum=k=>cent(entries.reduce((s,x)=>s+x[k],0));
+  return {pl,med,entPl,entries,planejado:sum('lim'),realizado:sum('realizado'),comprometido:sum('comprometido'),
+    disponivel:cent(entries.reduce((s,x)=>s+(x.lim?Math.max(0,x.disp):0),0)),
+    excesso:cent(entries.reduce((s,x)=>s+(x.estourado?-x.disp:0),0)),estourados:entries.filter(x=>x.estourado)};
+}
+function passaOrcFiltro(x,f){return f==='com'?x.lim>0:f==='sem'?x.lim===0:f==='estourados'?x.estourado:f==='comprometidos'?x.comprometido>.004:true}
 function vOrcamento(){
-  const pl=planejado(S.mes),r=resumo(S.mes),med=media();
-  const entPl=pl.entradas||Math.round(med.ent);
-  const verbaPl=Object.keys(S.nomes).reduce((s,e)=>s+(Number(S.mesadas[e])||0),0),verbaUso=soma(doMes(S.mes).filter(i=>i.tipo==='gasto'&&efetivo(i)&&ehLivre(i)));
-  const usos=Object.fromEntries(CATS_G.map(c=>[c.id,orcUso(c.id,S.mes)]));
-  const totPl=CATS_G.reduce((s,c)=>s+(Number(pl.gastos[c.id])||0),0)+verbaPl;
-  const totComp=CATS_G.reduce((s,c)=>s+usos[c.id].comprometido,0);
-  const cardVerba=verbaPl||verbaUso?`<div class="orc-card" data-ak="orc-livre"><div class="oc-top"><span class="oc-em">💸</span><b>Dinheiro pessoal</b></div>
-    <div class="oc-val"><span class="${verbaUso?'neg':'zero'}">${R0(verbaUso)}</span><span class="mut">/</span><button class="oc-ed ref" data-go="livre" title="Definir em Nosso dinheiro">${R0(verbaPl)}</button></div>
-    <div class="tr ${verbaPl?clsLim(verbaUso/verbaPl):''}"><i style="width:${verbaPl?Math.min(100,verbaUso/verbaPl*100):0}%"></i></div>
-    <div class="oc-rcd"><span>Realizado <b class="${verbaUso?'neg':'zero'}">${R0(verbaUso)}</b></span><span>Comprometido <b class="zero">${R0(0)}</b></span><span>Disponível <b class="${cS(verbaPl-verbaUso)}">${R0(verbaPl-verbaUso)}</b></span></div></div>`:'';
-  const cards=cardVerba+CATS_G.map(c=>{const u=usos[c.id],lim=Number(pl.gastos[c.id])||0,usado=u.realizado+u.comprometido,disp=lim-usado;
-    const wR=lim?Math.min(100,u.realizado/lim*100):0,wC=lim?Math.min(100-wR,u.comprometido/lim*100):0;
-    return `<div class="orc-card ${lim?'':'sem'}" data-ak="orc-${c.id}">${lim?selo(disp):''}
-      <div class="oc-top"><span class="oc-em">${c.em}</span><b>${esc(c.nome)}</b><button class="oc-zerar" data-act="orc-zerar" data-cat="${c.id}" ${lim?'':'disabled'} title="${lim?'Zerar o valor planejado':'Nada planejado para zerar'}">Zerar</button></div>
-      <div class="oc-val"><span class="${u.realizado>0?'neg':'zero'}">${R0(u.realizado)}</span><span class="mut">/</span><button class="oc-ed ref" data-orc-edit="${c.id}" title="Clique para editar">${lim?R0(lim):'Definir'}</button></div>
-      <div class="tr tr2 ${lim?clsLim(usado/lim):''}"><i style="width:${wR}%"></i><i class="c" style="left:${wR}%;width:${wC}%"></i></div>
-      <div class="oc-rcd"><span>Realizado <b class="${u.realizado>0?'neg':'zero'}">${R0(u.realizado)}</b></span><span>Comprometido <b class="${u.comprometido>0?'ref':'zero'}">${R0(u.comprometido)}</b></span><span>Disponível <b class="${lim?cS(disp):'zero'}">${lim?R0(disp):'—'}</b></span></div>
-    </div>`}).join('');
-  // 50/30/20 sobre as entradas previstas; sem entradas, não há base para percentual
-  const ess=['moradia','mercado','contas','transporte','saude','farmacia','dividas','impostos'].reduce((s,k)=>s+(Number(pl.gastos[k])||0),0),des=totPl-ess,fut=entPl-totPl;
+  const d=dadosOrcamento(),{pl,med,entPl}=d,f=ORC_FILTROS.some(x=>x[0]===S.orcFiltro)?S.orcFiltro:'todos';
+  const card=x=>{
+    const wR=x.lim?Math.min(100,x.realizado/x.lim*100):0,wC=x.lim?Math.min(100-wR,x.comprometido/x.lim*100):0;
+    const ratio=x.lim?pctF(x.usado/x.lim):'';
+    return `<div class="orc-card ${x.lim?'':'sem'} ${x.estourado?'orc-estourado':''}" data-ak="orc-${x.id}" data-orc-detail="${x.id}">
+      <div class="oc-top"><span class="oc-em" aria-hidden="true">${x.em}</span><b>${esc(x.nome)}</b><span class="oc-info" aria-hidden="true">ⓘ</span></div>
+      <div class="oc-val"><span class="oc-real">${R0(x.realizado)}</span><span class="mut">/</span>${x.id==='__livre'?`<button class="oc-ed oc-plan" data-go="livre" title="Definir dinheiro pessoal">${x.lim?R0(x.lim):'Definir'}</button>`:`<button class="oc-ed oc-plan" data-orc-edit="${x.id}" title="Editar orçamento de ${esc(x.nome)}">${x.lim?R0(x.lim):'Definir'}</button>`}</div>
+      ${x.lim?`<div class="oc-progress"><div class="tr tr2" role="meter" aria-label="Orçamento usado de ${esc(x.nome)}, incluindo compromissos" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100,Math.round(x.usado/x.lim*100))}" aria-valuetext="${ratio} utilizado"><i style="width:${wR}%"></i><i class="c" style="left:${wR}%;width:${wC}%"></i></div><span class="oc-percent">${ratio}</span></div>`:''}
+      ${x.comprometido>.004?`<div class="oc-commit"><b>${R0(x.comprometido)}</b> comprometidos</div>`:''}
+      <div class="oc-bottom">${x.lim?x.estourado?`<span class="oc-over"><b>${R0(-x.disp)}</b> acima do orçamento</span>`:`<span class="oc-available"><b>${R0(x.disp)}</b> disponíveis</span>`:'<span class="mut">Sem orçamento definido</span>'}${x.lim&&x.id!=='__livre'?`<button class="oc-zerar" data-act="orc-zerar" data-cat="${x.id}" title="Remover orçamento de ${esc(x.nome)}">Zerar</button>`:''}</div>
+    </div>`;
+  };
+  const groups=ORC_GRUPOS.map(g=>{const xs=g.cats.map(id=>d.entries.find(x=>x.id===id)).filter(x=>x&&passaOrcFiltro(x,f));
+    return xs.length?`<section class="orc-group" aria-labelledby="orc-group-${g.id}"><div class="orc-group-head"><h2 id="orc-group-${g.id}">${g.nome}</h2><span>${xs.length} ${xs.length===1?'categoria':'categorias'}</span></div><div class="orc-grid">${xs.map(card).join('')}</div></section>`:'';
+  }).join('');
+  const ess=['moradia','mercado','contas','transporte','saude','farmacia','dividas','impostos'].reduce((s,k)=>s+(Number(pl.gastos[k])||0),0),des=d.planejado-ess,fut=entPl-d.planejado;
   const ref503020=entPl>0?pbar('Essenciais (até 50%)',pctF(ess/entPl),RF(R0(ess)),ess/entPl/.5,clsLim(ess/entPl/.5))
       +pbar('Estilo de vida (até 30%)',pctF(des/entPl),RF(R0(des)),des/entPl/.3,clsLim(des/entPl/.3))
       +pbar('Metas e reserva (20% ou mais)',pctF(Math.max(0,fut)/entPl),RF(R0(fut)),Math.max(0,fut)/entPl/.2)
     :vazio('Sem entradas previstas','Definam a renda média mensal para calcular a divisão 50/30/20.',`<button class="btn" data-act="renda-media">Definir renda média</button>`);
-  return head('Orçamento','Quanto vocês planejam gastar em cada categoria. Clique no valor para editar.')+`
-  <div class="orc-resumo panel" data-ak="orc-resumo">
-    <div><small>${pl.entradas?'Entradas previstas':med.definida?'Renda média mensal':'Renda média histórica'}</small><button class="oc-ed big-ed pos" data-orc-edit="__ent" title="Clique para editar">${R0(entPl)}</button><small class="mut">${pl.entradas?'definidas por vocês para este mês':med.definida?'definida por vocês':'média dos últimos meses'}</small></div>
-    <div><small>Planejado para gastar</small><b class="ref">${R0(totPl)}</b><small class="mut">${totPl&&entPl>0?pctF(totPl/entPl)+' das entradas':'defina abaixo'}</small></div>
-    <div><small>Realizado + comprometido</small><b class="${r.gastos+totComp>0?'neg':'zero'}">${R0(r.gastos+totComp)}</b><small class="mut">${R0(r.gastos)} realizados · <span class="ref">${R0(totComp)}</span> comprometidos</small></div>
-    <div><small>Disponível no planejado</small>${totPl>0?`<b class="${cS(totPl-r.gastos-totComp)}">${R0(totPl-r.gastos-totComp)}</b><small class="mut">sobra planejada ${R0(entPl-totPl)}</small>`:`<b class="zero">—</b><small class="mut">defina o orçamento primeiro</small>`}</div>
+  return head('Orçamento','Planejem por categoria. Editem o limite ou abram o card para ver os detalhes.')+`<div class="orc-page">
+  <div class="orc-resumo" data-ak="orc-resumo">
+    <div class="tile" data-orc-detail="renda"><small>${pl.entradas?'Entradas previstas':med.definida?'Renda média mensal':'Renda média histórica'}</small><button class="oc-ed big-ed" data-orc-edit="__ent" title="Editar entradas previstas">${R0(entPl)}</button><small>${pl.entradas?'definidas para este mês':med.definida?'definida por vocês':'média dos últimos meses'}</small></div>
+    <div class="tile" data-orc-detail="planejado"><small>Planejado para gastar</small><b>${R0(d.planejado)}</b><small>${d.planejado&&entPl>0?pctF(d.planejado/entPl)+' das entradas':'defina os limites abaixo'}</small></div>
+    <div class="tile" data-orc-detail="uso"><small>Realizado${d.comprometido?' + comprometido':''}</small><b>${R0(d.realizado+d.comprometido)}</b><small>${R0(d.realizado)} realizados${d.comprometido?` · <span class="oc-commit">${R0(d.comprometido)} comprometidos</span>`:''}</small></div>
+    <div class="tile" data-orc-detail="disponivel"><small>Disponível no orçamento</small><b class="oc-available">${R0(d.disponivel)}</b><small>saldo das categorias com limite</small></div>
+  </div>
+  <div class="orc-alerts" aria-label="Destaques do orçamento">
+    ${d.estourados.length?`<button class="orc-alert over" data-orc-filter="estourados"><i aria-hidden="true"></i><b>${d.estourados.length}</b> ${d.estourados.length===1?'categoria acima':'categorias acima'} do orçamento <span>${R0(d.excesso)} de excesso</span></button>`:''}
+    ${d.comprometido>.004?`<button class="orc-alert commit" data-orc-filter="comprometidos"><i aria-hidden="true"></i><b>${R0(d.comprometido)}</b> comprometidos</button>`:''}
+    ${d.disponivel>.004?`<button class="orc-alert available" data-orc-detail="disponivel"><i aria-hidden="true"></i><b>${R0(d.disponivel)}</b> ainda disponíveis</button>`:''}
   </div>
   <div class="orc-acoes"><span class="mut">${pl.proprio?'Orçamento próprio de '+esc(soMes(S.mes))+'.':'Usando o orçamento padrão.'}</span>
-    <button class="btn sm ghost" data-act="renda-media">💰 ${med.definida?'Renda média: '+R0(S.rendaMedia):'Definir renda média'}</button>
+    <button class="btn sm ghost" data-act="renda-media">${med.definida?'Renda média: '+R0(S.rendaMedia):'Definir renda média'}</button>
     <button class="btn sm ghost" data-act="orc-copiar">Copiar do mês anterior</button><button class="btn sm ghost" data-act="orc-padrao">Usar como padrão</button></div>
-  <div class="orc-grid">${cards}</div>
-  <div class="panel" style="margin-top:16px"><h2>Referência 50/30/20</h2><p class="sub">Até 50% da renda no essencial, até 30% no estilo de vida e pelo menos 20% para o futuro</p>${ref503020}</div>`;
+  <div class="orc-filters" role="group" aria-label="Filtrar categorias">${ORC_FILTROS.map(([id,nome])=>`<button data-orc-filter="${id}" class="${f===id?'on':''}" aria-pressed="${f===id}">${nome}<span>${d.entries.filter(x=>passaOrcFiltro(x,id)).length}</span></button>`).join('')}</div>
+  ${groups||`<div class="orc-empty">${vazio('Nenhuma categoria neste filtro','Escolha outro filtro para ver as categorias.',`<button class="btn ghost" data-orc-filter="todos">Ver todas</button>`)}</div>`}
+  <details class="orc-reference panel"><summary>Referência 50/30/20</summary><p class="sub">Uma referência para distribuir a renda entre despesas e futuro.</p>${ref503020}</details></div>`;
+}
+function detalheOrcamento(key){
+  const d=dadosOrcamento(),x=d.entries.find(x=>x.id===key),lines=[],groups=[];
+  const line=(label,value,detail='',tipo='money')=>lines.push({label,value,detail,tipo});
+  const add=(title,rows,total)=>groups.push({title,rows,total});
+  const rows=(xs,k)=>xs.map(x=>({label:x.nome,value:x[k]}));
+  let titulo='',valor='',formula='',nota='';
+  if(x){
+    titulo=x.nome;valor=R(x.realizado)+' / '+(x.lim?R(x.lim):'Sem orçamento');
+    formula='Disponível = limite planejado − realizado − comprometido. A barra considera realizado + comprometido.';
+    line('Limite planejado',x.lim||'Não definido','',x.lim?'money':'text');line('Realizado',x.realizado);line('Comprometido',x.comprometido);
+    if(x.lim)line(x.estourado?'Acima do orçamento':'Disponível',x.estourado?-x.disp:x.disp);
+    const it=x.id==='__livre'?{realizados:doMes(S.mes).filter(i=>i.tipo==='gasto'&&efetivo(i)&&ehLivre(i)),compromissos:[]}:orcItens(x.id,S.mes);
+    const tx=i=>({label:descVis(i),value:i.valor,detail:[i.data?dataLonga(i.data):'',i.status==='previsto'?'Previsto':i.status==='comprometido'?'Compra no cartão · ainda a pagar':'Confirmado'].filter(Boolean).join(' · ')});
+    add('Realizados',it.realizados.map(tx),x.realizado);if(it.compromissos.length)add('Compromissos previstos',it.compromissos.map(tx),x.comprometido);
+    if(x.id==='__livre')add('Limites de dinheiro pessoal',Object.keys(S.nomes).map(e=>({label:S.nomes[e],value:Number(S.mesadas[e])||0})),x.lim);
+    nota='Compras confirmadas no cartão contam como realizadas no orçamento, mesmo antes de pagar a fatura. Comprometidos são gastos previstos e recorrências ainda não lançadas. Este saldo é um limite de gastos, não dinheiro livre em caixa.';
+  }else if(key==='renda'){
+    titulo='Entradas de referência';valor=R(d.entPl);formula=d.pl.entradas?'Entradas previstas definidas para este mês.':d.med.definida?'Renda média mensal definida por vocês.':'Média histórica calculada pelo dashboard.';
+    line('Entradas de referência',d.entPl);line('Planejado para gastar',d.planejado);line('Sobra planejada',cent(d.entPl-d.planejado));nota='Entradas previstas e renda média não representam dinheiro já recebido.';
+  }else if(key==='planejado'){
+    titulo='Planejado para gastar';valor=R(d.planejado);formula='Soma dos limites por categoria e do dinheiro pessoal.';add('Limites definidos',rows(d.entries.filter(x=>x.lim),'lim'),d.planejado);line('Entradas de referência',d.entPl);line('Sobra planejada',cent(d.entPl-d.planejado));
+  }else if(key==='uso'){
+    titulo='Realizado + comprometido';valor=R(d.realizado+d.comprometido);formula='Gastos realizados + compromissos previstos em todas as categorias, inclusive as que não têm limite.';
+    add('Realizados por categoria',rows(d.entries.filter(x=>x.realizado),'realizado'),d.realizado);if(d.comprometido)add('Comprometidos por categoria',rows(d.entries.filter(x=>x.comprometido),'comprometido'),d.comprometido);
+  }else{
+    titulo='Disponível no orçamento';valor=R(d.disponivel);formula='Soma dos saldos positivos (limite − realizado − comprometido) apenas nas categorias com orçamento. Excessos são mostrados separadamente.';
+    add('Saldo por categoria',d.entries.filter(x=>x.lim&&x.disp>0).map(x=>({label:x.nome,value:x.disp})),d.disponivel);
+    if(d.estourados.length)add('Acima do orçamento',d.estourados.map(x=>({label:x.nome,value:-x.disp})),d.excesso);
+    line('Saldo líquido das categorias com limite',cent(d.disponivel-d.excesso));
+    const sem=d.entries.filter(x=>!x.lim&&x.usado);if(sem.length)add('Gastos sem orçamento definido',rows(sem,'usado'),cent(sem.reduce((s,x)=>s+x.usado,0)));
+    nota='Disponível no orçamento não representa dinheiro em caixa. Categorias sem limite não geram saldo disponível.';
+  }
+  return {titulo,valor,dados:{formula,nota,lines,groups}};
 }
 /* ================= contas fixas ================= */
 function vContas(){
@@ -1275,6 +1336,19 @@ function salvarOrc(){S._orcPend=(S._orcPend||0)+1;const mes=S.mes,snap=JSON.pars
   filaOrc=filaOrc.then(async()=>{const {error}=await sb.from('orcamentos').upsert({mes,gastos:snap.gastos,entradas:snap.entradas||0,atualizado_em:new Date().toISOString()});
     if(error)toast(/orcamentos/.test(error.message||'')?'Falta rodar o schema-v4.sql no Supabase.':'Não deu para salvar agora.')}).finally(()=>{S._orcPend--});return filaOrc}
 function ligarOrcamento(){
+  const root=$('view');
+  root.querySelectorAll('[data-orc-filter]').forEach(b=>b.addEventListener('click',()=>{
+    S.orcFiltro=b.dataset.orcFilter;render();$('view').querySelector('.orc-filters [data-orc-filter="'+S.orcFiltro+'"]')?.focus({preventScroll:true});
+  }));
+  root.querySelectorAll('[data-orc-detail]').forEach(card=>{
+    const open=()=>modalCardDetalhe(detalheOrcamento(card.dataset.orcDetail));
+    if(card.tagName!=='BUTTON'){
+      card.setAttribute('role','button');card.tabIndex=0;
+      card.setAttribute('aria-label',(card.querySelector('.oc-top b')?.textContent||card.querySelector('small')?.textContent||'Orçamento')+'. Ver composição detalhada');
+      card.addEventListener('keydown',e=>{if(e.target===card&&['Enter',' '].includes(e.key)){e.preventDefault();e.stopPropagation();open()}});
+    }
+    card.addEventListener('click',e=>{if(e.target!==card){const control=e.target.closest('button,a,input,select');if(control&&control!==card)return;}e.stopPropagation();open()});
+  });
   document.querySelectorAll('[data-orc-edit]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.dataset.orcEdit,pl0=planejado(S.mes),atual=k==='__ent'?(pl0.entradas||''):(pl0.gastos[k]||'');
     const inp=document.createElement('input');inp.className='field oc-inp';inp.inputMode='decimal';inp.value=fmtInput(atual);inp.placeholder='0,00';
@@ -1520,7 +1594,7 @@ function render(animarMovimento=false){
 /* ================= cards: composição dos valores ================= */
 function ligarCardsDetalhes(root,origem=S.view){
   root.querySelectorAll('.tile,.kpi,.fact').forEach(card=>{
-    if(card.dataset.act)return; // mantém as janelas de detalhe que já existiam
+    if(card.dataset.act||card.dataset.orcDetail)return; // mantém as janelas de detalhe que já existiam
     const title=card.querySelector('.k')||card.querySelector('small');
     const value=card.querySelector('.v')||card.querySelector('b');
     if(!title||!value)return;
@@ -1642,7 +1716,7 @@ function dadosCardDetalhe(view,titulo,fechado=false){
   return {formula,nota,lines,groups};
 }
 function modalCardDetalhe(snapshot){
-  const d=dadosCardDetalhe(snapshot.origem,snapshot.titulo,snapshot.fechado),volta=snapshot.origem==='fatura'?{...S.fatView}:null;
+  const d=snapshot.dados||dadosCardDetalhe(snapshot.origem,snapshot.titulo,snapshot.fechado),volta=snapshot.origem==='fatura'?{...S.fatView}:null;
   const fmt=r=>r.tipo==='text'?esc(r.value):R(r.value);
   const linha=(r,extra='')=>`<div class="card-detail-row ${extra}"><span>${esc(r.label)}${r.detail?`<small>${esc(r.detail)}</small>`:''}</span><b class="${r.tipo==='text'?'':cS(r.value)}">${fmt(r)}</b></div>`;
   modal(`<h2>${esc(snapshot.titulo)}</h2><div class="card-detail-value">${esc(snapshot.valor)}</div>${snapshot.sub?`<p class="card-detail-note">${esc(snapshot.sub)}</p>`:''}<div class="card-detail-formula">${esc(d.formula)}</div>${d.lines.length?`<div class="card-detail-group"><h3>Como o valor é formado</h3>${d.lines.map(x=>linha(x)).join('')}</div>`:''}${d.groups.map(g=>`<section class="card-detail-group"><h3>${esc(g.title)}</h3>${g.rows.length?g.rows.map(x=>linha(x)).join(''):'<p class="card-detail-note">Nenhum item neste grupo.</p>'}${g.total!==undefined?linha({label:'Total deste grupo',value:g.total},'total'):''}</section>`).join('')}${d.nota?`<p class="card-detail-note">${esc(d.nota)}</p>`:''}<div class="btns" style="margin-top:18px"><button class="btn ghost" data-m="cancelar">${volta?'Voltar à fatura':'Fechar'}</button></div>`);
@@ -2555,7 +2629,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='24';
+const VERSAO='25';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
