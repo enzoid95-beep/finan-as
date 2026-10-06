@@ -1219,8 +1219,24 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 .bar-tip-details span{color:#a8b2c3}.bar-tip-details b{font-family:var(--num);font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
 @media(prefers-reduced-motion:reduce){.cb .bar-3d{transition:none!important}.cb .bar-3d.bar-active{transform:none}}
 
+/* ===== v51: cards padronizados (fundo escuro, contorno dourado fino), sem sombra interna e sem "i" ===== */
+.tile,.panel,.meta-card,.conta,.orc-card,.ct-card,.ccard-wrap,.cal-panel,.res-hero,
+.orc-page .orc-card,.orc-page .orc-resumo>.tile{
+  background:#10151d!important;
+  border:1px solid rgba(232,169,12,.34)!important;
+  box-shadow:none!important}
+.tile::after,.panel::after,.orc-card::after,.ct-card::after,.meta-card::after,.valor-card::after,
+.orc-page .orc-card::after,.orc-page .tile::after{content:none!important;display:none!important}
+.tile:hover,.orc-card:hover,.ct-card:hover,.meta-card:hover,.ccard-wrap:hover,.valor-card:hover,
+.orc-page .orc-card:hover,.orc-page .tile:hover{
+  background:#151c27!important;border-color:rgba(255,210,90,.62)!important;box-shadow:none!important;filter:none}
+.valor-card .k,.valor-card>small:first-child{padding-right:0!important}
+.kpi-i,.oc-info{display:none!important}
+/* a moldura dourada fica em cada card, não em volta do grupo */
+.orc-resumo,.orc-page .orc-resumo{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+.orc-resumo::before,.orc-resumo::after{display:none!important}
 </style>
-<link rel="stylesheet" href="radar.css?v=49">
+<link rel="stylesheet" href="radar.css?v=51">
 </head>
 <body>
 
@@ -1300,8 +1316,8 @@ body.priv .meta-facts b,body.priv .dl,body.priv .m,body.priv .fact b,body.priv .
 
 <script src="supabase.js"></script>
 <script src="config.js"></script>
-<script src="radar-core.js?v=49"></script>
-<script src="radar-ui.js?v=49"></script>
-<script src="app.js?v=49"></script>
+<script src="radar-core.js?v=51"></script>
+<script src="radar-ui.js?v=51"></script>
+<script src="app.js?v=51"></script>
 </body>
 </html>
