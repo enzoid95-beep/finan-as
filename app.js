@@ -257,7 +257,7 @@ async function recarregar(){
       };
       if(!await carregar())continue;
       S.hist=null;S._histV=(S._histV||0)+1;S._histC=false;S.retro={};S._retroC={};S._retroV=(S._retroV||0)+1;
-      const pintar=()=>{const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;if(S.assMov!==undefined){S._movCarregado=true;S._ultimaAssMov=S.assMov}render(mudou)};
+      const pintar=()=>{const mudou=permitirMovimento&&S.assMov!==S._ultimaAssMov;if(S.assMov!==undefined){S._movCarregado=true;S._ultimaAssMov=S.assMov}render(mudou,true)};
       pintar();
       if(!gerando&&S.temV9){gerando=true;try{if(await gerarOcorrencias()>0&&await carregar())pintar()}finally{gerando=false}}
     }while(repetirCarga)}catch(e){toast('Não deu para atualizar os dados. Tente novamente; os valores anteriores foram preservados.');return false}
@@ -285,10 +285,11 @@ function assinar(){
    Tudo é idempotente: rodar de novo não duplica nada. */
 async function gerarOcorrencias(){
   let n=0;const novos=[];
+  const existentes=new Set([...S.itens,...(S.cardTodos||[])].filter(x=>x.recorrente_id&&x.ref_mes).map(x=>x.recorrente_id+'|'+x.ref_mes));
   for(const r of S.recorrentes){
     if(!r.ativa)continue;const card=r.cartao_id&&S.cartoes.find(c=>c.id===r.cartao_id);
     for(const m of [MES_ATUAL,addMes(MES_ATUAL,1)]){
-      if(r.inicio>m||(r.fim&&m>r.fim))continue;const d=diaNoMes(m,r.dia);
+      if(r.inicio>m||(r.fim&&m>r.fim)||existentes.has(r.id+'|'+m))continue;const d=diaNoMes(m,r.dia);
       const o={tipo:r.tipo,valor:r.valor,descricao:r.descricao,categoria:r.categoria,data:d,recorrente_id:r.id,ref_mes:m,status:'previsto'};
       if(S.temV10&&r.meio)o.meio=r.meio;
       if(S.temV11&&r.dono)o.dono=r.dono;
@@ -495,20 +496,24 @@ function delta(atual,anterior,inverso){
   return `<span class="dl ${bom?'up':'down'}" title="${txt}" aria-label="${txt}">${d>0?SETA_UP:SETA_DN}</span>`;
 }
 /* ================= navegação ================= */
+function htmlSeMudou(el,html){
+  if(el._htmlFonte===html)return false;
+  el.innerHTML=html;el._htmlFonte=html;return true;
+}
 function navHTML(){
   const atras=S.recorrentes.filter(r=>r.ativa&&r.tipo==='gasto'&&statusConta(r,MES_ATUAL).k==='late').length;
   const gAtual=grupoDe(S.view).id;
   if(!S.abertos){S.abertos={};}
   if(S._gAnt!==gAtual){S.abertos[gAtual]=true;S._gAnt=gAtual}
-  $('sideNav').innerHTML=GRUPOS.map(g=>{
+  htmlSeMudou($('sideNav'),GRUPOS.map(g=>{
     const badge=g.id==='g-plan'&&atras?`<span class="badge">${atras}</span>`:'';
     const multi=g.views.length>1,aberto=multi;
     const subs=multi?`<div class="nav-subs" ${aberto?'':'hidden'}>${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);const b=id==='contas'&&atras?`<span class="badge">${atras}</span>`:'';return `<button class="nav-sub" data-go="${id}" ${S.view===id?'aria-current="page"':''}>${esc(v.nome)}${b}</button>`}).join('')}</div>`:'';
-    return `<div class="nav-g ${aberto?'aberto':''}"><button class="nav-btn" data-grupo-nav="${g.id}" ${gAtual===g.id&&!multi?'aria-current="page"':''}  ${gAtual===g.id&&multi?'data-ativo="1"':''}>${svg(g.ic)}<span>${g.nome}</span>${multi?'':badge}</button>${subs}</div>`}).join('');
-  $('tabbar').innerHTML=TABS.map(id=>{const g=GRUPOS.find(x=>x.id===id);return `<button data-grupo="${id}" ${gAtual===id?'aria-current="page"':''}>${svg(g.ic)}<span>${g.curto}</span></button>`}).join('')
-    +`<button data-act="mais" ${TABS.includes(gAtual)?'':'aria-current="page"'}>${svg('mais')}<span>Mais</span></button>`;
-  $('privBtn').innerHTML=svg(S.priv?'olhoF':'olho')+`<span>${S.priv?'Mostrar valores':'Esconder valores'}</span>`;
-  $('privTop').innerHTML=svg(S.priv?'olhoF':'olho');
+    return `<div class="nav-g ${aberto?'aberto':''}"><button class="nav-btn" data-grupo-nav="${g.id}" ${gAtual===g.id&&!multi?'aria-current="page"':''}  ${gAtual===g.id&&multi?'data-ativo="1"':''}>${svg(g.ic)}<span>${g.nome}</span>${multi?'':badge}</button>${subs}</div>`}).join(''));
+  htmlSeMudou($('tabbar'),TABS.map(id=>{const g=GRUPOS.find(x=>x.id===id);return `<button data-grupo="${id}" ${gAtual===id?'aria-current="page"':''}>${svg(g.ic)}<span>${g.curto}</span></button>`}).join('')
+    +`<button data-act="mais" ${TABS.includes(gAtual)?'':'aria-current="page"'}>${svg('mais')}<span>Mais</span></button>`);
+  htmlSeMudou($('privBtn'),svg(S.priv?'olhoF':'olho')+`<span>${S.priv?'Mostrar valores':'Esconder valores'}</span>`);
+  htmlSeMudou($('privTop'),svg(S.priv?'olhoF':'olho'));
   document.body.classList.toggle('priv',S.priv);
 }
 function ir(v){v=ALIAS[v]||v;if(!VIEWS.some(x=>x.id===v))v='geral';S.view=v;S.ultima[grupoDe(v).id]=v;if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);render();window.scrollTo(0,0)}
@@ -1416,8 +1421,9 @@ function ligarBarras(root=$('view')){
 const ANIM=new Map();
 const SEM_MOV=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RX_MOEDA=/^(\s*[+−→]?\s*)(-?)R\$\s?([\d.]+)(,(\d{2}))?(\s*)$/;
+let cicloAnim=0;
 function animar(permitir=false){
-  if(SEM_MOV)return;
+  const ciclo=++cicloAnim;if(SEM_MOV)return;
   const root=$('view'),v=S.view;
   // números: contam do valor anterior até o novo (subindo ou descendo)
   const jobs=[];let i=0;ANIM._c={};
@@ -1433,12 +1439,13 @@ function animar(permitir=false){
   }
   if(jobs.length){
     const t0=performance.now(),D=800;
-    const passo=agora=>{const p=Math.min(1,(agora-t0)/D),e=1-Math.pow(1-p,3);
+    const passo=agora=>{if(ciclo!==cicloAnim)return;const p=Math.min(1,(agora-t0)/D),e=1-Math.pow(1-p,3);
       jobs.forEach(j=>{j.n.nodeValue=j.pre+j.fmt.format(p<1?j.de+(j.para-j.de)*e:j.para)+j.suf});
       if(p<1)requestAnimationFrame(passo)};
     requestAnimationFrame(passo);
   }
   // barras, gráficos e anéis: crescem ou encolhem a partir da posição anterior
+  const barras=[];
   root.querySelectorAll('.tr i,.cb i,.ring circle[stroke-dasharray]').forEach((b,k)=>{
     const key=v+'|b'+k,anel=b.tagName.toLowerCase()==='circle',prop=anel?'strokeDashoffset':b.closest('.cb')?'height':'width';
     const alvo=anel?b.getAttribute('stroke-dashoffset'):b.style[prop];
@@ -1446,10 +1453,9 @@ function animar(permitir=false){
     ANIM.set(key,alvo);
     if(!permitir||ini===alvo||alvo==null)return;
     b.style.transition='none';b.style[prop]=ini;
-    b.getBoundingClientRect();
-    b.style.transition='';
-    requestAnimationFrame(()=>{b.style[prop]=alvo});
+    barras.push({b,prop,alvo});
   });
+  if(barras.length){root.getBoundingClientRect();barras.forEach(({b})=>{b.style.transition=''});requestAnimationFrame(()=>{if(ciclo===cicloAnim)barras.forEach(({b,prop,alvo})=>{b.style[prop]=alvo})})}
   // pizza: gira e abre ao entrar na tela
 
 }
@@ -1637,6 +1643,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(document.querySele
 addEventListener('resize',()=>fecharSel());addEventListener('scroll',e=>{if(!(e.target&&e.target.closest&&e.target.closest('.sel-pop')))fecharSel()},true);
 /* listas de seleção no visual do site: substituem as caixas brancas do navegador */
 const SEL_CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+function limparSelects(root){
+  (root._selectObservers||[]).forEach(o=>o.disconnect());root._selectObservers=[];
+}
 function melhorarSelects(root){
   root.querySelectorAll('select:not([data-sx])').forEach(sel=>{
     sel.dataset.sx='1';sel.classList.add('sx-oculto');sel.tabIndex=-1;
@@ -1645,7 +1654,7 @@ function melhorarSelects(root){
     b.innerHTML='<span class="sel-txt"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
     sel.after(b);
     const sync=()=>{const o=sel.options[sel.selectedIndex];b.querySelector('.sel-txt').textContent=o?o.textContent:'';b.disabled=sel.disabled};
-    sync();sel.addEventListener('change',sync);new MutationObserver(sync).observe(sel,{childList:true,subtree:true,attributes:true});
+    sync();sel.addEventListener('change',sync);const observer=new MutationObserver(sync);observer.observe(sel,{childList:true,subtree:true,attributes:true});(root._selectObservers||(root._selectObservers=[])).push(observer);
     b.addEventListener('click',e=>{e.stopPropagation();if(b.getAttribute('aria-expanded')==='true')return fecharSel();abrirSel(sel,b)});
     b.addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();abrirSel(sel,b)}});
   });
@@ -1693,11 +1702,14 @@ document.addEventListener('input',e=>{const i=e.target;if(!(i instanceof HTMLInp
 },true);
 
 /* ================= render ================= */
-function render(animarMovimento=false){
+function render(animarMovimento=false,reutilizar=false){
   navHTML();
   const V={relmes:vRelMes,patrimonio:vPatrimonio,transf:vTransf,geral:vGeral,calendario:vCalendario,gastos:vGastos,entradas:vEntradas,cartoes:vCartoes,orcamento:vOrcamento,contas:vContas,dividas:vDividas,metas:vMetas,desejos:vDesejos,reserva:vReserva,livre:vLivre,retro:vRetro,investimentos:vInvestimentos};
-  if(S.temV9===false){$('view').innerHTML=`<div class="panel" style="max-width:640px;margin:40px auto">${vazio('Falta um passo para ativar a nova versão','Rodem o arquivo <b>schema-v9.sql</b> no SQL Editor do Supabase e recarreguem a página. Ele converte todos os lançamentos para o novo modelo, sem apagar nada.')}</div>`;return}
-  $('view').innerHTML=subAbas()+(V[S.view]||vGeral)();
+  if(S.temV9===false){limparSelects($('view'));$('view')._htmlFonte=null;$('view').innerHTML=`<div class="panel" style="max-width:640px;margin:40px auto">${vazio('Falta um passo para ativar a nova versão','Rodem o arquivo <b>schema-v9.sql</b> no SQL Editor do Supabase e recarreguem a página. Ele converte todos os lançamentos para o novo modelo, sem apagar nada.')}</div>`;return}
+  const root=$('view'),html=subAbas()+(V[S.view]||vGeral)(),chave=[S.view,S.mes,HOJE,S.me].join('|');
+  if(reutilizar&&root._htmlFonte===html&&root._renderChave===chave)return;
+  document.querySelectorAll('.dp-pop,.sel-pop').forEach(p=>{if(!p.closest('dialog'))p.remove()});limparSelects(root);
+  root.innerHTML=html;root._htmlFonte=html;root._renderChave=chave;
   ligarOrcamento();
   ligarPizza();
   ligarBarras();
@@ -1854,7 +1866,7 @@ function modalCardDetalhe(snapshot){
 /* ================= modal ================= */
 let onSave=null;
 function modal(html,salvar){
-  S.fatAtiva=false;$('mdl').innerHTML=html;onSave=salvar||null;fecharDP();fecharSel();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarSelects($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('dlg').scrollTop=0;marcarValores($('mdl'));ligarTabelas($('mdl'));ligarCardsDetalhes($('mdl'));caberModal();
+  S.fatAtiva=false;limparSelects($('mdl'));$('mdl').innerHTML=html;onSave=salvar||null;fecharDP();fecharSel();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarSelects($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('dlg').scrollTop=0;marcarValores($('mdl'));ligarTabelas($('mdl'));ligarCardsDetalhes($('mdl'));caberModal();
   const f=$('mdl').querySelector('input.big,input:not([type=checkbox])');if(f&&salvar)setTimeout(()=>f.focus(),40);
   $('mdl').querySelectorAll('.seg,.chips').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!g.contains(b))return;g.querySelectorAll(':scope>button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));if(g.dataset.onchange&&window[g.dataset.onchange])window[g.dataset.onchange](b)}));
 }
@@ -2778,7 +2790,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='29';
+const VERSAO='30';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
