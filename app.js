@@ -176,13 +176,16 @@ function movimentoInvest(item,valor,excluir=false){
   return {principal,operacao:op('investimentos','update',{valor:novo,aplicado},{id:x.id,valor:x.valor,aplicado:x.aplicado},1)};
 }
 async function lerTodos(criar,chave='id'){
-  const data=[];let inicio=0;
+  const data=[];let inicio=0,total=null;
   for(;;){
-    const r=await criar().order(chave,{ascending:true}).range(inicio,inicio+499);
+    // Conta somente na primeira página; mantém paginação se o servidor limitar linhas.
+    const r=await criar(inicio===0?{count:'exact'}:undefined).order(chave,{ascending:true}).range(inicio,inicio+499);
     if(r.error)return {data:null,error:r.error};
     if(!Array.isArray(r.data))return {data:null,error:new Error('Resposta de dados inválida.')};
     if(!r.data.length)return {data,error:null};
+    if(inicio===0&&Number.isSafeInteger(r.count)&&r.count>=r.data.length)total=r.count;
     data.push(...r.data);inicio+=r.data.length;
+    if(total!==null&&inicio>=total)return {data,error:null};
   }
 }
 function erroSchema(e){return !!e&&['42P01','42703','PGRST204','PGRST205'].includes(e.code)}
@@ -190,7 +193,7 @@ function conferirLeitura(r,opcional=false){if(r.error&&!(opcional&&erroSchema(r.
 async function carregarItens(aplicar=true){
   const usuario=S.me,alvo=S.mes,menor=S.mes<MES_ATUAL?S.mes:MES_ATUAL,maior=S.mes>MES_ATUAL?S.mes:addMes(MES_ATUAL,1);
   const ini=addMes(menor,-5)+'-01',fim=addMes(maior,1)+'-01';
-  const {data,error}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').or(`and(data.gte.${ini},data.lt.${fim}),and(data_caixa.gte.${ini},data_caixa.lt.${fim}),and(status.eq.previsto,cartao_id.is.null,data.lt.${ini})`)));
+  const {data,error}=conferirLeitura(await lerTodos((contagem)=>sb.from('lancamentos').select('*',contagem).or(`and(data.gte.${ini},data.lt.${fim}),and(data_caixa.gte.${ini},data_caixa.lt.${fim}),and(status.eq.previsto,cartao_id.is.null,data.lt.${ini})`)));
   if(alvo!==S.mes||usuario!==S.me)return;
   const itens=data.map(deLinha);if(aplicar)S.itens=itens;return {mes:alvo,itens};
 }
@@ -199,21 +202,21 @@ async function carregarResto(aplicar=true){
   const q=t=>sb.from(t);
   const ini3=addMes(MES_ATUAL,-3)+'-01',fimAt=addMes(MES_ATUAL,1)+'-01';
   const r=await Promise.all([
-    lerTodos(()=>q('metas').select('*').order('criado_em')),
+    lerTodos((contagem)=>q('metas').select('*',contagem).order('criado_em')),
     q('config').select('*').eq('id','casal').maybeSingle(),
-    lerTodos(()=>q('lancamentos').select('meta_id,tipo,valor,data').in('tipo',['aporte','resgate']).not('meta_id','is',null).eq('status','pago').lte('data',HOJE)),
-    lerTodos(()=>q('lancamentos').select('id,tipo,valor,data_caixa').eq('status','pago').lte('data_caixa',HOJE)),
-    lerTodos(()=>q('lancamentos').select('tipo,valor,data,categoria,livre,status').in('status',['pago','comprometido']).gte('data',ini3).lt('data',fimAt)),
-    lerTodos(()=>q('cartoes').select('*').order('criado_em')),
-    lerTodos(()=>q('recorrentes').select('*').order('dia')),
-    lerTodos(()=>q('dividas').select('*').order('criado_em')),
-    lerTodos(()=>q('desejos').select('*').order('criado_em')),
-    lerTodos(()=>q('orcamentos').select('*'),'mes'),
-    lerTodos(()=>q('lancamentos').select('*').not('cartao_id','is',null)),
-    lerTodos(()=>q('lancamentos').select('divida_id,data,tipo').eq('tipo','divida').not('divida_id','is',null).eq('status','pago').lte('data',HOJE)),
-    lerTodos(()=>q('investimentos').select('*').order('data',{ascending:false})),
+    lerTodos((contagem)=>q('lancamentos').select('meta_id,tipo,valor,data',contagem).in('tipo',['aporte','resgate']).not('meta_id','is',null).eq('status','pago').lte('data',HOJE)),
+    lerTodos((contagem)=>q('lancamentos').select('id,tipo,valor,data_caixa',contagem).eq('status','pago').lte('data_caixa',HOJE)),
+    lerTodos((contagem)=>q('lancamentos').select('tipo,valor,data,categoria,livre,status',contagem).in('status',['pago','comprometido']).gte('data',ini3).lt('data',fimAt)),
+    lerTodos((contagem)=>q('cartoes').select('*',contagem).order('criado_em')),
+    lerTodos((contagem)=>q('recorrentes').select('*',contagem).order('dia')),
+    lerTodos((contagem)=>q('dividas').select('*',contagem).order('criado_em')),
+    lerTodos((contagem)=>q('desejos').select('*',contagem).order('criado_em')),
+    lerTodos((contagem)=>q('orcamentos').select('*',contagem),'mes'),
+    lerTodos((contagem)=>q('lancamentos').select('*',contagem).not('cartao_id','is',null)),
+    lerTodos((contagem)=>q('lancamentos').select('divida_id,data,tipo',contagem).eq('tipo','divida').not('divida_id','is',null).eq('status','pago').lte('data',HOJE)),
+    lerTodos((contagem)=>q('investimentos').select('*',contagem).order('data',{ascending:false})),
     q('lancamentos').select('status,fatura_mes').limit(1),
-    lerTodos(()=>q('fechamentos').select('*'),'mes'),
+    lerTodos((contagem)=>q('fechamentos').select('*',contagem),'mes'),
     q('lancamentos').select('tags').limit(1),
     q('recorrentes').select('dono,fim').limit(1)
   ]);
@@ -300,7 +303,7 @@ async function gerarOcorrencias(){
   if(novos.length){const {data,error}=await sb.from('lancamentos').upsert(novos,{onConflict:'recorrente_id,ref_mes',ignoreDuplicates:true}).select('id');if(error)throw error;if(data)n+=data.length}
   const autos=S.recorrentes.filter(r=>r.ativa&&r.auto);
   if(autos.length){
-    const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').eq('status','previsto').in('recorrente_id',autos.map(r=>r.id)).lte('data',HOJE)));
+    const {data}=conferirLeitura(await lerTodos((contagem)=>sb.from('lancamentos').select('*',contagem).eq('status','previsto').in('recorrente_id',autos.map(r=>r.id)).lte('data',HOJE)));
     const atualizar=data.filter(x=>{const r=autos.find(r=>r.id===x.recorrente_id),mes=x.ref_mes||x.data.slice(0,7);return r&&mes>=r.inicio&&(!r.fim||mes<=r.fim)}).map(x=>op('lancamentos','update',x.cartao_id?{status:'comprometido',data_caixa:null}:{status:'pago',data_caixa:x.data},{id:x.id,status:'previsto'}));
     // Blocos independentes: cada ocorrência é confirmada inteira e não duplica em outro aparelho.
     for(let k=0;k<atualizar.length;k+=500){const resultado=await transacao(atualizar.slice(k,k+500));n+=resultado.reduce((s,a)=>s+a.length,0)}
@@ -1294,7 +1297,7 @@ function vLivre(){
 async function carregarRetro(ano){
   const versao=S._retroV||0;S._retroC=S._retroC||{};if(S._retroC[ano])return S._retroC[ano];
   const promessa=(async()=>{try{
-    const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').gte('data',ano+'-01-01').lt('data',(Number(ano)+1)+'-01-01')));
+    const {data}=conferirLeitura(await lerTodos((contagem)=>sb.from('lancamentos').select('*',contagem).gte('data',ano+'-01-01').lt('data',(Number(ano)+1)+'-01-01')));
     if(versao!==(S._retroV||0))return false;
     S.retro[ano]=data.filter(x=>x.status!=='previsto'&&x.status!=='cancelado').map(deLinha);if(S.view==='retro')render();return true;
   }catch(e){toast('Não deu para carregar o ano. Tente atualizar novamente.');return false}
@@ -1563,7 +1566,7 @@ function ligarOrcamento(){
 async function carregarHist(){
   if(S._histC)return S._histProm;S._histC=true;const v0=S._histV=(S._histV||0)+1;
   S._histProm=(async()=>{try{
-    const {data}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*')));
+    const {data}=conferirLeitura(await lerTodos((contagem)=>sb.from('lancamentos').select('*',contagem)));
     if(v0!==S._histV)return false;
     S.hist=data.map(x=>({...x,valor:Number(x.valor)}));if(['relmes','patrimonio'].includes(S.view))render();return true;
   }catch(e){toast('Não deu para carregar o histórico. Tente atualizar novamente.');return false}
@@ -2626,7 +2629,7 @@ function modalRecorrente(r){
     const reg={descricao,valor,dia,categoria:sel('cat'),auto:sel('como')==='auto',ativa:sel('ativa')!=='0'};
     if(r.tipo==='gasto'&&S.temV10){const meio=sel('meio')||'pix';reg.meio=meio;reg.cartao_id=meio==='credito'?(sel('cartao')||null):null;if(meio==='credito'&&!reg.cartao_id)return 'Escolham o cartão.'}
     if(S.temV11){if(sel('dono'))reg.dono=sel('dono');const rest=Number(val('mRest')||0);if(!Number.isInteger(rest)||rest<0||rest>120)return 'Informe de 1 a 120 cobranças, ou deixe em branco.';reg.fim=rest?addMes(proxCobranca(r),rest-1):null}
-    const {data:linhas}=conferirLeitura(await lerTodos(()=>sb.from('lancamentos').select('*').eq('recorrente_id',r.id).eq('status','previsto')));
+    const {data:linhas}=conferirLeitura(await lerTodos((contagem)=>sb.from('lancamentos').select('*',contagem).eq('recorrente_id',r.id).eq('status','previsto')));
     const operacoes=[op('recorrentes','update',reg,{id:r.id,valor:r.valor,dia:r.dia},1)];
     for(const p of linhas){
       const mes=p.ref_mes||p.data.slice(0,7),d=diaNoMes(mes,dia);
@@ -2847,7 +2850,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='32';
+const VERSAO='33';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
