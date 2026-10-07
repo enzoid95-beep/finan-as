@@ -14,7 +14,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="stylesheet" href="fontes-ui.css?v=56">
+<link rel="stylesheet" href="fontes-ui.css?v=57">
 <style>
 /* Barlow, Barlow Condensed e Saira Condensed (licença SIL OFL 1.1) embutidas no próprio site: nenhum arquivo externo. */
 
@@ -1338,18 +1338,18 @@ body.priv .rs{filter:blur(8px)!important}
 </head>
 <body>
 
-<div class="login" id="login" hidden>
+<div class="login" id="login">
   <div class="login-card panel">
     <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="1000" height="219"></div>
 
     <div id="lForm">
-      <button class="btn-google" id="lGoogle" type="button">
+      <button class="btn-google" id="lGoogle" type="button" disabled>
         <span>Entrar com Google</span></button>
       <div class="ou"><span>ou entre com e-mail e senha</span></div>
       <label class="lbl">E-mail<input class="field" id="lEmail" type="email" autocomplete="email" inputmode="email" placeholder="voce@exemplo.com"></label>
       <label class="lbl">Senha<input class="field" id="lSenha" type="password" autocomplete="current-password" placeholder="Sua senha"></label>
-      <button class="btn" id="lEntrar" type="button">Entrar</button>
-      <button class="lnk lnk-c" id="lEsqueci" type="button">Primeiro acesso com senha ou esqueceu a senha?</button>
+      <button class="btn" id="lEntrar" type="button" disabled>Entrar</button>
+      <button class="lnk lnk-c" id="lEsqueci" type="button" disabled>Primeiro acesso com senha ou esqueceu a senha?</button>
     </div>
 
     <div id="lReset" hidden>
@@ -1374,7 +1374,7 @@ body.priv .rs{filter:blur(8px)!important}
       <button class="lnk lnk-c" id="lVoltarMfa" type="button">Entrar com outra conta</button>
     </div>
 
-    <div class="msg" id="lMsg" role="status"></div>
+    <div class="msg" id="lMsg" role="status">Carregando o dashboard…</div>
     <p class="ver-login" id="verLogin"></p>
     <button class="lnk lnk-c" id="lSair" hidden>Entrar com outra conta</button>
   </div>
@@ -1412,8 +1412,8 @@ body.priv .rs{filter:blur(8px)!important}
 
 <dialog id="dlg"><div class="modal-window"><button class="mdl-x" id="mdlX" type="button" aria-label="Fechar" title="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="mdl" id="mdl"></div></div></dialog>
 
-<script src="supabase.js?v=56" defer></script>
+<script src="supabase.js?v=57" defer></script>
 <script src="config.js" defer></script>
-<script src="app.js?v=56" defer></script>
+<script src="app.js?v=57" defer></script>
 </body>
 </html>

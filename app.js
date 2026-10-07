@@ -2850,7 +2850,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='33';
+const VERSAO='34';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
@@ -3014,7 +3014,7 @@ let recuperando=/type=recovery/.test(location.hash+location.search);
 function msgLogin(t,erro){const m=$('lMsg');m.textContent=t||'';m.classList.toggle('erro-l',!!erro)}
 const MODOS_LOGIN=['lForm','lReset','lNova','lMfa'];
 function modoLogin(m){MODOS_LOGIN.forEach(id=>$(id).hidden=id!==m);msgLogin('')}
-function telaLogin(msg,semForm){$('app').hidden=true;$('login').hidden=false;modoLogin(semForm?'':'lForm');if(semForm)MODOS_LOGIN.forEach(id=>$(id).hidden=true);msgLogin(msg||'',!!semForm)}
+function telaLogin(msg,semForm){for(const id of ['lGoogle','lEntrar','lEsqueci'])$(id).disabled=!sb;$('app').hidden=true;$('login').hidden=false;modoLogin(semForm?'':'lForm');if(semForm)MODOS_LOGIN.forEach(id=>$(id).hidden=true);msgLogin(msg||'',!!semForm)}
 function erroPT(e){const m=(e&&e.message)||'';
   if(/invalid totp|totp code|invalid.*(mfa|code)/i.test(m))return 'Código incorreto ou vencido. Use o código atual do aplicativo (ele muda a cada 30 segundos) e confira se a hora do celular está automática.';
   if(/enabled|not.*support/i.test(m)&&/mfa|factor|totp/i.test(m))return 'A verificação em 2 etapas está desligada no Supabase. Ative em Authentication > Multi-Factor.';
@@ -3119,14 +3119,15 @@ async function sair(){fechar();try{const {error}=await sb.auth.signOut();if(erro
 $('lSair').addEventListener('click',sair);
 
 (async()=>{
-  if(!window.supabase||!CFG.url||!CFG.anonKey||CFG.url.includes('COLE_AQUI')){telaLogin('Falta configurar o arquivo config.js com o endereço e a chave do Supabase.',true);return}
+  if(!window.supabase){telaLogin('O arquivo supabase.js não foi carregado. Confira os arquivos publicados neste repositório.',true);return}
+  if(!CFG.url||!CFG.anonKey||CFG.url.includes('COLE_AQUI')){telaLogin('Falta configurar o arquivo config.js com o endereço e a chave do Supabase.',true);return}
   sb=window.supabase.createClient(CFG.url.replace(/\/(rest|auth)\/v1\/?$/,'').replace(/\/$/,''),CFG.anonKey);
   sb.auth.onAuthStateChange((ev,s)=>{
     if(ev==='PASSWORD_RECOVERY'){recuperando=true;$('app').hidden=true;$('login').hidden=false;modoLogin('lNova');return}
     if(ev==='SIGNED_OUT'){geracaoAuth++;clearTimeout(timer);S.me='';S.itens=[];S.card=[];S.cardTodos=[];S.metas=[];S.movMetas=[];S.cartoes=[];S.recorrentes=[];S.dividas=[];S.pagDiv=[];S.desejos=[];S.invest=[];S.hist=null;S._histV=(S._histV||0)+1;S.retro={};S._retroC={};S._retroV=(S._retroV||0)+1;S.saldoInicial=0;S.movCaixa=0;pedidosPendentes.clear();S._movCarregado=false;S._ultimaAssMov=undefined;if(canal){sb.removeChannel(canal);canal=null}fechar();$('view').innerHTML='';telaLogin();return}
     if(ev==='SIGNED_IN'&&s&&!recuperando&&$('app').hidden&&$('lSair').hidden)setTimeout(()=>aposLogin(s),0);
   });
-  const {data:{session}}=await sb.auth.getSession();
+  const {data:inicio,error:erroInicial}=await sb.auth.getSession();if(erroInicial)throw erroInicial;const session=inicio?.session;
   if(recuperando&&session){$('app').hidden=true;$('login').hidden=false;modoLogin('lNova');return}
   const erroUrl=new URLSearchParams(location.hash.slice(1)+'&'+location.search.slice(1)).get('error_description');
   if(session)aposLogin(session);else telaLogin(erroUrl?'Não deu para entrar: '+erroUrl.replace(/\+/g,' '):'');
