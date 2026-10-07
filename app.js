@@ -98,7 +98,7 @@ let hojeD=new Date();
 let HOJE=`${hojeD.getFullYear()}-${pad(hojeD.getMonth()+1)}-${pad(hojeD.getDate())}`;
 let MES_ATUAL=HOJE.slice(0,7);
 let ANO_ATUAL=hojeD.getFullYear();
-function atualizarHoje(){hojeD=new Date();HOJE=`${hojeD.getFullYear()}-${pad(hojeD.getMonth()+1)}-${pad(hojeD.getDate())}`;MES_ATUAL=HOJE.slice(0,7);ANO_ATUAL=hojeD.getFullYear()}
+function atualizarHoje(){const anterior=MES_ATUAL;hojeD=new Date();HOJE=`${hojeD.getFullYear()}-${pad(hojeD.getMonth()+1)}-${pad(hojeD.getDate())}`;MES_ATUAL=HOJE.slice(0,7);ANO_ATUAL=hojeD.getFullYear();if(anterior!==MES_ATUAL)definirMesHistoricoCartoes(MES_ATUAL)}
 function dataValida(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const [y,m,d]=s.split('-').map(Number);return y>=1900&&y<=9999&&m>=1&&m<=12&&d>=1&&d<=ultimoDia(s.slice(0,7))}
 function mesValido(s){return /^\d{4}-(0[1-9]|1[0-2])$/.test(s)}
 function addMes(m,d){const [y,mm]=m.split('-').map(Number);const x=new Date(y,mm-1+d,1);return `${x.getFullYear()}-${pad(x.getMonth()+1)}`}
@@ -143,7 +143,7 @@ const CFG=window.CAIXA_CONFIG||{};
 let sb=null,canal=null,timer=null,gerando=false,instalarEvt=null;
 const S={fTag:'',ultima:{},mes:MES_ATUAL,ano:ANO_ATUAL,view:'geral',itens:[],movMetas:[],metas:[],contas:[],limites:{},mesadas:{},nomes:{},me:'',
   ordDes:(()=>{try{return localStorage.getItem('pf-ord-des')||'prioridade'}catch(e){return 'prioridade'}})(),fCat:'',fOrd:(()=>{try{return localStorage.getItem('pf-ord')||'recente'}catch(e){return 'recente'}})(),fBusca:'',temV2:true,temV4:true,saldoInicial:0,movCaixa:0,base:[],cartoes:[],recorrentes:[],dividas:[],desejos:[],orc:{},
-  pagPrev:{},temV12:false,patrIni:'',temPatr:false,rendaMedia:0,temRenda:false,fut:[],card:[],fech:{},ccF:{cartao:'',mes:'',ano:''},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
+  pagPrev:{},temV12:false,patrIni:'',temPatr:false,rendaMedia:0,temRenda:false,fut:[],card:[],fech:{},ccF:{cartao:'',mes:MES_ATUAL.slice(5,7),ano:MES_ATUAL.slice(0,4)},pagDiv:[],invest:[],temV5:true,invAtivo:null,retro:{},calDia:null,abaDesejos:'aberto',sim:{nome:'',valor:'',forma:'vista',n:10},priv:false};
 try{S.priv=localStorage.getItem('pf-priv')==='1'}catch(e){}
 
 /* ================= carregamento ================= */
@@ -516,7 +516,7 @@ function navHTML(){
   htmlSeMudou($('privTop'),svg(S.priv?'olhoF':'olho'));
   document.body.classList.toggle('priv',S.priv);
 }
-function ir(v){v=ALIAS[v]||v;if(!VIEWS.some(x=>x.id===v))v='geral';S.view=v;S.ultima[grupoDe(v).id]=v;if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);render();window.scrollTo(0,0)}
+function ir(v){v=ALIAS[v]||v;if(!VIEWS.some(x=>x.id===v))v='geral';if(v==='cartoes')definirMesHistoricoCartoes();S.view=v;S.ultima[grupoDe(v).id]=v;if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);render();window.scrollTo(0,0)}
 function irGrupo(gid){const g=GRUPOS.find(x=>x.id===gid)||GRUPOS[0];ir(S.ultima[gid]||g.views[0])}
 function subAbas(){const g=grupoDe(S.view);if(g.views.length<2)return '';
   return `<div class="subabas" role="tablist" aria-label="${esc(g.nome)}"><span class="sub-g">${svg(g.ic)}${esc(g.nome)}</span>${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);return `<button role="tab" data-go="${id}" aria-selected="${S.view===id}">${esc(v.nome)}</button>`}).join('')}</div>`}
@@ -861,6 +861,11 @@ function vCartoes(){
   </div>`;
 }
 /* histórico de todos os lançamentos dos cartões, por fatura */
+/* Cada abertura do histórico começa no mês/ano corrente; o cartão escolhido é preservado. */
+function definirMesHistoricoCartoes(mes){
+  const agora=new Date(),ref=mes||`${agora.getFullYear()}-${pad(agora.getMonth()+1)}`;
+  S.ccF={...S.ccF,mes:ref.slice(5,7),ano:ref.slice(0,4)};
+}
 function itensHistoricoCartoes(){
   const f=S.ccF;
   return S.card.filter(x=>{const ref=refDoItem(x);return (!f.cartao||x.cartao_id===f.cartao)&&(!f.ano||ref.slice(0,4)===f.ano)&&(!f.mes||ref.slice(5,7)===f.mes)});
@@ -2842,7 +2847,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='31';
+const VERSAO='32';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
@@ -2998,7 +3003,7 @@ document.addEventListener('click',async e=>{
     case 'sair':await sair();break;
   }}catch(e){toast('Não deu para concluir: '+(e?.message||'tente novamente.'))}finally{a.disabled=false}
 });
-window.addEventListener('hashchange',()=>{let v=location.hash.slice(1);v=ALIAS[v]||v;if(VIEWS.some(x=>x.id===v)&&v!==S.view){S.view=v;S.ultima[grupoDe(v).id]=v;render()}});
+window.addEventListener('hashchange',()=>{let v=location.hash.slice(1);v=ALIAS[v]||v;if(VIEWS.some(x=>x.id===v)&&v!==S.view){if(v==='cartoes')definirMesHistoricoCartoes();S.view=v;S.ultima[grupoDe(v).id]=v;render()}});
 
 /* ================= login ================= */
 const URL_SITE=location.origin+location.pathname;
