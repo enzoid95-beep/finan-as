@@ -50,6 +50,10 @@ const ICON={
   baixar:'<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>',
   instalar:'<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3M10 18.5h4"/>',
   sair:'<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
+  transf:'<path d="M4 8h13M13 4l4 4-4 4"/><path d="M20 16H7M11 12l-4 4 4 4"/>',
+  relmes:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 17v-3M12 17v-5M15 17v-2"/>',
+  patrimonio:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M6 7V5.5A1.5 1.5 0 0 1 7.5 4H18v3"/><path d="M16 13.5h2.5"/>',
+  reserva:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9"/>',
   escudo:'<path d="M12 3l8 3v6c0 4.5-3.2 8.3-8 9-4.8-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   del:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
@@ -1794,6 +1798,7 @@ function render(animarMovimento=false,reutilizar=false){
 function ligarTabelas(root){
   root.querySelectorAll('.tbl-wrap table').forEach(table=>{
     const headers=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+    const assinatura=headers.join('|');table.classList.toggle('tb-lanc',assinatura==='Data|Descrição|Categoria|Quem lançou|Valor|');table.classList.toggle('tb-mov',assinatura==='Data|Movimento|Origem → destino|Valor|');table.classList.toggle('tb-inv',assinatura.startsWith('Categoria|Produto|'));
     table.querySelectorAll('tbody tr').forEach(row=>[...row.children].forEach((cell,i)=>{cell.dataset.label=headers[i]||''}));
   });
 }
@@ -1927,7 +1932,7 @@ function modalCardDetalhe(snapshot){
 let onSave=null;
 function modal(html,salvar){
   S.fatAtiva=false;limparSelects($('mdl'));$('mdl').innerHTML=html;onSave=salvar||null;fecharDP();fecharSel();soNumeros($('mdl'));melhorarDatas($('mdl'));melhorarSelects($('mdl'));melhorarArquivos($('mdl'));layoutModal();if(!$('dlg').open)$('dlg').showModal();$('dlg').scrollTop=0;marcarValores($('mdl'));ligarTabelas($('mdl'));ligarCardsDetalhes($('mdl'));caberModal();
-  const f=$('mdl').querySelector('input.big,input:not([type=checkbox])');if(f&&salvar)setTimeout(()=>f.focus(),40);
+  const f=$('mdl').querySelector('input.big,input:not([type=checkbox])');if(f&&salvar)setTimeout(()=>f.focus(),40);else if(document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('mdl-x'))document.activeElement.blur();
   $('mdl').querySelectorAll('.seg,.chips').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!g.contains(b))return;g.querySelectorAll(':scope>button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));if(g.dataset.onchange&&window[g.dataset.onchange])window[g.dataset.onchange](b)}));
 }
 function fechar(){S.fatAtiva=false;S.fatVoltar=null;if($('dlg').open)$('dlg').close()}
@@ -2800,7 +2805,7 @@ function modalMesadas(){
 }
 /* ---------- menu "mais", exportar, instalar ---------- */
 function modalMais(){
-  modal(`<h2>Menu</h2>${GRUPOS.map(g=>`<div class="mais-g"><div class="side-title">${esc(g.nome)}</div><div class="mais">${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);return `<button data-go="${id}" ${S.view===id?'aria-current="page"':''}>${svg(id==='geral'?'geral':id==='reserva'?'metas':id==='contas'?'contas':id)}${esc(v.nome)}</button>`}).join('')}</div></div>`).join('')}
+  modal(`<h2>Menu</h2>${GRUPOS.map(g=>`<div class="mais-g"><div class="side-title">${esc(g.nome)}</div><div class="mais">${g.views.map(id=>{const v=VIEWS.find(x=>x.id===id);return `<button data-go="${id}" ${S.view===id?'aria-current="page"':''}>${svg(ICON[id]?id:'mais')}${esc(v.nome)}</button>`}).join('')}</div></div>`).join('')}
     <div class="side-title">Ferramentas</div>
     <div class="mais"><button data-act="priv">${svg(S.priv?'olhoF':'olho')}${S.priv?'Mostrar valores':'Esconder valores'}</button><button data-act="exportar">${svg('baixar')}Exportar</button>${standalone()?'':`<button data-act="instalar">${svg('instalar')}Instalar app</button>`}
     <button data-act="seguranca">${svg('escudo')}Segurança</button><button data-act="ajustar-caixa">💵 Ajustar saldo</button><button data-act="sair">${svg('sair')}Sair</button></div>
@@ -2850,7 +2855,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='34';
+const VERSAO='35';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){

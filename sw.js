@@ -1,8 +1,8 @@
 // Controle 360 particular — cache do site separado dos outros perfis.
 const RAIZ = self.registration.scope;
 const PREFIXO = 'controle360-' + encodeURIComponent(RAIZ) + '-';
-const CACHE = PREFIXO + 'v57';
-const ARQUIVOS = ['./index.html', './app.js?v=57', './supabase.js?v=57', './config.js', './fontes-ui.css?v=57', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './logo-horizontal.png'];
+const CACHE = PREFIXO + 'v58';
+const ARQUIVOS = ['./index.html', './app.js?v=58', './supabase.js?v=58', './config.js', './fontes-ui.css?v=58', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './logo-horizontal.png'];
 const ESTATICOS = new Set(ARQUIVOS.filter(a => !['./index.html', './config.js'].includes(a)).map(a => new URL(a, RAIZ).href));
 // Excel é carregado e guardado somente quando a exportação for utilizada.
 ESTATICOS.add(new URL('./xlsx.full.min.js', RAIZ).href);
