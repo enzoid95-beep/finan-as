@@ -14,7 +14,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="stylesheet" href="fontes-ui.css?v=58">
+<link rel="preload" as="image" href="logo-horizontal.png">
+<link rel="stylesheet" href="fontes-ui.css?v=59">
 <style>
 /* Barlow, Barlow Condensed e Saira Condensed (licença SIL OFL 1.1) embutidas no próprio site: nenhum arquivo externo. */
 
@@ -1383,13 +1384,21 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
   /* evita o zoom automático do iPhone ao tocar num campo */
   input.field,select.field,textarea.field,.sel-btn,.dp-btn,.toolbar .field,#fBusca{font-size:16px}
 }
+
+/* ================= abertura do site: logo + indicador, sem o formulário de login (v36) ================= */
+.login.carregando #lForm{opacity:0;pointer-events:none;max-height:0;overflow:hidden;margin:0;animation:revelaLogin .01s linear 12s forwards}
+@keyframes revelaLogin{to{opacity:1;pointer-events:auto;max-height:700px}}
+.login.carregando #lMsg{display:block;text-align:center;color:var(--muted);font-size:14px;padding:4px 0 2px}
+.login.carregando #lMsg::before{content:"";display:block;width:38px;height:38px;margin:4px auto 14px;border-radius:50%;border:3px solid rgba(240,180,30,.22);border-top-color:#f0b41e;animation:giroLogin .9s linear infinite}
+@keyframes giroLogin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.login.carregando #lMsg::before{animation:none}}
 </style>
 </head>
 <body>
 
-<div class="login" id="login">
+<div class="login carregando" id="login">
   <div class="login-card panel">
-    <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="1000" height="219"></div>
+    <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="800" height="175" fetchpriority="high" decoding="async"></div>
 
     <div id="lForm">
       <button class="btn-google" id="lGoogle" type="button" disabled>
@@ -1423,7 +1432,7 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
       <button class="lnk lnk-c" id="lVoltarMfa" type="button">Entrar com outra conta</button>
     </div>
 
-    <div class="msg" id="lMsg" role="status">Carregando o dashboard…</div>
+    <div class="msg" id="lMsg" role="status">Abrindo seu dashboard…</div>
     <p class="ver-login" id="verLogin"></p>
     <button class="lnk lnk-c" id="lSair" hidden>Entrar com outra conta</button>
   </div>
@@ -1431,7 +1440,7 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
 
 <div class="app" id="app" hidden>
   <aside class="side" aria-label="Navegação">
-    <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="1000" height="219"></div>
+    <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="800" height="175" fetchpriority="high" decoding="async"></div>
     <button class="btn novo-side" data-act="novo-global"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Novo</button>
     <button class="btn ghost busca-side" data-act="busca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Buscar</button>
     <nav id="sideNav"></nav>
@@ -1448,7 +1457,7 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
   </aside>
   <main class="main">
     <div class="topbar">
-      <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="1000" height="219"></div>
+      <div class="brand brand-logo"><img src="logo-horizontal.png" alt="Controle 360" width="800" height="175" fetchpriority="high" decoding="async"></div>
       <button class="ic ic-novo" data-act="novo-global" aria-label="Novo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       <button class="ic" data-act="busca" aria-label="Buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
       <button class="ic" id="privTop" data-act="priv" aria-label="Esconder ou mostrar valores"></button>
@@ -1461,8 +1470,8 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
 
 <dialog id="dlg"><div class="modal-window"><button class="mdl-x" id="mdlX" type="button" aria-label="Fechar" title="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="mdl" id="mdl"></div></div></dialog>
 
-<script src="supabase.js?v=58" defer></script>
+<script src="supabase.js?v=59" defer></script>
 <script src="config.js" defer></script>
-<script src="app.js?v=58" defer></script>
+<script src="app.js?v=59" defer></script>
 </body>
 </html>

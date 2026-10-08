@@ -2855,7 +2855,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='35';
+const VERSAO='36';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
@@ -3018,7 +3018,7 @@ const URL_SITE=location.origin+location.pathname;
 let recuperando=/type=recovery/.test(location.hash+location.search);
 function msgLogin(t,erro){const m=$('lMsg');m.textContent=t||'';m.classList.toggle('erro-l',!!erro)}
 const MODOS_LOGIN=['lForm','lReset','lNova','lMfa'];
-function modoLogin(m){MODOS_LOGIN.forEach(id=>$(id).hidden=id!==m);msgLogin('')}
+function modoLogin(m){$('login').classList.remove('carregando');MODOS_LOGIN.forEach(id=>$(id).hidden=id!==m);msgLogin('')}
 function telaLogin(msg,semForm){for(const id of ['lGoogle','lEntrar','lEsqueci'])$(id).disabled=!sb;$('app').hidden=true;$('login').hidden=false;modoLogin(semForm?'':'lForm');if(semForm)MODOS_LOGIN.forEach(id=>$(id).hidden=true);msgLogin(msg||'',!!semForm)}
 function erroPT(e){const m=(e&&e.message)||'';
   if(/invalid totp|totp code|invalid.*(mfa|code)/i.test(m))return 'Código incorreto ou vencido. Use o código atual do aplicativo (ele muda a cada 30 segundos) e confira se a hora do celular está automática.';
