@@ -759,6 +759,58 @@ function toolbar(cats){
     <select class="field" id="fCat"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${c.id}" ${S.fCat===c.id?'selected':''}>${c.em} ${esc(c.nome)}</option>`).join('')}</select>
     <select class="field" id="fOrd" aria-label="Ordenar">${ORDENS.map(([v,t])=>`<option value="${v}" ${S.fOrd===v?'selected':''}>${t}</option>`).join('')}</select>${(()=>{const ts=[...new Set(doMes(S.mes).flatMap(i=>i.tags||[]))].sort();return ts.length?`<select class="field" id="fTag"><option value="">Todas as tags</option>${ts.map(t=>`<option value="${esc(t)}" ${S.fTag===t?'selected':''}>#${esc(t)}</option>`).join('')}</select>`:''})()}</div>`;
 }
+/* ================= pizza dos gastos por categoria (mesmo visual da pizza dos investimentos) ================= */
+function dadosPizzaGastos(r,pc){
+  const gs=r.ef.filter(i=>i.tipo==='gasto');
+  const fatias=Object.entries(pc).filter(([id,v])=>v>0).map(([id,v])=>{
+    const c=CAT[id]||{em:'•',nome:id},its=gs.filter(i=>i.categoria===id),pp={};
+    its.forEach(i=>{const k=descVis(i)||c.nome;pp[k]=cent((pp[k]||0)+i.valor)});
+    const idx=id==='livre'?20:CATS_G.findIndex(x=>x.id===id);
+    return {id,nome:c.nome,em:c.em,valor:v,qtd:its.length,cor:ORC_CORES[idx]||'#94a3b8',partes:Object.entries(pp).sort((x,y)=>y[1]-x[1])};
+  }).sort((x,y)=>y.valor-x.valor||x.nome.localeCompare(y.nome));
+  const total=fatias.reduce((s,f)=>s+f.valor,0);
+  /* percentuais com 1 casa que sempre somam 100% (maior resto), para a legenda não fechar em 100,2% */
+  if(total>0){const br=fatias.map(f=>f.valor/total*1000),base=br.map(Math.floor);let resto=1000-base.reduce((a,b)=>a+b,0);
+    br.map((b,i)=>[b-base[i],i]).sort((x,y)=>y[0]-x[0]).slice(0,resto).forEach(([,i])=>base[i]++);
+    fatias.forEach((f,i)=>{f.pct=(base[i]/10).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%'})}
+  return {fatias,total};
+}
+function pizzaGastosHTML(r,pc){
+  const {fatias,total}=dadosPizzaGastos(r,pc);S._fatiasG=fatias;S._totalG=total;
+  if(!fatias.length||!(total>0))return '';
+  return `<div class="panel inv-distribution gastos-pizza" style="margin-bottom:16px"><h2>Divisão dos gastos</h2><p class="sub">Para onde foi o dinheiro de ${esc(nomeMes(S.mes))}. Passe o mouse (ou toque) em uma fatia para ver os detalhes</p>
+    <div class="inv-wrap${fatias.length>6?' longa':''}">
+      <div class="pie-box" id="pieBoxG">${pizzaSVG(fatias,total,{prefix:'g-',label:'Divisão dos gastos por categoria'})}<div class="pie-tip" id="pieTipG" hidden></div></div>
+      <div class="leg">${fatias.map((f,i)=>`<div class="leg-row" data-fatia="${i}"><i style="background:linear-gradient(135deg,${mixHex(f.cor,'#ffffff',.3)},${f.cor})"></i><span>${f.em} ${esc(f.nome)}<small class="mut"> · ${plural(f.qtd,'lançamento','lançamentos')}</small></span><b class="neg m">${R(f.valor)}</b><small>${f.pct}</small></div>`).join('')}
+        <div class="leg-row tot"><i style="background:transparent"></i><span><b style="font:inherit;font-weight:700">Total</b></span><b class="neg m">${R(total)}</b><small>100%</small></div></div>
+    </div>
+  </div>`;
+}
+function ligarPizzaGastos(){
+  const box=$('pieBoxG');if(!box)return;const tip=$('pieTipG'),fatias=S._fatiasG||[],tot=S._totalG||0;
+  const els=[...$('view').querySelectorAll('.gastos-pizza [data-fatia]')];
+  const ativar=(i,ev)=>{
+    els.forEach(el=>el.classList.toggle('on',el.dataset.fatia===String(i)));
+    box.classList.toggle('ativo',i!==null);
+    const f=i===null?null:fatias[i];if(!f||!tot){tip.hidden=true;return}
+    const din=v=>S.priv?'R$ •••':R(v);
+    tip.innerHTML=`<div class="pt-h"><i style="background:${f.cor}"></i>${f.em} ${esc(f.nome)}</div><div class="pt-v neg">${din(f.valor)}</div><div class="pt-p">${f.pct} dos gastos · ${plural(f.qtd,'lançamento','lançamentos')}</div>${f.partes.length>1?`<div class="pt-l">${f.partes.slice(0,5).map(([k,v])=>`<span>${esc(k)}</span><b class="neg">${S.priv?'•••':R(v)}</b>`).join('')}${f.partes.length>5?`<span class="mut">+ ${f.partes.length-5} outros</span><b></b>`:''}</div>`:''}`;
+    tip.hidden=false;
+    const rc=box.getBoundingClientRect();
+    if(ev&&ev.clientX&&box.contains(ev.target)){tip.style.left=(ev.clientX-rc.left)+'px';tip.style.top=(ev.clientY-rc.top)+'px'}
+    else{tip.style.left='50%';tip.style.top='18%'}
+  };
+  els.forEach(el=>{
+    const i=Number(el.dataset.fatia);
+    /* mouse: passa por cima; toque: um toque abre e outro toque fecha (o toque também dispara "mouseenter", por isso ponteiros) */
+    el.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')ativar(i,e)});
+    el.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&box.contains(e.target))ativar(i,e)});
+    el.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')ativar(null)});
+    el.addEventListener('click',e=>{e.stopPropagation();ativar(e.pointerType==='mouse'?i:(el.classList.contains('on')?null:i),e)});
+  });
+  S._ocultarPizzaG=()=>ativar(null);
+  if(!S._pzGFora){S._pzGFora=true;document.addEventListener('click',()=>{if(S._ocultarPizzaG)S._ocultarPizzaG()})}
+}
 function vGastos(){
   const r=resumo(S.mes),ant=resumo(addMes(S.mes,-1)),lista=filtrar('gasto'),pc=porCategoria(r.it);
   const dias=S.mes===MES_ATUAL?hojeD.getDate():ultimoDia(S.mes);
@@ -768,6 +820,7 @@ function vGastos(){
   const aPagarIt=gs.filter(i=>i.cartao_id&&i.status==='comprometido'),aPagar=soma(aPagarIt),jaSaiu=r.gastos-aPagar;
   const datasPag=[...new Set(aPagarIt.map(i=>{const cd=S.cartoes.find(c=>c.id===i.cartao_id);return cd&&i.fatura_mes?(pagPrevisto(cd,i.fatura_mes)||vencFatura(cd,i.fatura_mes)):''}).filter(Boolean))].sort();
   const cats=Object.entries(pc).sort((a,b)=>b[1]-a[1]);
+  const pizzaG=pizzaGastosHTML(r,pc);
   return head('Gastos','Tudo que vocês gastaram no mês, independentemente da forma de pagamento.',BTN('novo','Novo gasto','data-tipo="gasto"'))+`
   <div class="tiles">
     <div class="tile"><div class="k">Total gasto</div><div class="vrow"><div class="v neg">${R(r.gastos)}</div>${delta(r.gastos,ant.gastos,true)}</div><div class="d">${plural(gs.length,'lançamento','lançamentos')}${aPagar>0?`<br>${R0(jaSaiu)} já saíram do caixa · <span class="ref">${R0(aPagar)} a pagar</span>`:''}</div></div>
@@ -775,6 +828,7 @@ function vGastos(){
     <div class="tile"><div class="k">Maior gasto</div><div class="v neg">${maior?R(maior.valor):'—'}</div><div class="d">${maior?esc(descVis(maior)):'Nenhum gasto'}</div></div>
     <div class="tile"><div class="k">A ser pago no cartão</div><div class="v ${aPagar>0?'ref':'zero'}">${R(aPagar)}</div><div class="d">${aPagar>0?`já é gasto, mas o caixa só muda ao pagar a fatura${datasPag.length?' · pagamento '+(datasPag.length>1?'a partir de ':'previsto em ')+dataBR(datasPag[0]):''}`:`nada pendente · ${R0(noCartao)} no cartão, tudo pago`}</div></div>
   </div>
+  ${pizzaG}
   <div class="grid g21">
     <div class="panel"><h2>Lançamentos</h2><p class="sub">Toque no lápis para corrigir um lançamento.</p>${toolbar(CATS_G)}${tabela(lista,'gasto')}</div>
     <div class="panel"><div class="panel-head"><div><h2>Por categoria</h2><p class="sub">Participação no total</p></div><button class="lnk" data-go="orcamento">Orçamento</button></div>
@@ -1776,6 +1830,7 @@ function render(animarMovimento=false,reutilizar=false){
   ligarOrcamento();
   ligarPizza();
   ligarPizzaOrcamento();
+  ligarPizzaGastos();
   ligarBarras();
   ligarTabelas($('view'));
   ligarCardsDetalhes($('view'));
@@ -2855,7 +2910,7 @@ function instalar(){
     :`<p>No <b>Android</b>, abra no Chrome, toque no menu <b>⋮</b> e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p><p>No <b>computador</b>, no Chrome ou no Edge, clique no ícone de instalar que aparece no canto direito da barra de endereço.</p>`);
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instalarEvt=e});
-const VERSAO='36';
+const VERSAO='37';
 if($('verLogin'))$('verLogin').textContent='Versão '+VERSAO;
 /* atualização automática: quando sai uma versão nova, o site se recarrega sozinho (espera fechar a janela aberta, se houver) */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){

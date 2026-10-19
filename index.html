@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preload" as="image" href="logo-horizontal.png">
-<link rel="stylesheet" href="fontes-ui.css?v=59">
+<link rel="stylesheet" href="fontes-ui.css?v=60">
 <style>
 /* Barlow, Barlow Condensed e Saira Condensed (licença SIL OFL 1.1) embutidas no próprio site: nenhum arquivo externo. */
 
@@ -1392,6 +1392,14 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
 .login.carregando #lMsg::before{content:"";display:block;width:38px;height:38px;margin:4px auto 14px;border-radius:50%;border:3px solid rgba(240,180,30,.22);border-top-color:#f0b41e;animation:giroLogin .9s linear infinite}
 @keyframes giroLogin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.login.carregando #lMsg::before{animation:none}}
+
+/* ================= pizza dos gastos: valores em vermelho (saída), como manda a regra de cores ================= */
+.pt-v.neg{color:var(--neg)}
+.pt-l b.neg{color:var(--neg)}
+/* muitas categorias: a legenda fica mais alta que a pizza; então a pizza fica no topo e acompanha a rolagem */
+.gastos-pizza .inv-wrap.longa{align-items:start}
+.gastos-pizza .inv-wrap.longa .pie-box{position:sticky;top:24px}
+@media (max-width:1000px){.gastos-pizza .inv-wrap.longa .pie-box{position:relative;top:auto}}
 </style>
 </head>
 <body>
@@ -1470,8 +1478,8 @@ button,[data-act],a{-webkit-tap-highlight-color:transparent;touch-action:manipul
 
 <dialog id="dlg"><div class="modal-window"><button class="mdl-x" id="mdlX" type="button" aria-label="Fechar" title="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="mdl" id="mdl"></div></div></dialog>
 
-<script src="supabase.js?v=59" defer></script>
+<script src="supabase.js?v=60" defer></script>
 <script src="config.js" defer></script>
-<script src="app.js?v=59" defer></script>
+<script src="app.js?v=60" defer></script>
 </body>
 </html>
